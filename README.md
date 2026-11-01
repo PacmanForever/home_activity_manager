@@ -68,9 +68,9 @@ The integration works on supported Home Assistant versions; displaying its local
 
 ## Configuration
 
-Each configured device has a separate config entry. Its profile and any available activity mode are fixed after setup and shown when editing; create a new device to change them. Setup asks for:
+Each general category has one config entry. Add, edit, or remove appliances from that category's options; each appliance keeps its own name, profile, activity mode, sensors, actions, and runtime state. A profile and its activity mode are fixed after setup. Existing per-appliance entries are consolidated automatically during migration, preserving appliance IDs, entity IDs, registry customizations, and runtime state. Setup asks for:
 
-In Home Assistant's device registry, each general appliance category has one shared parent device, such as "Thermostat". All category groups appear as soon as at least one Home Activity Manager appliance is configured, even when a category has no appliances yet. Each appliance remains an independent child device with its own entities, runtime state, and configuration. Air conditioners and climate-based thermostats are children of the same Thermostat group. The category groups remain while any Home Activity Manager appliance is configured and are removed when the last appliance is deleted.
+In Home Assistant's device registry, each configured general category has one shared parent device, such as "Thermostat", with its configured appliances as child devices. A category appears when its first appliance is added and disappears when its last appliance is removed. Air conditioners and climate-based thermostats share the Thermostat group.
 
 1. A device profile, name, and activity mode when that profile offers a choice.
 2. The required activity source and any optional compatible sensors or controls. A refrigerator requires a door contact; a mailbox requires a separate main-door contact; opening can optionally include a lock.

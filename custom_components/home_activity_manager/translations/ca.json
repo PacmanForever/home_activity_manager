@@ -8,7 +8,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Nom i tipus d’electrodomèstic",
+        "title": "Categoria i nom de l’electrodomèstic",
         "data": {
           "name": "Nom que es mostrarà per a aquest electrodomèstic",
           "appliance_type": "Tipus d’electrodomèstic"
@@ -74,14 +74,25 @@
   "options": {
     "step": {
       "init": {
-        "title": "Nom i tipus d’electrodomèstic",
+        "title": "Gestiona els aparells",
         "data": {
+          "appliance_action": "Acció",
           "name": "Nom que es mostrarà per a aquest electrodomèstic",
           "appliance_type": "Tipus d’electrodomèstic",
           "activity_mode": "Modalitat de detecció d'activitat"
         },
         "data_description": {"activity_mode": "Només aquest sensor determina l'activitat de l'aparell."}
       },
+      "select_appliance": {"title": "Selecciona l’aparell", "data": {"appliance_id": "Aparell"}},
+      "edit_appliance": {"title": "Edita l’aparell", "data": {"name": "Nom que es mostrarà per a aquest electrodomèstic", "appliance_type": "Categoria de l’aparell", "activity_mode": "Modalitat de detecció d'activitat"}},
+      "activity_mode_thermostat": {"title": "Modalitat de detecció del termòstat", "data": {"activity_mode": "Com detecta l’activitat aquest termòstat"}},
+      "activity_mode_dryer": {"title": "Modalitat de detecció de l’assecadora", "data": {"activity_mode": "Com detecta l’activitat aquesta assecadora"}},
+      "activity_mode_mailbox": {"title": "Modalitat de detecció de la bústia", "data": {"activity_mode": "Com detecta l’arribada de correu aquesta bústia"}},
+      "activity_mode_refrigerator": {"title": "Modalitat de detecció de la nevera", "data": {"activity_mode": "Com detecta l’activitat aquesta nevera"}},
+      "activity_mode_washer": {"title": "Modalitat de detecció de la rentadora", "data": {"activity_mode": "Com detecta l’activitat aquesta rentadora"}},
+      "activity_mode_dishwasher": {"title": "Modalitat de detecció del rentaplats", "data": {"activity_mode": "Com detecta l’activitat aquest rentaplats"}},
+      "activity_mode_opening": {"title": "Modalitat de detecció de l’obertura", "data": {"activity_mode": "Com informa del seu estat aquesta obertura"}},
+      "activity_mode_sun_protection": {"title": "Modalitat de detecció de la protecció solar", "data": {"activity_mode": "Com informa del seu estat aquesta protecció solar"}},
       "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)"}},
       "parameters_opening": {"title": "Paràmetres de l’obertura", "data": {}},
       "actions_opening": {"title": "Accions de l’obertura", "data": {"start_actions": "Accions quan comença el cicle (opcional)", "finish_actions": "Accions quan acaba el cicle (opcional)"}},
@@ -128,11 +139,13 @@
       "invalid_alarm_settings": "Els retards i l’interval han de ser enters positius. Les repeticions addicionals han de ser un enter no negatiu.",
       "invalid_plug_off_alarm_settings": "L’interval de repetició amb l’endoll apagat ha de ser un enter positiu i les alarmes addicionals, un enter no negatiu.",
       "appliance_type_immutable": "No es poden canviar el tipus d’aparell ni la modalitat d'activitat després de configurar-lo. Afegeix un aparell nou per canviar-los.",
+      "cannot_remove_last_appliance": "Elimina l’entrada de la categoria per suprimir-ne l’últim aparell.",
       "mailbox_sensors_must_be_distinct": "El sensor d’arribada de correu i el sensor de la porta principal han de ser entitats diferents.",
       "climate_entity_requires_no_device": "Tria una entitat climate existent o la que ja estigui assignada a aquest aparell."
     }
   },
   "selector": {
+    "appliance_action": {"options": {"add": "Afegeix un aparell", "edit": "Edita un aparell", "remove": "Elimina un aparell"}},
     "appliance_category": {
       "options": {"thermostat": "Termòstat", "dryer": "Assecadora", "mailbox": "Bústia", "refrigerator": "Nevera", "washer": "Rentadora", "dishwasher": "Rentaplats", "opening": "Obertura", "sun_protection": "Protecció solar"}
     },

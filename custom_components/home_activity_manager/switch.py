@@ -13,7 +13,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import CONF_PLUG_ENTITY, DOMAIN
 from .device import appliance_device_info
 from .entity_proxy import _suggested_proxy_object_id
-from .runtime import ApplianceRuntime
+from .runtime import ApplianceRuntime, entry_runtimes
 
 
 class AppliancePlugSwitch(SwitchEntity):
@@ -26,7 +26,9 @@ class AppliancePlugSwitch(SwitchEntity):
     def __init__(self, runtime: ApplianceRuntime, entry: ConfigEntry) -> None:
         self._runtime = runtime
         self._entity_id = runtime.config[CONF_PLUG_ENTITY]
-        self._attr_unique_id = f"{entry.entry_id}_plug"
+        self._attr_unique_id = (
+            f"{getattr(runtime, 'appliance_id', entry.entry_id)}_plug"
+        )
         self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     @property
@@ -87,18 +89,19 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the selected smart plug, if configured."""
-    runtime: ApplianceRuntime = entry.runtime_data
-    switches = (
-        [AppliancePlugSwitch(runtime, entry)]
-        if runtime.config.get(CONF_PLUG_ENTITY)
-        else []
-    )
     registry = er.async_get(hass)
-    if not switches:
-        entity_id = registry.async_get_entity_id(
-            "switch", DOMAIN, f"{entry.entry_id}_plug"
+    for runtime in entry_runtimes(entry):
+        appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
+        switches = (
+            [AppliancePlugSwitch(runtime, entry)]
+            if runtime.config.get(CONF_PLUG_ENTITY)
+            else []
         )
-        if entity_id is not None:
-            registry.async_remove(entity_id)
-    if switches:
-        async_add_entities(switches)
+        if not switches:
+            entity_id = registry.async_get_entity_id(
+                "switch", DOMAIN, f"{appliance_id}_plug"
+            )
+            if entity_id is not None:
+                registry.async_remove(entity_id)
+        if switches:
+            async_add_entities(switches)

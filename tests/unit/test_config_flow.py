@@ -912,9 +912,11 @@ async def test_config_flow_has_five_forward_steps_and_separates_options():
         }
     )
     assert created["title"] == "Washer"
-    assert created["data"]["power_entity"] == "sensor.washer_power"
-    assert "start_power_w" not in created["data"]
-    assert created["options"]["start_power_w"] == 4
+    assert created["data"]["category"] == "washer"
+    appliance = created["data"]["appliances"][0]
+    assert appliance["data"]["power_entity"] == "sensor.washer_power"
+    assert "start_power_w" not in appliance["data"]
+    assert appliance["options"]["start_power_w"] == 4
     assert [result["step_id"] for result in shown_steps] == [
         "user",
         "activity_mode_washer",
@@ -994,9 +996,10 @@ async def test_pending_settings_are_validated_on_parameters_step():
             CONF_PENDING_ACTIONS: [],
         }
     )
-    assert created["options"][CONF_PENDING_DELAY_SECONDS] == 1200
-    assert created["options"][CONF_PENDING_INTERVAL_SECONDS] == 1800
-    assert created["options"][CONF_PENDING_REPEATS] == 2
+    options = created["data"]["appliances"][0]["options"]
+    assert options[CONF_PENDING_DELAY_SECONDS] == 1200
+    assert options[CONF_PENDING_INTERVAL_SECONDS] == 1800
+    assert options[CONF_PENDING_REPEATS] == 2
 
 
 @pytest.mark.asyncio

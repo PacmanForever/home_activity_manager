@@ -1,15 +1,19 @@
 """Home Assistant-managed config-flow component tests."""
 
+import asyncio
+
 import pytest
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.helpers import device_registry as dr, entity_registry as er, selector
+from homeassistant.helpers.storage import Store
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.plugins import enable_custom_integrations
 
 from custom_components.home_activity_manager import async_migrate_entry
 from custom_components.home_activity_manager.appliance_types import (
     APPLIANCE_CATEGORIES,
+    APPLIANCE_CATEGORY_NAMES,
     APPLIANCE_PROFILES,
 )
 from custom_components.home_activity_manager.config_flow import (
@@ -130,13 +134,49 @@ async def test_add_appliance_through_four_config_flow_steps(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Washer"
-    assert result["data"][CONF_POWER_ENTITY] == "sensor.washer_power"
-    assert result["data"]["appliance_type"] == "washer"
-    assert CONF_DOOR_ENTITY not in result["data"]
-    assert "start_duration_seconds" not in result["data"]
-    assert result["options"]["start_power_w"] == 4
-    assert result["options"][CONF_START_ACTIONS] == []
-    assert result["options"][CONF_FINISH_ACTIONS] == []
+    assert result["data"]["category"] == "washer"
+    appliance = result["data"]["appliances"][0]
+    assert appliance["data"][CONF_POWER_ENTITY] == "sensor.washer_power"
+    assert appliance["data"][CONF_APPLIANCE_TYPE] == "washer"
+    assert CONF_DOOR_ENTITY not in appliance["data"]
+    assert "start_duration_seconds" not in appliance["data"]
+    assert appliance["options"]["start_power_w"] == 4
+    assert appliance["options"][CONF_START_ACTIONS] == []
+    assert appliance["options"][CONF_FINISH_ACTIONS] == []
+
+    entry = result["result"]
+    options_result = await hass.config_entries.options.async_init(entry.entry_id)
+    options_flow_id = options_result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        options_flow_id, {"appliance_action": "add"}
+    )
+    assert result["step_id"] == "activity_mode_washer"
+    result = await hass.config_entries.options.async_configure(
+        options_flow_id, {"activity_mode": "power"}
+    )
+    assert result["step_id"] == "sensors_washer"
+    result = await hass.config_entries.options.async_configure(
+        options_flow_id, {"washer_power_entity": "sensor.second_washer_power"}
+    )
+    assert result["step_id"] == "parameters_washer"
+    result = await hass.config_entries.options.async_configure(
+        options_flow_id,
+        {
+            "start_power_w": 4,
+            "start_duration_seconds": 15,
+            "finish_power_w": 1,
+            "finish_duration_seconds": 60,
+        },
+    )
+    result = await hass.config_entries.options.async_configure(
+        options_flow_id,
+        {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: [], "max_runtime_actions": []},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert len(entry.data["appliances"]) == 2
+    assert entry.data["appliances"][1]["data"][CONF_POWER_ENTITY] == (
+        "sensor.second_washer_power"
+    )
 
 
 @pytest.mark.asyncio
@@ -199,8 +239,9 @@ async def test_add_air_conditioner_with_opening_sensor(hass, enable_custom_integ
         {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: []},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_RUNNING_ENTITY] == "binary_sensor.ac_vane"
-    assert CONF_POWER_ENTITY not in result["data"]
+    appliance = result["data"]["appliances"][0]
+    assert appliance["data"][CONF_RUNNING_ENTITY] == "binary_sensor.ac_vane"
+    assert CONF_POWER_ENTITY not in appliance["data"]
 
 
 @pytest.mark.asyncio
@@ -254,7 +295,9 @@ async def test_thermostat_climate_accepts_parented_entity(
         flow_id, {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: []}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_CLIMATE_ENTITY] == parented_entity.entity_id
+    assert result["data"]["appliances"][0]["data"][CONF_CLIMATE_ENTITY] == (
+        parented_entity.entity_id
+    )
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -527,7 +570,7 @@ async def test_migrate_saved_duration_options_from_minutes_to_seconds(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 7
+    assert entry.version == 8
     assert entry.options == {
         "start_duration_seconds": 15,
         "finish_duration_seconds": 60,
@@ -538,11 +581,86 @@ async def test_migrate_saved_duration_options_from_minutes_to_seconds(hass):
 
 @pytest.mark.asyncio
 async def test_migrate_future_config_entry_version_is_rejected(hass):
-    entry = MockConfigEntry(domain=DOMAIN, version=8)
+    entry = MockConfigEntry(domain=DOMAIN, version=9)
     entry.add_to_hass(hass)
 
     assert not await async_migrate_entry(hass, entry)
-    assert entry.version == 8
+    assert entry.version == 9
+
+
+@pytest.mark.asyncio
+async def test_migrate_merges_same_category_entries_and_preserves_registry_state(hass):
+    entries = [
+        MockConfigEntry(
+            domain=DOMAIN,
+            version=7,
+            title=f"Washer {index}",
+            data={
+                "name": f"Washer {index}",
+                CONF_APPLIANCE_TYPE: "washer",
+                CONF_POWER_ENTITY: f"sensor.washer_{index}_power",
+            },
+        )
+        for index in (1, 2)
+    ]
+    for entry in entries:
+        entry.add_to_hass(hass)
+
+    entity_registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    appliance_devices = []
+    for entry in entries:
+        entity_registry.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{entry.entry_id}_power",
+            config_entry=entry,
+        )
+        appliance_devices.append(
+            device_registry.async_get_or_create(
+                config_entry_id=entry.entry_id,
+                identifiers={(DOMAIN, entry.entry_id)},
+                name=entry.title,
+            )
+        )
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, "category:washer")},
+            name="Washer",
+        )
+        await Store(hass, 1, f"{DOMAIN}_{entry.entry_id}").async_save(
+            {"preserved": entry.entry_id}
+        )
+
+    migration_results = await asyncio.gather(
+        *(async_migrate_entry(hass, entry) for entry in entries)
+    )
+    assert all(migration_results)
+    survivor = next(
+        entry
+        for entry in entries
+        if entry in hass.config_entries.async_entries(DOMAIN)
+    )
+    merged = next(entry for entry in entries if entry is not survivor)
+
+    assert survivor.version == 8
+    assert survivor.data["category"] == "washer"
+    assert {record["id"] for record in survivor.data["appliances"]} == {
+        entry.entry_id for entry in entries
+    }
+    assert merged not in hass.config_entries.async_entries(DOMAIN)
+    merged_entity = entity_registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{merged.entry_id}_power"
+    )
+    assert entity_registry.async_get(merged_entity).config_entry_id == survivor.entry_id
+    for device in appliance_devices:
+        migrated_device = device_registry.async_get(device.id)
+        assert migrated_device is not None
+        assert survivor.entry_id in migrated_device.config_entries
+        assert merged.entry_id not in migrated_device.config_entries
+    assert await Store(hass, 1, f"{DOMAIN}_{merged.entry_id}").async_load() == {
+        "preserved": merged.entry_id
+    }
 
 
 @pytest.mark.parametrize(
@@ -572,7 +690,7 @@ async def test_migrate_hides_existing_proxies_without_overriding_user_choice(
 
     migrated_proxy = registry.async_get(proxy.entity_id)
     assert migrated_proxy.hidden_by == expected_hidden_by
-    assert entry.version == 7
+    assert entry.version == 8
 
     if expected_hidden_by == er.RegistryEntryHider.INTEGRATION:
         registry.async_update_entity(proxy.entity_id, hidden_by=None)
@@ -611,7 +729,7 @@ async def test_migrate_releases_legacy_climate_device_assignment(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 7
+    assert entry.version == 8
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
 
 
@@ -639,11 +757,18 @@ async def test_migrate_removes_unsupported_ac_contact_sensor(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 7
-    assert entry.data == {
-        CONF_APPLIANCE_TYPE: appliance_type,
+    assert entry.version == 8
+    assert entry.data["category"] == "thermostat"
+    expected_type = (
+        "thermostat_climate"
+        if appliance_type == "air_conditioner_climate"
+        else appliance_type
+    )
+    assert entry.data["appliances"][0]["data"] == {
+        CONF_APPLIANCE_TYPE: expected_type,
         source_key: source_entity,
     }
+    assert entry.data["appliances"][0]["options"] == {}
 
 
 @pytest.mark.parametrize("appliance_type", ("refrigerator", "refrigerator_switch"))
@@ -672,8 +797,9 @@ async def test_migrate_removes_refrigerator_compressor_and_plug_alarms(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 7
-    assert entry.options == {
+    assert entry.version == 8
+    assert entry.options == {}
+    assert entry.data["appliances"][0]["options"] == {
         CONF_START_ACTIONS: [{"action": "test.start"}],
         CONF_FINISH_ACTIONS: [{"action": "test.finish"}],
         CONF_DOOR_OPEN_ACTIONS: [{"action": "test.door"}],
@@ -808,18 +934,36 @@ async def test_every_profile_supports_config_entry_crud(
     result = await hass.config_entries.flow.async_configure(flow_id, action_values)
     assert result["type"] is FlowResultType.CREATE_ENTRY
     entry = result["result"]
-    assert entry.data[CONF_APPLIANCE_TYPE] == appliance_type
-    assert entry.data == {
+    appliance = entry.data["appliances"][0]
+    assert appliance["data"][CONF_APPLIANCE_TYPE] == appliance_type
+    assert appliance["data"] == {
         "name": f"{appliance_type} appliance",
         CONF_APPLIANCE_TYPE: appliance_type,
         **first_sensor_storage,
     }
+    category = next(
+        category
+        for category, modes in APPLIANCE_CATEGORIES.items()
+        if appliance_type in modes.values()
+    )
+    assert entry.data["category"] == category
+    assert entry.title == APPLIANCE_CATEGORY_NAMES[category]
     assert entry in hass.config_entries.async_entries(DOMAIN)
 
     options_result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert CONF_APPLIANCE_TYPE in options_result["data_schema"].schema
-    assert "activity_mode" in options_result["data_schema"].schema
+    assert "appliance_action" in {
+        marker.schema for marker in options_result["data_schema"].schema
+    }
     options_flow_id = options_result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        options_flow_id,
+        {"appliance_action": "edit"},
+    )
+    assert result["step_id"] == "select_appliance"
+    result = await hass.config_entries.options.async_configure(
+        options_flow_id, {"appliance_id": appliance["id"]}
+    )
+    assert result["step_id"] == "edit_appliance"
     result = await hass.config_entries.options.async_configure(
         options_flow_id,
         {"name": f"{appliance_type} updated"},
@@ -841,8 +985,9 @@ async def test_every_profile_supports_config_entry_crud(
         options_flow_id, action_values
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.title == f"{appliance_type} updated"
-    assert entry.data == {
+    updated_appliance = entry.data["appliances"][0]
+    assert entry.title == APPLIANCE_CATEGORY_NAMES[category]
+    assert updated_appliance["data"] == {
         "name": f"{appliance_type} updated",
         CONF_APPLIANCE_TYPE: appliance_type,
         **second_sensor_storage,

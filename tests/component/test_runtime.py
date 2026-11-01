@@ -819,9 +819,7 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
         for identifier in device.identifiers
         if identifier[0] == DOMAIN and identifier[1].startswith("category:")
     }
-    assert profile_identifiers == {
-        f"category:{category}" for category in APPLIANCE_CATEGORIES
-    }
+    assert profile_identifiers == {"category:washer"}
     assert device_registry.async_get_device(
         identifiers={(DOMAIN, "profile:washer")}
     ) is None
@@ -872,26 +870,38 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
 
 
 @pytest.mark.asyncio
-async def test_appliances_share_category_devices_and_keep_all_categories_visible(
+async def test_appliances_share_category_device_and_can_be_removed_individually(
     hass, enable_custom_integrations
 ):
-    entries = []
-    for name in ("Washer 1", "Washer 2"):
-        power_entity = f"sensor.{name.lower().replace(' ', '_')}_power"
-        hass.states.async_set(
-            power_entity, "0", {ATTR_UNIT_OF_MEASUREMENT: "W"}
-        )
-        entry = MockConfigEntry(
-            domain=DOMAIN,
-            data={
-                CONF_POWER_ENTITY: power_entity,
+    appliance_records = [
+        {
+            "id": appliance_id,
+            "data": {
+                CONF_POWER_ENTITY: f"sensor.{appliance_id}_power",
                 "name": name,
-                "appliance_type": "washer",
+                CONF_APPLIANCE_TYPE: "washer",
             },
+            "options": {},
+        }
+        for appliance_id, name in (
+            ("washer_one", "Washer 1"),
+            ("washer_two", "Washer 2"),
         )
-        entry.add_to_hass(hass)
-        assert await hass.config_entries.async_setup(entry.entry_id)
-        entries.append(entry)
+    ]
+    for record in appliance_records:
+        hass.states.async_set(
+            record["data"][CONF_POWER_ENTITY],
+            "0",
+            {ATTR_UNIT_OF_MEASUREMENT: "W"},
+        )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Washer",
+        data={"category": "washer", "appliances": appliance_records},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
 
     device_registry = dr.async_get(hass)
     category_device = device_registry.async_get_device(
@@ -900,21 +910,38 @@ async def test_appliances_share_category_devices_and_keep_all_categories_visible
     assert category_device is not None
     assert device_registry.async_get_device(
         identifiers={(DOMAIN, "category:thermostat")}
-    ) is not None
+    ) is None
     appliance_devices = [
-        device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
-        for entry in entries
+        device_registry.async_get_device(
+            identifiers={(DOMAIN, record["id"])}
+        )
+        for record in appliance_records
     ]
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id == category_device.id for device in appliance_devices)
+    assert len(entry.runtime_data) == 2
 
-    await hass.config_entries.async_remove(entries[0].entry_id)
-    assert (
-        device_registry.async_get_device(identifiers={(DOMAIN, "category:washer")})
-        is not None
+    options_result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        options_result["flow_id"], {"appliance_action": "remove"}
     )
+    result = await hass.config_entries.options.async_configure(
+        options_result["flow_id"], {"appliance_id": "washer_two"}
+    )
+    assert result["type"] == "create_entry"
+    await hass.async_block_till_done()
+    assert [record["id"] for record in entry.data["appliances"]] == ["washer_one"]
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, "washer_two")}
+    ) is None
+    assert er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, "washer_two_power"
+    ) is None
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, "category:washer")}
+    ) is not None
 
-    await hass.config_entries.async_remove(entries[1].entry_id)
+    await hass.config_entries.async_remove(entry.entry_id)
     assert (
         device_registry.async_get_device(identifiers={(DOMAIN, "category:washer")})
         is None
@@ -930,7 +957,7 @@ async def test_thermostat_profiles_share_category_device(
         ("air_conditioner_power", CONF_POWER_ENTITY, "sensor.ac_power"),
         ("thermostat_climate", CONF_CLIMATE_ENTITY, "climate.ac"),
     )
-    entries = []
+    appliance_records = []
     for index, (appliance_type, source_key, source_entity) in enumerate(profiles):
         attributes = (
             {ATTR_UNIT_OF_MEASUREMENT: "W"}
@@ -942,34 +969,47 @@ async def test_thermostat_profiles_share_category_device(
             "0" if source_key == CONF_POWER_ENTITY else "off",
             attributes,
         )
-        entry = MockConfigEntry(
-            domain=DOMAIN,
-            data={
-                CONF_APPLIANCE_TYPE: appliance_type,
-                source_key: source_entity,
-                "name": f"Thermostat {index}",
+        appliance_records.append(
+            {
+                "id": f"thermostat-{index}",
+                "data": {
+                    CONF_APPLIANCE_TYPE: appliance_type,
+                    source_key: source_entity,
+                    "name": f"Thermostat {index}",
+                },
+                "options": {},
             },
         )
-        entry.add_to_hass(hass)
-        assert await hass.config_entries.async_setup(entry.entry_id)
-        entries.append(entry)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Thermostat",
+        data={"category": "thermostat", "appliances": appliance_records},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
 
     device_registry = dr.async_get(hass)
     category_device = device_registry.async_get_device(
         identifiers={(DOMAIN, "category:thermostat")}
     )
     assert category_device is not None
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, "category:washer")}
+    ) is None
     appliance_devices = [
-        device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
-        for entry in entries
+        device_registry.async_get_device(
+            identifiers={(DOMAIN, record["id"])}
+        )
+        for record in appliance_records
     ]
     assert all(device is not None for device in appliance_devices)
     assert all(
         device.via_device_id == category_device.id for device in appliance_devices
     )
 
-    for entry in entries:
-        await hass.config_entries.async_remove(entry.entry_id)
+    assert len(entry.runtime_data) == len(profiles)
+    await hass.config_entries.async_remove(entry.entry_id)
 
 
 @pytest.mark.parametrize("with_power", [False, True])
@@ -2387,9 +2427,14 @@ async def test_climate_wrapper_preserves_and_tracks_source_entity(
 
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
 
-    updated_data = dict(entry.data)
-    updated_data[CONF_CLIMATE_ENTITY] = replacement_climate.entity_id
-    hass.config_entries.async_update_entry(entry, data=updated_data)
+    appliance_record = dict(entry.data["appliances"][0])
+    appliance_data = dict(appliance_record["data"])
+    appliance_data[CONF_CLIMATE_ENTITY] = replacement_climate.entity_id
+    appliance_record["data"] = appliance_data
+    hass.config_entries.async_update_entry(
+        entry,
+        data={**entry.data, "appliances": [appliance_record]},
+    )
     await hass.async_block_till_done()
     assert (
         er.async_get(hass).async_get_entity_id(
@@ -2400,10 +2445,16 @@ async def test_climate_wrapper_preserves_and_tracks_source_entity(
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
     assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id is None
 
-    updated_data = dict(entry.data)
-    updated_data.pop(CONF_CLIMATE_ENTITY)
-    hass.config_entries.async_update_entry(entry, data=updated_data)
+    appliance_record = dict(entry.data["appliances"][0])
+    appliance_data = dict(appliance_record["data"])
+    appliance_data.pop(CONF_CLIMATE_ENTITY)
+    appliance_record["data"] = appliance_data
+    hass.config_entries.async_update_entry(
+        entry,
+        data={**entry.data, "appliances": [appliance_record]},
+    )
     await hass.async_block_till_done()
+    assert CONF_CLIMATE_ENTITY not in entry.runtime_data[entry.entry_id].config
     assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id is None
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
     assert (

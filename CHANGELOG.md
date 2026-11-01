@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+## v0.9.19 - 2026-11-02
+
+### Changed
+
+- Store appliances under one config entry per general category, with independent add, edit, and remove controls for each appliance.
+- Consolidate existing per-appliance entries automatically while preserving appliance identifiers, entity registry entries, device assignments, and runtime storage.
+- Register only the configured category parent and attach all its appliance devices beneath it.
+
 ## v0.9.18 - 2026-11-01
 
 ### Changed

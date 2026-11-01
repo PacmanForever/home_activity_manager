@@ -39,7 +39,8 @@ class EntityProxyMixin:
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = source_entity_id
-        self._attr_unique_id = f"{entry.entry_id}_{domain}_proxy"
+        appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
+        self._attr_unique_id = f"{appliance_id}_{domain}_proxy"
         self._attr_has_entity_name = True
         self._attr_name = None
         self._attr_should_poll = False

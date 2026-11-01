@@ -98,6 +98,47 @@ _ACTIVITY_SOURCE_KEYS = {
 }
 
 
+def appliance_configurations(entry: ConfigEntry) -> list[tuple[str, dict[str, Any]]]:
+    """Return stable IDs and merged settings for appliances owned by an entry."""
+    records = entry.data.get("appliances")
+    if not isinstance(records, list):
+        return [(entry.entry_id, {**entry.data, **entry.options})]
+
+    configurations = []
+    for record in records:
+        if not isinstance(record, dict) or not isinstance(record.get("id"), str):
+            continue
+        config = {**record.get("data", {}), **record.get("options", {})}
+        config["_appliance_id"] = record["id"]
+        configurations.append((record["id"], config))
+    return configurations
+
+
+class ApplianceRuntimeCollection(dict[str, Any]):
+    """Runtime instances for a category entry, with single-runtime compatibility."""
+
+    def __getattr__(self, name: str) -> Any:
+        if len(self) == 1:
+            return getattr(next(iter(self.values())), name)
+        raise AttributeError(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if len(self) == 1 and hasattr(next(iter(self.values())), name):
+            setattr(next(iter(self.values())), name, value)
+            return
+        super().__setattr__(name, value)
+
+
+def entry_runtimes(entry: ConfigEntry) -> tuple[ApplianceRuntime, ...]:
+    """Return all appliance runtimes owned by a config entry."""
+    runtime_data = entry.runtime_data
+    if isinstance(runtime_data, ApplianceRuntimeCollection):
+        return tuple(runtime_data.values())
+    if isinstance(runtime_data, ApplianceRuntime):
+        return (runtime_data,)
+    return ()
+
+
 class ApplianceRuntime:
     """Own one appliance's detector, persistent state, and subscriptions."""
 
@@ -107,6 +148,7 @@ class ApplianceRuntime:
         self.hass = hass
         self.entry = entry
         self.config = config
+        self.appliance_id = config.get("_appliance_id", entry.entry_id)
         self.profile = get_appliance_profile(config.get(CONF_APPLIANCE_TYPE, "washer"))
         self._configured_inputs = {
             item.config_key: config[item.config_key]
@@ -178,7 +220,7 @@ class ApplianceRuntime:
         self._restoring_detector_state = False
         self._power_available = False
         self._last_valid_power_w: float | None = None
-        self._store = Store(hass, _STORE_VERSION, f"{DOMAIN}_{entry.entry_id}")
+        self._store = Store(hass, _STORE_VERSION, f"{DOMAIN}_{self.appliance_id}")
 
     async def async_setup(self) -> None:
         """Restore state, subscribe to inputs, and reconcile current states."""
@@ -446,7 +488,7 @@ class ApplianceRuntime:
         self._notify()
 
     def _input_issue_id(self, entity_id: str) -> str:
-        return f"{self.entry.entry_id}_{entity_id}"
+        return f"{self.appliance_id}_{entity_id}"
 
     def _update_input_availability(self, entity_id: str, state: Any) -> None:
         if entity_id not in self._configured_inputs.values():
@@ -770,7 +812,7 @@ class ApplianceRuntime:
                 self.entry.async_create_background_task(
                     self.hass,
                     self._run_pending_reminder(pending_generation),
-                    name=f"{DOMAIN} {self.entry.entry_id} pending reminder",
+                    name=f"{DOMAIN} {self.appliance_id} pending reminder",
                 )
             elif self.door_open is None:
                 self.next_pending_reminder = now + timedelta(
@@ -828,7 +870,7 @@ class ApplianceRuntime:
         self.entry.async_create_background_task(
             self.hass,
             self._run_actions_serialized(key),
-            name=f"{DOMAIN} {self.entry.entry_id} {key}",
+            name=f"{DOMAIN} {self.appliance_id} {key}",
         )
 
     async def _run_actions_serialized(
@@ -937,7 +979,7 @@ class ApplianceRuntime:
         self.entry.async_create_background_task(
             self.hass,
             self._execute_alarm(alarm, now, generation),
-            name=f"{DOMAIN} {self.entry.entry_id} {alarm} alarm",
+            name=f"{DOMAIN} {self.appliance_id} {alarm} alarm",
         )
 
     async def _run_alarm_if_due(self, alarm: str, now: datetime) -> None:

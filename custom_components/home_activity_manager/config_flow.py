@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import math
 from typing import Any
+from uuid import uuid4
 
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er, selector
+from homeassistant.helpers import device_registry as dr, entity_registry as er, selector
+from homeassistant.helpers.storage import Store
 
 from .appliance_types import (
     APPLIANCE_CATEGORIES,
+    APPLIANCE_CATEGORY_NAMES,
     APPLIANCE_TYPES,
     ApplianceTypeProfile,
     get_appliance_profile,
@@ -745,9 +748,9 @@ def _entry_options(values: dict[str, Any]) -> dict[str, Any]:
 
 
 class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle initial setup of one appliance."""
+    """Handle initial setup of an appliance category."""
 
-    VERSION = 7
+    VERSION = 8
 
     def __init__(self) -> None:
         self._draft: dict[str, Any] = {}
@@ -871,10 +874,20 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_DOOR_ENTITY
             ):
                 _clear_pending_settings(self._draft)
+            category = self._category
+            assert category is not None
             return self.async_create_entry(
-                title=self._draft[CONF_NAME],
-                data=_entry_data(self._draft),
-                options=_entry_options(self._draft),
+                title=APPLIANCE_CATEGORY_NAMES[category],
+                data={
+                    "category": category,
+                    "appliances": [
+                        {
+                            "id": uuid4().hex,
+                            "data": _entry_data(self._draft),
+                            "options": _entry_options(self._draft),
+                        }
+                    ],
+                },
             )
         return self.async_show_form(
             step_id=_profile_step_id("actions", self._draft[CONF_APPLIANCE_TYPE]),
@@ -937,15 +950,45 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
-    """Handle edits to an existing appliance using the same four steps."""
+    """Handle appliance edits and additions within a category entry."""
 
     def __init__(self) -> None:
         self._draft: dict[str, Any] = {}
         self._saved: dict[str, Any] = {}
+        self._appliance_id: str | None = None
+        self._adding_appliance = False
+        self._appliance_action: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
+        records = self.config_entry.data.get("appliances")
+        if isinstance(records, list):
+            if user_input is not None:
+                self._appliance_action = user_input["appliance_action"]
+                if self._appliance_action == "add":
+                    self._adding_appliance = True
+                    category = self.config_entry.data["category"]
+                    self._draft = {CONF_APPLIANCE_TYPE: category}
+                    return await self.async_step_activity_mode()
+                return await self.async_step_select_appliance()
+
+            return self.async_show_form(
+                step_id="init",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("appliance_action"): selector.SelectSelector(
+                            selector.SelectSelectorConfig(
+                                options=["add", "edit", "remove"],
+                                mode=selector.SelectSelectorMode.DROPDOWN,
+                                translation_key="appliance_action",
+                            )
+                        )
+                    }
+                ),
+                last_step=False,
+            )
+
         if not self._saved:
             self._saved = {**self.config_entry.data, **self.config_entry.options}
             self._saved.setdefault(CONF_NAME, self.config_entry.title)
@@ -968,6 +1011,124 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             return await self.async_step_sensors()
         return self.async_show_form(
             step_id="init",
+            data_schema=_options_identity_schema(self._saved),
+            last_step=False,
+        )
+
+    @staticmethod
+    def _category_appliance_schema(records: list[dict[str, Any]]) -> vol.Schema:
+        options = []
+        for record in records:
+            if not isinstance(record, dict) or not isinstance(record.get("id"), str):
+                continue
+            name = record.get("data", {}).get(CONF_NAME, "Appliance")
+            options.append({"value": record["id"], "label": name})
+        return vol.Schema(
+            {
+                vol.Required("appliance_id"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                )
+            }
+        )
+
+    async def async_step_select_appliance(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        records = self.config_entry.data["appliances"]
+        if user_input is not None:
+            appliance_id = user_input["appliance_id"]
+            if self._appliance_action == "remove":
+                if len(records) <= 1:
+                    return self.async_show_form(
+                        step_id="select_appliance",
+                        data_schema=self._category_appliance_schema(records),
+                        errors={"base": "cannot_remove_last_appliance"},
+                    )
+                registry = er.async_get(self.hass)
+                for entity in tuple(registry.entities.values()):
+                    if (
+                        entity.config_entry_id == self.config_entry.entry_id
+                        and entity.unique_id.startswith(f"{appliance_id}_")
+                    ):
+                        registry.async_remove(entity.entity_id)
+                device_registry = dr.async_get(self.hass)
+                device = device_registry.async_get_device(
+                    identifiers={(DOMAIN, appliance_id)}
+                )
+                if device is not None:
+                    device_registry.async_update_device(
+                        device.id,
+                        remove_config_entry_id=self.config_entry.entry_id,
+                    )
+                await Store(self.hass, 1, f"{DOMAIN}_{appliance_id}").async_remove()
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data={
+                        **self.config_entry.data,
+                        "appliances": [
+                            record
+                            for record in records
+                            if record.get("id") != appliance_id
+                        ],
+                    },
+                )
+                return self.async_create_entry(title="", data={})
+
+            record = next(record for record in records if record.get("id") == appliance_id)
+            self._appliance_id = appliance_id
+            self._saved = {
+                **record.get("data", {}),
+                **record.get("options", {}),
+            }
+            self._saved.setdefault(
+                CONF_NAME, record.get("data", {}).get(CONF_NAME, "")
+            )
+            return await self.async_step_edit_appliance()
+        return self.async_show_form(
+            step_id="select_appliance",
+            data_schema=self._category_appliance_schema(records),
+        )
+
+    async def async_step_activity_mode(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        category = self.config_entry.data["category"]
+        if user_input is not None:
+            self._draft[CONF_APPLIANCE_TYPE] = APPLIANCE_CATEGORIES[category][
+                user_input["activity_mode"]
+            ]
+            return await self.async_step_sensors()
+        return self.async_show_form(
+            step_id=f"activity_mode_{category}",
+            data_schema=_activity_mode_schema(category),
+            last_step=False,
+        )
+
+    async def async_step_edit_appliance(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        if user_input is not None:
+            category, mode = _profile_identity(self._saved[CONF_APPLIANCE_TYPE])
+            if (
+                user_input.get(CONF_APPLIANCE_TYPE, category) != category
+                or user_input.get("activity_mode", mode) != mode
+            ):
+                return self.async_show_form(
+                    step_id="edit_appliance",
+                    data_schema=_options_identity_schema(self._saved),
+                    errors={"base": "appliance_type_immutable"},
+                    last_step=False,
+                )
+            self._draft = {
+                CONF_NAME: user_input[CONF_NAME],
+                CONF_APPLIANCE_TYPE: self._saved[CONF_APPLIANCE_TYPE],
+            }
+            return await self.async_step_sensors()
+        return self.async_show_form(
+            step_id="edit_appliance",
             data_schema=_options_identity_schema(self._saved),
             last_step=False,
         )
@@ -1069,6 +1230,25 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             ):
                 _clear_pending_settings(values)
                 _clear_pending_settings(self._draft)
+            if isinstance(self.config_entry.data.get("appliances"), list):
+                records = list(self.config_entry.data["appliances"])
+                record = {
+                    "id": self._appliance_id or uuid4().hex,
+                    "data": _entry_data(values),
+                    "options": _entry_options(values),
+                }
+                if self._adding_appliance:
+                    records.append(record)
+                else:
+                    records = [
+                        record if item.get("id") == self._appliance_id else item
+                        for item in records
+                    ]
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data={**self.config_entry.data, "appliances": records},
+                )
+                return self.async_create_entry(title="", data={})
             self.hass.config_entries.async_update_entry(
                 self.config_entry,
                 data=_entry_data(values),
@@ -1087,6 +1267,14 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_sensors_thermostat_climate = async_step_sensors
     async_step_parameters_thermostat_climate = async_step_parameters
     async_step_actions_thermostat_climate = async_step_actions
+    async_step_activity_mode_thermostat = async_step_activity_mode
+    async_step_activity_mode_dryer = async_step_activity_mode
+    async_step_activity_mode_mailbox = async_step_activity_mode
+    async_step_activity_mode_refrigerator = async_step_activity_mode
+    async_step_activity_mode_washer = async_step_activity_mode
+    async_step_activity_mode_dishwasher = async_step_activity_mode
+    async_step_activity_mode_opening = async_step_activity_mode
+    async_step_activity_mode_sun_protection = async_step_activity_mode
     async_step_sensors_air_conditioner_contact = async_step_sensors
     async_step_parameters_air_conditioner_contact = async_step_parameters
     async_step_actions_air_conditioner_contact = async_step_actions

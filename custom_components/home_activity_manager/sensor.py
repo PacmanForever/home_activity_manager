@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_ENERGY_ENTITY, CONF_POWER_ENTITY, DOMAIN
 from .device import appliance_device_info
-from .runtime import ApplianceRuntime
+from .runtime import ApplianceRuntime, entry_runtimes
 
 
 def _format_duration(seconds: float | None) -> str | None:
@@ -50,7 +50,7 @@ class ApplianceSensor(SensorEntity):
         self._runtime = runtime
         self._key = key
         self._value_fn = value_fn
-        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_unique_id = f"{getattr(runtime, 'appliance_id', entry.entry_id)}_{key}"
         self._attr_translation_key = key
         self._attr_icon = {
             "power": "mdi:flash",
@@ -116,74 +116,75 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up appliance sensors."""
-    runtime: ApplianceRuntime = entry.runtime_data
-    sensors = {
-        "power": ApplianceSensor(
-            runtime,
-            entry,
-            "power",
-            lambda: runtime.display_power_w,
-            UnitOfPower.WATT,
-            SensorDeviceClass.POWER,
-            SensorStateClass.MEASUREMENT,
-        ),
-        "total_energy": ApplianceSensor(
-            runtime,
-            entry,
-            "total_energy",
-            lambda: runtime.display_energy_kwh,
-            UnitOfEnergy.KILO_WATT_HOUR,
-            SensorDeviceClass.ENERGY,
-            SensorStateClass.TOTAL_INCREASING,
-        ),
-        "last_cycle_duration": ApplianceSensor(
-            runtime,
-            entry,
-            "last_cycle_duration",
-            lambda: _format_duration(
-                runtime.detector.last_cycle_duration.total_seconds()
-                if runtime.detector.last_cycle_duration is not None
-                else None
-            ),
-            None,
-            None,
-            None,
-        ),
-        "estimated_remaining": ApplianceSensor(
-            runtime,
-            entry,
-            "estimated_remaining",
-            lambda: _format_duration(runtime.remaining_seconds),
-            None,
-            None,
-            None,
-        ),
-    }
-    input_outputs = {
-        input_config.output_entity: input_config.config_key
-        for input_config in runtime.profile.sensor_inputs
-        if input_config.output_entity is not None
-    }
-    expected_keys = set()
-    for key in sensors:
-        config_key = input_outputs.get(key)
-        if (
-            config_key is not None
-            and runtime.config.get(config_key)
-        ) or (
-            config_key is None
-            and key in runtime.profile.output_entities
-        ):
-            expected_keys.add(key)
-
     registry = er.async_get(hass)
-    for key in set(sensors) - expected_keys:
-        entity_id = registry.async_get_entity_id(
-            "sensor", DOMAIN, f"{entry.entry_id}_{key}"
-        )
-        if entity_id is not None:
-            registry.async_remove(entity_id)
+    for runtime in entry_runtimes(entry):
+        appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
+        sensors = {
+            "power": ApplianceSensor(
+                runtime,
+                entry,
+                "power",
+                lambda runtime=runtime: runtime.display_power_w,
+                UnitOfPower.WATT,
+                SensorDeviceClass.POWER,
+                SensorStateClass.MEASUREMENT,
+            ),
+            "total_energy": ApplianceSensor(
+                runtime,
+                entry,
+                "total_energy",
+                lambda runtime=runtime: runtime.display_energy_kwh,
+                UnitOfEnergy.KILO_WATT_HOUR,
+                SensorDeviceClass.ENERGY,
+                SensorStateClass.TOTAL_INCREASING,
+            ),
+            "last_cycle_duration": ApplianceSensor(
+                runtime,
+                entry,
+                "last_cycle_duration",
+                lambda runtime=runtime: _format_duration(
+                    runtime.detector.last_cycle_duration.total_seconds()
+                    if runtime.detector.last_cycle_duration is not None
+                    else None
+                ),
+                None,
+                None,
+                None,
+            ),
+            "estimated_remaining": ApplianceSensor(
+                runtime,
+                entry,
+                "estimated_remaining",
+                lambda runtime=runtime: _format_duration(runtime.remaining_seconds),
+                None,
+                None,
+                None,
+            ),
+        }
+        input_outputs = {
+            input_config.output_entity: input_config.config_key
+            for input_config in runtime.profile.sensor_inputs
+            if input_config.output_entity is not None
+        }
+        expected_keys = set()
+        for key in sensors:
+            config_key = input_outputs.get(key)
+            if (
+                config_key is not None
+                and runtime.config.get(config_key)
+            ) or (
+                config_key is None
+                and key in runtime.profile.output_entities
+            ):
+                expected_keys.add(key)
 
-    async_add_entities(
-        [sensor for key, sensor in sensors.items() if key in expected_keys]
-    )
+        for key in set(sensors) - expected_keys:
+            entity_id = registry.async_get_entity_id(
+                "sensor", DOMAIN, f"{appliance_id}_{key}"
+            )
+            if entity_id is not None:
+                registry.async_remove(entity_id)
+
+        async_add_entities(
+            [sensor for key, sensor in sensors.items() if key in expected_keys]
+        )

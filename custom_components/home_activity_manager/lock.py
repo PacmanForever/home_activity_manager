@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_LOCK_ENTITY
 from .entity_proxy import EntityProxyMixin
-from .runtime import ApplianceRuntime
+from .runtime import ApplianceRuntime, entry_runtimes
 
 
 _STANDARD_ATTRIBUTES = {
@@ -123,13 +123,14 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    runtime: ApplianceRuntime = entry.runtime_data
-    if runtime.config.get(CONF_LOCK_ENTITY):
-        async_add_entities([ApplianceLockProxy(runtime, entry)])
-        return
     registry = er.async_get(hass)
-    proxy_id = registry.async_get_entity_id(
-        "lock", "home_activity_manager", f"{entry.entry_id}_lock_proxy"
-    )
-    if proxy_id is not None:
-        registry.async_remove(proxy_id)
+    for runtime in entry_runtimes(entry):
+        appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
+        if runtime.config.get(CONF_LOCK_ENTITY):
+            async_add_entities([ApplianceLockProxy(runtime, entry)])
+            continue
+        proxy_id = registry.async_get_entity_id(
+            "lock", "home_activity_manager", f"{appliance_id}_lock_proxy"
+        )
+        if proxy_id is not None:
+            registry.async_remove(proxy_id)

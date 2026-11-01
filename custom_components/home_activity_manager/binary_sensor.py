@@ -17,7 +17,7 @@ from .appliance_types import SensorInput
 from .const import CONF_DOOR_ENTITY, CONF_MAIL_SLOT_ENTITY, DOMAIN
 from .device import appliance_device_info
 from .entity_proxy import _suggested_proxy_object_id
-from .runtime import ApplianceRuntime
+from .runtime import ApplianceRuntime, entry_runtimes
 
 
 _RUNNING_ICONS = {
@@ -62,7 +62,7 @@ class ApplianceBinarySensor(BinarySensorEntity):
         self._runtime = runtime
         self._key = key
         self._value_fn = value_fn
-        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_unique_id = f"{getattr(runtime, 'appliance_id', entry.entry_id)}_{key}"
         self._attr_translation_key = key
         self._attr_device_class = device_class
         self._attr_device_info = appliance_device_info(entry, runtime.config)
@@ -176,7 +176,9 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
         self._source_entity_id = runtime.config[input_config.config_key]
         input_name = input_config.config_key.removesuffix("_entity")
         self._input_name = input_name
-        self._attr_unique_id = f"{entry.entry_id}_input_{input_name}"
+        self._attr_unique_id = (
+            f"{getattr(runtime, 'appliance_id', entry.entry_id)}_input_{input_name}"
+        )
         self._attr_translation_key = f"input_{input_name}"
         self._attr_device_info = appliance_device_info(entry, runtime.config)
         if input_config.device_classes:
@@ -238,79 +240,89 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up appliance binary sensors."""
-    runtime: ApplianceRuntime = entry.runtime_data
-    entities = []
-    if "running" in runtime.profile.output_entities:
-        entities.append(ApplianceBinarySensor(
-            runtime,
-            entry,
-            "running",
-            lambda: runtime.detector.is_running,
-            BinarySensorDeviceClass.RUNNING,
-        ))
-    if (
-        "door" in runtime.profile.output_entities
-        and runtime.config.get(CONF_DOOR_ENTITY)
-    ):
-        entities.append(
-            ApplianceBinarySensor(
-                runtime,
-                entry,
-                "door",
-                lambda: runtime.door_open,
-                BinarySensorDeviceClass.DOOR,
-            )
-        )
-    if (
-        "pending_unload" in runtime.profile.output_entities
-        and runtime.config.get(CONF_DOOR_ENTITY)
-    ):
-        entities.append(
-            ApplianceBinarySensor(
-                runtime,
-                entry,
-                "pending_unload",
-                lambda: runtime.pending_unload,
-            )
-        )
-    if (
-        "mail_slot" in runtime.profile.output_entities
-        and runtime.config.get(CONF_MAIL_SLOT_ENTITY)
-    ):
-        entities.append(
-            ApplianceBinarySensor(
-                runtime,
-                entry,
-                "mail_slot",
-                lambda: runtime.mail_slot_open,
-                BinarySensorDeviceClass.DOOR,
-            )
-        )
-    input_wrappers = tuple(
-        input_config
-        for input_config in runtime.profile.inputs_requiring_wrapper
-        if input_config.domain == "binary_sensor"
-        and runtime.config.get(input_config.config_key)
-    )
     registry = er.async_get(hass)
-    expected_unique_ids = {
-        entity.unique_id for entity in entities
-    } | {
-        f"{entry.entry_id}_input_{input_config.config_key.removesuffix('_entity')}"
-        for input_config in input_wrappers
-    }
-    entity_prefix = f"{entry.entry_id}_"
+    entities = []
+    expected_unique_ids = set()
+    entity_prefixes = set()
+    for runtime in entry_runtimes(entry):
+        appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
+        entity_prefixes.add(f"{appliance_id}_")
+        runtime_entities = []
+        if "running" in runtime.profile.output_entities:
+            runtime_entities.append(
+                ApplianceBinarySensor(
+                    runtime,
+                    entry,
+                    "running",
+                    lambda runtime=runtime: runtime.detector.is_running,
+                    BinarySensorDeviceClass.RUNNING,
+                )
+            )
+        if (
+            "door" in runtime.profile.output_entities
+            and runtime.config.get(CONF_DOOR_ENTITY)
+        ):
+            runtime_entities.append(
+                ApplianceBinarySensor(
+                    runtime,
+                    entry,
+                    "door",
+                    lambda runtime=runtime: runtime.door_open,
+                    BinarySensorDeviceClass.DOOR,
+                )
+            )
+        if (
+            "pending_unload" in runtime.profile.output_entities
+            and runtime.config.get(CONF_DOOR_ENTITY)
+        ):
+            runtime_entities.append(
+                ApplianceBinarySensor(
+                    runtime,
+                    entry,
+                    "pending_unload",
+                    lambda runtime=runtime: runtime.pending_unload,
+                )
+            )
+        if (
+            "mail_slot" in runtime.profile.output_entities
+            and runtime.config.get(CONF_MAIL_SLOT_ENTITY)
+        ):
+            runtime_entities.append(
+                ApplianceBinarySensor(
+                    runtime,
+                    entry,
+                    "mail_slot",
+                    lambda runtime=runtime: runtime.mail_slot_open,
+                    BinarySensorDeviceClass.DOOR,
+                )
+            )
+        input_wrappers = tuple(
+            input_config
+            for input_config in runtime.profile.inputs_requiring_wrapper
+            if input_config.domain == "binary_sensor"
+            and runtime.config.get(input_config.config_key)
+        )
+        entities.extend(runtime_entities)
+        expected_unique_ids.update(entity.unique_id for entity in runtime_entities)
+        expected_unique_ids.update(
+            f"{appliance_id}_input_{input_config.config_key.removesuffix('_entity')}"
+            for input_config in input_wrappers
+        )
+        entities.extend(
+            ApplianceInputBinarySensor(runtime, entry, input_config)
+            for input_config in input_wrappers
+        )
+
     for registered_entity in tuple(registry.entities.values()):
         if (
             registered_entity.config_entry_id == entry.entry_id
             and registered_entity.domain == "binary_sensor"
-            and registered_entity.unique_id.startswith(entity_prefix)
+            and any(
+                registered_entity.unique_id.startswith(prefix)
+                for prefix in entity_prefixes
+            )
             and registered_entity.unique_id not in expected_unique_ids
         ):
             registry.async_remove(registered_entity.entity_id)
-
-    entities.extend(
-        ApplianceInputBinarySensor(runtime, entry, input_config)
-        for input_config in input_wrappers
-    )
-    async_add_entities(entities)
+    if entities:
+        async_add_entities(entities)

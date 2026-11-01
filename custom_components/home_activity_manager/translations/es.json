@@ -8,7 +8,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Nombre y tipo de electrodoméstico",
+        "title": "Categoría y nombre del electrodoméstico",
         "data": {
           "name": "Nombre que se mostrará para este electrodoméstico",
           "appliance_type": "Tipo de electrodoméstico"
@@ -74,14 +74,25 @@
   "options": {
     "step": {
       "init": {
-        "title": "Nombre y tipo de electrodoméstico",
+        "title": "Gestionar electrodomésticos",
         "data": {
+          "appliance_action": "Acción",
           "name": "Nombre que se mostrará para este electrodoméstico",
           "appliance_type": "Tipo de electrodoméstico",
           "activity_mode": "Modalidad de detección de actividad"
         },
         "data_description": {"activity_mode": "Solo este sensor determina la actividad del aparato."}
       },
+      "select_appliance": {"title": "Seleccionar electrodoméstico", "data": {"appliance_id": "Electrodoméstico"}},
+      "edit_appliance": {"title": "Editar electrodoméstico", "data": {"name": "Nombre que se mostrará para este electrodoméstico", "appliance_type": "Categoría del electrodoméstico", "activity_mode": "Modalidad de detección de actividad"}},
+      "activity_mode_thermostat": {"title": "Modalidad de detección del termostato", "data": {"activity_mode": "Cómo detecta la actividad este termostato"}},
+      "activity_mode_dryer": {"title": "Modalidad de detección de la secadora", "data": {"activity_mode": "Cómo detecta la actividad esta secadora"}},
+      "activity_mode_mailbox": {"title": "Modalidad de detección del buzón", "data": {"activity_mode": "Cómo detecta la llegada de correo este buzón"}},
+      "activity_mode_refrigerator": {"title": "Modalidad de detección del frigorífico", "data": {"activity_mode": "Cómo detecta la actividad este frigorífico"}},
+      "activity_mode_washer": {"title": "Modalidad de detección de la lavadora", "data": {"activity_mode": "Cómo detecta la actividad esta lavadora"}},
+      "activity_mode_dishwasher": {"title": "Modalidad de detección del lavavajillas", "data": {"activity_mode": "Cómo detecta la actividad este lavavajillas"}},
+      "activity_mode_opening": {"title": "Modalidad de detección de la apertura", "data": {"activity_mode": "Cómo informa de su estado esta apertura"}},
+      "activity_mode_sun_protection": {"title": "Modalidad de detección de la protección solar", "data": {"activity_mode": "Cómo informa de su estado esta protección solar"}},
       "sensors_opening": {"title": "Sensores de la apertura", "data": {"opening_sensor": "Sensor de contacto de la apertura (obligatorio)", "opening_lock_entity": "Cerradura (opcional)"}},
       "parameters_opening": {"title": "Parámetros de la apertura", "data": {}},
       "actions_opening": {"title": "Acciones de la apertura", "data": {"start_actions": "Acciones cuando empieza el ciclo (opcional)", "finish_actions": "Acciones cuando termina el ciclo (opcional)"}},
@@ -128,11 +139,13 @@
       "invalid_alarm_settings": "Los retrasos y el intervalo deben ser enteros positivos. Las repeticiones adicionales deben ser un entero no negativo.",
       "invalid_plug_off_alarm_settings": "El intervalo de repetición con el enchufe apagado debe ser un entero positivo y los avisos adicionales, un entero no negativo.",
       "appliance_type_immutable": "No se pueden cambiar el tipo de aparato ni la modalidad de actividad después de configurarlo. Añade un aparato nuevo para cambiarlos.",
+      "cannot_remove_last_appliance": "Elimina la entrada de la categoría para borrar su último electrodoméstico.",
       "mailbox_sensors_must_be_distinct": "El sensor de llegada de correo y el sensor de la puerta principal deben ser entidades diferentes.",
       "climate_entity_requires_no_device": "Elige una entidad climate existente o la que ya esté asignada a este aparato."
     }
   },
   "selector": {
+    "appliance_action": {"options": {"add": "Añadir electrodoméstico", "edit": "Editar electrodoméstico", "remove": "Eliminar electrodoméstico"}},
     "appliance_category": {
       "options": {"thermostat": "Termostato", "dryer": "Secadora", "mailbox": "Buzón", "refrigerator": "Frigorífico", "washer": "Lavadora", "dishwasher": "Lavavajillas", "opening": "Apertura", "sun_protection": "Protección solar"}
     },

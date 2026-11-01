@@ -8,7 +8,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Appliance name and type",
+        "title": "Appliance category and name",
         "data": {
           "name": "Name shown for this appliance",
           "appliance_type": "Appliance type"
@@ -74,14 +74,25 @@
   "options": {
     "step": {
       "init": {
-        "title": "Appliance name and type",
+        "title": "Manage appliances",
         "data": {
+          "appliance_action": "Action",
           "name": "Name shown for this appliance",
           "appliance_type": "Appliance type",
           "activity_mode": "Activity detection method"
         },
         "data_description": {"activity_mode": "Only this sensor determines appliance activity."}
       },
+      "select_appliance": {"title": "Select appliance", "data": {"appliance_id": "Appliance"}},
+      "edit_appliance": {"title": "Edit appliance", "data": {"name": "Name shown for this appliance", "appliance_type": "Appliance category", "activity_mode": "Activity detection method"}},
+      "activity_mode_thermostat": {"title": "Thermostat detection mode", "data": {"activity_mode": "How this thermostat detects activity"}},
+      "activity_mode_dryer": {"title": "Dryer detection mode", "data": {"activity_mode": "How this dryer detects activity"}},
+      "activity_mode_mailbox": {"title": "Mailbox detection mode", "data": {"activity_mode": "How this mailbox detects incoming mail"}},
+      "activity_mode_refrigerator": {"title": "Refrigerator detection mode", "data": {"activity_mode": "How this refrigerator detects activity"}},
+      "activity_mode_washer": {"title": "Washer detection mode", "data": {"activity_mode": "How this washer detects activity"}},
+      "activity_mode_dishwasher": {"title": "Dishwasher detection mode", "data": {"activity_mode": "How this dishwasher detects activity"}},
+      "activity_mode_opening": {"title": "Opening detection mode", "data": {"activity_mode": "How this opening reports its state"}},
+      "activity_mode_sun_protection": {"title": "Sun-protection detection mode", "data": {"activity_mode": "How this sun protection reports its state"}},
       "sensors_opening": {"title": "Opening sensors", "data": {"opening_sensor": "Opening contact sensor (required)", "opening_lock_entity": "Lock (optional)"}},
       "parameters_opening": {"title": "Opening parameters", "data": {}},
       "actions_opening": {"title": "Opening actions", "data": {"start_actions": "Actions when the cycle starts (optional)", "finish_actions": "Actions when the cycle ends (optional)"}},
@@ -128,11 +139,13 @@
       "invalid_alarm_settings": "Alarm delays and repeat interval must be positive whole numbers. Additional repeats must be a non-negative whole number.",
       "invalid_plug_off_alarm_settings": "The plug-off repeat interval must be a positive whole number and additional alarms a non-negative whole number.",
       "appliance_type_immutable": "The appliance type and activity mode cannot be changed after setup. Add a new appliance to change them.",
+      "cannot_remove_last_appliance": "Remove the category entry to delete its last appliance.",
       "mailbox_sensors_must_be_distinct": "The mail-arrival sensor and main-door sensor must be different entities.",
       "climate_entity_requires_no_device": "Select an existing climate entity, or the climate entity already assigned to this appliance."
     }
   },
   "selector": {
+    "appliance_action": {"options": {"add": "Add appliance", "edit": "Edit appliance", "remove": "Remove appliance"}},
     "appliance_category": {
       "options": {"thermostat": "Thermostat", "dryer": "Dryer", "mailbox": "Mailbox", "refrigerator": "Refrigerator", "washer": "Washer", "dishwasher": "Dishwasher", "opening": "Opening", "sun_protection": "Sun protection"}
     },
