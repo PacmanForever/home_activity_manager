@@ -11,7 +11,7 @@
 [![Home Assistant](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FPacmanForever%2Fhome_activity_manager%2Fmain%2Fdocs%2Fhome_assistant_compatibility.json&query=%24.tested_version&suffix=%20tested&label=home%20assistant&color=blue)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 [![Daily HA compatibility](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml/badge.svg?branch=main)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 
-Home Activity Manager brings compatible Home Assistant entities together under a dedicated device, making it easier to monitor household equipment and manage its activity, actions, reminders, and alarms. It is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles cover laundry appliances, air conditioners, refrigerators, mailboxes, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
+Home Activity Manager brings compatible Home Assistant entities together under a dedicated device, making it easier to monitor household equipment and manage its activity, actions, reminders, and alarms. It is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles cover laundry appliances, air conditioners, thermostats, refrigerators, mailboxes, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
 
 ## Features
 
@@ -25,10 +25,11 @@ Home Activity Manager brings compatible Home Assistant entities together under a
 	- Detect cycles from power thresholds and configurable confirmation times.
 	- Optionally monitor the door and control a smart plug; track pending unloading and reminders.
 - **Air conditioner**
-	- **Climate-entity option:** use an existing climate entity as the activity source. A native climate proxy is added to the managed device; the original entity remains on its existing device and is not changed. The proxy mirrors standard climate state and controls and forwards standard climate actions to the original entity. Vendor-specific services are not proxied. Activity follows climate mode (`off` versus any active mode), including periods when `hvac_action` is idle.
 	- **Contact/opening-sensor option:** detect activity from a binary contact/opening sensor.
 	- **Power option:** detect activity from power readings and configurable thresholds.
-	- The contact/opening sensor is required in contact mode and is not offered in climate or power mode. Other auxiliary sensors and smart-plug controls are available according to each mode. Only the selected activity source determines running state.
+	- The contact/opening sensor is required in contact mode and is not offered in power mode. Other auxiliary sensors and smart-plug controls are available according to each mode. Only the selected activity source determines running state.
+- **Thermostat**
+	- Use an existing climate entity as the activity source. A native climate proxy is added to the managed device; the original entity remains on its existing device and is not changed. The proxy mirrors standard climate state and controls and forwards standard climate actions to the original entity. Vendor-specific services are not proxied. Activity follows climate mode (`off` versus any active mode), including periods when `hvac_action` is idle.
 - **Refrigerator**
 	- **Power option:** requires a power sensor and door contact. Cycle-start/end actions follow compressor activity; the door-open alarm is configurable. A controllable smart plug is optional and does not trigger an off alarm.
 	- **Smart-switch option:** requires a smart switch and separate door contact. Cycle-start/end actions follow the switch state; optional power and energy sensors do not change activity. The door-open alarm is configurable; the switch does not trigger an off alarm.
@@ -70,7 +71,7 @@ The integration works on supported Home Assistant versions; displaying its local
 
 Each configured device has a separate config entry. Its profile and any available activity mode are fixed after setup and shown when editing; create a new device to change them. Setup asks for:
 
-In Home Assistant's device registry, appliances are grouped under a shared parent for their exact profile, such as "Air conditioner (climate entity)". Each appliance remains an independent child device with its own entities, runtime state, and configuration. Removing an appliance leaves the group while other appliances use it; removing the last appliance removes the empty group.
+In Home Assistant's device registry, appliances are grouped under a shared parent for their exact profile, such as "Thermostat (climate entity)". Each appliance remains an independent child device with its own entities, runtime state, and configuration. Removing an appliance leaves the group while other appliances use it; removing the last appliance removes the empty group.
 
 1. A device profile, name, and activity mode when that profile offers a choice.
 2. The required activity source and any optional compatible sensors or controls. A refrigerator requires a door contact; a mailbox requires a separate main-door contact; opening can optionally include a lock.

@@ -6,7 +6,7 @@ Crear una integració local de Home Assistant per centralitzar en un únic dispo
 
 L'usuari no ha de necessitar crear automatitzacions o blueprints externs per detectar l'inici o el final del cicle ni per executar les accions configurades.
 
-Els tipus generals inicials són rentadora, rentaplats, assecadora, aire condicionat, nevera i bústia. Cada tipus ofereix les modalitats d'activitat que li corresponen: potència per als electrodomèstics de bugaderia; sensor de contacte/obertura, potència o entitat `climate` per a l'aire condicionat; potència o interruptor per a la nevera; i moviment interior o sensor de contacte/obertura de portella per a la bústia. Les entrades auxiliars es declaren explícitament a cada perfil; no totes estan disponibles en totes les modalitats. L'estructura ha de permetre afegir tipus futurs sense repartir condicions específiques per tipus entre els fluxos, el runtime i les plataformes d'entitats.
+Els tipus generals inicials són rentadora, rentaplats, assecadora, aire condicionat, termòstat, nevera i bústia. Cada tipus ofereix les modalitats d'activitat que li corresponen: potència per als electrodomèstics de bugaderia; sensor de contacte/obertura o potència per a l'aire condicionat; una entitat `climate` per al termòstat; potència o interruptor per a la nevera; i moviment interior o sensor de contacte/obertura de portella per a la bústia. Les entrades auxiliars es declaren explícitament a cada perfil; no totes estan disponibles en tots els tipus. L'estructura ha de permetre afegir tipus futurs sense repartir condicions específiques per tipus entre els fluxos, el runtime i les plataformes d'entitats.
 
 ## 2. Identitat del projecte
 
@@ -15,7 +15,7 @@ Els tipus generals inicials són rentadora, rentaplats, assecadora, aire condici
 - **Tipus**: integració personalitzada de Home Assistant, distribuïble amb HACS
 - **Funcionament**: local; sense API externa ni credencials
 - **Font d'activitat**: una entitat de Home Assistant determinada per la modalitat seleccionada
-- **Tipus generals inicials**: `washer`, `dishwasher`, `dryer`, `air_conditioner`, `refrigerator`, `mailbox`
+- **Tipus generals inicials**: `washer`, `dishwasher`, `dryer`, `air_conditioner`, `thermostat`, `refrigerator`, `mailbox`
 - **Idioma font**: anglès
 - **Idiomes de la interfície**: anglès, castellà i català
 
@@ -28,6 +28,7 @@ La integració ha de permetre:
 - **Crear** un dispositiu per a cada electrodomèstic, amb nom i tipus propis.
 - **Modificar** la configuració d'un dispositiu existent sense crear-ne un duplicat. El nom, les fonts, els valors i les accions s'han de poder canviar després de la configuració inicial, però el tipus general i la modalitat d'activitat són immutables; per canviar-los cal crear un dispositiu nou.
 - **Eliminar** un dispositiu de la integració i retirar-ne les entitats del registre de Home Assistant quan ja no hi hagi cap entrada que les faci servir.
+- Agrupar els dispositius individuals sota un dispositiu pare compartit per perfil. Cada aparell conserva les seves entitats, l'estat runtime i la configuració; el pare es manté mentre hi hagi aparells del perfil i s'elimina quan queda buit.
 - Mantenir cada aparell i la seva configuració aïllats dels altres, encara que comparteixin la mateixa integració.
 - Recuperar les entrades configurades després d'un reinici de Home Assistant.
 
@@ -65,7 +66,7 @@ Aquest flux és el lloc central per configurar tot el comportament propi de l'el
 - **Obertura de porta per a bugaderia**: selector opcional per a rentadora, rentaplats i assecadora; activa estat de porta i «pendent de buidar».
 - **Switch intel·ligent de l'endoll**: selector opcional en aparells endollats. La integració n'exposa el control; només determina l'activitat si és la font seleccionada.
 
-Les fonts obligatòries depenen de la modalitat seleccionada. En AC, el contacte/obertura només s'ofereix i és obligatori en la modalitat de contacte; no apareix en les modalitats `climate` ni potència. Només la font seleccionada determina l'activitat. No es requereixen helpers externs: la integració proporciona les entitats de sortida de la secció 5. Les entitats seleccionades són fonts externes i no s'han d'esborrar quan s'elimina el dispositiu. La integració no n'ha de canviar mai l'associació amb un dispositiu pare; els inputs de pala de l'AC i els sensors d'entrada de la bústia no s'han de duplicar com a wrappers visibles.
+Les fonts obligatòries depenen del tipus seleccionat. En AC, el contacte/obertura només s'ofereix i és obligatori en la modalitat de contacte; no apareix en la modalitat per potència. L'entitat `climate` pertany al tipus independent de termòstat. Només la font seleccionada determina l'activitat. No es requereixen helpers externs: la integració proporciona les entitats de sortida de la secció 5. Les entitats seleccionades són fonts externes i no s'han d'esborrar quan s'elimina el dispositiu. La integració no n'ha de canviar mai l'associació amb un dispositiu pare; els inputs de pala de l'AC i els sensors d'entrada de la bústia no s'han de duplicar com a wrappers visibles.
 
 ### 4.3 Detecció del cicle per potència
 
@@ -115,8 +116,9 @@ Les accions són configuració de cada dispositiu; no s'han de codificar com a s
 ## 5. Entitats i associació amb el dispositiu
 
 - Cada electrodomèstic configurat ha d'aparèixer com un dispositiu propi al registre de dispositius de Home Assistant.
+- Els dispositius d'electrodomèstics amb el mateix perfil comparteixen un dispositiu pare. El dispositiu pare no conté entitats pròpies; cada aparell continua tenint el seu dispositiu independent com a fill.
 - Totes les entitats de sortida creades per la integració han d'estar associades al dispositiu de l'electrodomèstic i ser visibles des de la seva pàgina.
-- **Regla d'associació i representació d'inputs**: les entitats externes seleccionades no s'han de reassignar ni esborrar. Quan hi ha una sortida pròpia que representa l'input, s'ha de reutilitzar aquesta sortida. El sensor de pala de l'AC es representa només amb «En funcionament»; els sensors de la bústia no creen wrappers visibles, i es mantenen les sortides «Porta», «Portella» i «Pendent de recollir» que corresponguin al perfil. Els inputs sense una sortida associada poden tenir un wrapper només quan el perfil ho declara. L'entitat `climate` de l'AC continua associada directament al dispositiu, sense wrapper, per conservar-ne els controls i la identitat originals.
+- **Regla d'associació i representació d'inputs**: les entitats externes seleccionades no s'han de reassignar ni esborrar. Quan hi ha una sortida pròpia que representa l'input, s'ha de reutilitzar aquesta sortida. El sensor de pala de l'AC es representa només amb «En funcionament»; els sensors de la bústia no creen wrappers visibles, i es mantenen les sortides «Porta», «Portella» i «Pendent de recollir» que corresponguin al perfil. Els inputs sense una sortida associada poden tenir un wrapper només quan el perfil ho declara. L'entitat `climate` del termòstat continua associada directament al dispositiu de l'aparell, sense wrapper, per conservar-ne els controls i la identitat originals.
 - **Actualització dels wrappers**: cada wrapper declarat pel perfil ha d'actualitzar el valor quan canvia la seva font, incloent-hi `unknown`, `unavailable`, desaparició i recuperació. Una font `unknown` es representa com a desconeguda; una font `unavailable` o absent, com a no disponible. Els valors de potència i energia es normalitzen a W i kWh. L'última potència vàlida pot conservar-se internament, però no s'ha de mostrar com a lectura actual mentre la font és desconeguda o no disponible. La detecció i la persistència del cicle continuen independents d'aquesta representació.
 - **Potència** i **Energia total consumida**: es creen segons les entrades configurades, independentment de la modalitat. L'energia es mostra en kWh, des d'un sensor extern o calculada i persistent a partir de potència.
 - **Reinici de l'energia exposada**: si hi ha un sensor de potència, es crea un botó per posar a zero el total visible de la integració. Amb energia local, reinicia l'acumulació calculada. Amb un sensor extern seleccionat, fixa una base a la lectura actual i mostra els increments posteriors; no modifica ni escriu a l'entitat externa. La base es conserva després de reiniciar Home Assistant i s'aplica només a la mateixa entitat font.
