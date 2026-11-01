@@ -61,7 +61,9 @@ class ApplianceSensor(SensorEntity):
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class
         self._attr_state_class = state_class
-        self._attr_device_info = appliance_device_info(entry, runtime.config)
+        self._attr_device_info = appliance_device_info(
+            getattr(runtime, "hass", None), entry, runtime.config
+        )
 
     @property
     def native_value(self) -> Any:

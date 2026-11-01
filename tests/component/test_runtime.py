@@ -59,6 +59,7 @@ from custom_components.home_activity_manager import (
     async_unload_entry,
 )
 from custom_components.home_activity_manager import runtime as runtime_module
+from custom_components.home_activity_manager import device as device_module
 from custom_components.home_activity_manager.appliance import ApplianceCycleDetector
 from custom_components.home_activity_manager.sensor import _format_duration
 from custom_components.home_activity_manager.appliance_types import (
@@ -867,6 +868,29 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     assert set(remaining) == set(created_entity_ids)
     assert all(state.state == "unavailable" for state in remaining.values())
     assert hass.states.get(config[CONF_POWER_ENTITY]) is not None
+
+
+def test_appliance_device_info_uses_registered_parent_id_for_new_api(
+    hass, monkeypatch
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Washer",
+        data={"category": "washer"},
+    )
+    entry.add_to_hass(hass)
+    category_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "category:washer")},
+        name="Washer",
+    )
+    monkeypatch.setattr(device_module, "_VIA_DEVICE_KEY", "via_device_id")
+
+    info = device_module.appliance_device_info(
+        hass, entry, {CONF_APPLIANCE_TYPE: "washer"}
+    )
+
+    assert info["via_device_id"] == category_device.id
 
 
 @pytest.mark.asyncio

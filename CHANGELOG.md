@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v0.9.21 - 2026-11-02
+
+### Fixed
+
+- Avoid transferring category parents belonging to unrelated appliances during legacy entry consolidation.
+- Use the registered category parent's device ID for Home Assistant's `via_device_id` device info.
+
 ## v0.9.20 - 2026-11-02
 
 ### Fixed

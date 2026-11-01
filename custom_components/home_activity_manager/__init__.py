@@ -198,15 +198,25 @@ async def _async_consolidate_category_entries(
 		candidate_devices = dr.async_entries_for_config_entry(
 			device_registry, candidate.entry_id
 		)
-		duplicate_category_device_ids = {
+		category_parent_identifiers = {
+			identifier
+			for device in candidate_devices
+			for domain, identifier in device.identifiers
+			if domain == DOMAIN and identifier.startswith("category:")
+		}
+		category_parent_device_ids = {
 			device.id
 			for device in candidate_devices
-			if category_identifier in device.identifiers
+			if any(
+				domain == DOMAIN and identifier.startswith("category:")
+				for domain, identifier in device.identifiers
+			)
 		}
 		for device in candidate_devices:
-			if device.id in duplicate_category_device_ids:
+			if device.id in category_parent_device_ids:
 				if (
-					target_category_device is not None
+					category_identifier[1] in category_parent_identifiers
+					and target_category_device is not None
 					and device.id != target_category_device.id
 				):
 					for child in candidate_devices:
@@ -226,7 +236,8 @@ async def _async_consolidate_category_entries(
 			}
 			if (
 				target_category_device is not None
-				and device.via_device_id in duplicate_category_device_ids
+				and device.via_device_id in category_parent_device_ids
+				and category_identifier[1] in category_parent_identifiers
 			):
 				updates["via_device_id"] = target_category_device.id
 			device_registry.async_update_device(device.id, **updates)

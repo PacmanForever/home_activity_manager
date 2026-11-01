@@ -119,7 +119,9 @@ def remove_legacy_profile_devices(
             )
 
 
-def appliance_device_info(entry: ConfigEntry, config: dict[str, Any]) -> DeviceInfo:
+def appliance_device_info(
+    hass: HomeAssistant | None, entry: ConfigEntry, config: dict[str, Any]
+) -> DeviceInfo:
     """Return device info for an appliance nested under its general category."""
     appliance_type = config.get(CONF_APPLIANCE_TYPE)
     category = get_appliance_category(appliance_type)
@@ -130,5 +132,13 @@ def appliance_device_info(entry: ConfigEntry, config: dict[str, Any]) -> DeviceI
         "model": get_appliance_model(appliance_type),
     }
     if category is not None:
-        info[_VIA_DEVICE_KEY] = _category_device_identifier(category)
+        category_identifier = _category_device_identifier(category)
+        if _VIA_DEVICE_KEY == "via_device_id" and hass is not None:
+            parent = _get_device_by_identifier(
+                dr.async_get(hass), category_identifier, entry.entry_id
+            )
+            if parent is not None:
+                info[_VIA_DEVICE_KEY] = parent.id
+        elif _VIA_DEVICE_KEY == "via_device":
+            info[_VIA_DEVICE_KEY] = category_identifier
     return cast(DeviceInfo, info)

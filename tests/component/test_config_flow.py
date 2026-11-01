@@ -19,6 +19,7 @@ from custom_components.home_activity_manager.appliance_types import (
 from custom_components.home_activity_manager.config_flow import (
     _validate_climate_entity,
 )
+from custom_components.home_activity_manager import device as device_module
 from custom_components.home_activity_manager.const import (
     CONF_ALARM_REPEAT_COUNT,
     CONF_ALARM_REPEAT_INTERVAL_SECONDS,
@@ -610,11 +611,30 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
 
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
+    dryer_entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=8,
+        title="Dryer",
+        data={"category": "dryer", "appliances": []},
+    )
+    dryer_entry.add_to_hass(hass)
+    dryer_parent = device_registry.async_get_or_create(
+        config_entry_id=dryer_entry.entry_id,
+        identifiers={(DOMAIN, "category:dryer")},
+        name="Dryer",
+    )
+    for entry in entries:
+        device_registry.async_update_device(
+            dryer_parent.id, add_config_entry_id=entry.entry_id
+        )
     original_update_device = device_registry.async_update_device
 
     def reject_category_parent_transfer(device_id, **updates):
         device = device_registry.async_get(device_id)
-        if (DOMAIN, "category:washer") in device.identifiers:
+        if any(
+            domain == DOMAIN and identifier.startswith("category:")
+            for domain, identifier in device.identifiers
+        ):
             assert "add_config_entry_id" not in updates
         return original_update_device(device_id, **updates)
 
@@ -662,6 +682,11 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
         entry.entry_id for entry in entries
     }
     assert merged not in hass.config_entries.async_entries(DOMAIN)
+    migrated_dryer_parent = device_registry.async_get(dryer_parent.id)
+    assert migrated_dryer_parent is not None
+    assert dryer_entry.entry_id in migrated_dryer_parent.config_entries
+    assert survivor.entry_id not in migrated_dryer_parent.config_entries
+    assert merged.entry_id not in migrated_dryer_parent.config_entries
     merged_entity = entity_registry.async_get_entity_id(
         "sensor", DOMAIN, f"{merged.entry_id}_power"
     )
