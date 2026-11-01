@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v0.9.20 - 2026-11-02
+
+### Fixed
+
+- Consolidate duplicate category parent devices safely during migration and reparent their appliance devices.
+- Use current Home Assistant device registry APIs and parent-device identifiers, retaining compatibility with older supported versions.
+
 ## v0.9.19 - 2026-11-02
 
 ### Changed

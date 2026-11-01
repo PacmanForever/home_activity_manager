@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+import inspect
+from typing import Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -17,9 +18,28 @@ from .appliance_types import (
 )
 from .const import CONF_APPLIANCE_TYPE, DOMAIN
 
+_VIA_DEVICE_KEY = (
+    "via_device_id"
+    if "via_device_id"
+    in inspect.signature(dr.DeviceRegistry.async_get_or_create).parameters
+    else "via_device"
+)
+
 
 def _category_device_identifier(category: str) -> tuple[str, str]:
     return (DOMAIN, f"category:{category}")
+
+
+def _get_device_by_identifier(
+    registry: dr.DeviceRegistry,
+    identifier: tuple[str, str],
+    config_entry_id: str,
+) -> Any:
+    """Look up a device with the API available in this Home Assistant version."""
+    get_by_identifier = getattr(registry, "async_get_device_by_identifier", None)
+    if get_by_identifier is not None:
+        return get_by_identifier(identifier, config_entry_id)
+    return registry.async_get_device(identifiers={identifier})
 
 
 def register_appliance_category_devices(
@@ -67,13 +87,17 @@ def remove_legacy_profile_devices(
             configurations[0][1].get(CONF_APPLIANCE_TYPE)
         )
     category_device = (
-        registry.async_get_device(identifiers={_category_device_identifier(category)})
+        _get_device_by_identifier(
+            registry,
+            _category_device_identifier(category),
+            entry.entry_id,
+        )
         if category is not None
         else None
     )
 
     appliance_ids = {appliance_id for appliance_id, _ in configurations}
-    for device in registry.devices.get_devices_for_config_entry_id(entry.entry_id):
+    for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
         if category_device is not None and any(
             (DOMAIN, appliance_id) in device.identifiers
             for appliance_id in appliance_ids
@@ -85,7 +109,7 @@ def remove_legacy_profile_devices(
             ):
                 registry.async_update_device(device.id, via_device_id=category_device.id)
 
-    for device in registry.devices.get_devices_for_config_entry_id(entry.entry_id):
+    for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
         if any(
             domain == DOMAIN and identifier.startswith("profile:")
             for domain, identifier in device.identifiers
@@ -100,13 +124,11 @@ def appliance_device_info(entry: ConfigEntry, config: dict[str, Any]) -> DeviceI
     appliance_type = config.get(CONF_APPLIANCE_TYPE)
     category = get_appliance_category(appliance_type)
     appliance_id = config.get("_appliance_id", entry.entry_id)
-    return DeviceInfo(
-        identifiers={(DOMAIN, appliance_id)},
-        name=config.get("name", entry.title),
-        model=get_appliance_model(appliance_type),
-        via_device=(
-            _category_device_identifier(category)
-            if category is not None
-            else None
-        ),
-    )
+    info: dict[str, Any] = {
+        "identifiers": {(DOMAIN, appliance_id)},
+        "name": config.get("name", entry.title),
+        "model": get_appliance_model(appliance_type),
+    }
+    if category is not None:
+        info[_VIA_DEVICE_KEY] = _category_device_identifier(category)
+    return cast(DeviceInfo, info)

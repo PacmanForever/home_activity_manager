@@ -21,6 +21,8 @@ from .const import (
 	DOMAIN,
 )
 from .device import (
+	_category_device_identifier,
+	_get_device_by_identifier,
 	register_appliance_category_devices,
 	remove_legacy_profile_devices,
 )
@@ -51,12 +53,7 @@ def _async_appliance_device_id(
 ) -> str | None:
 	entry_id = entry.entry_id if isinstance(entry, ConfigEntry) else entry
 	registry = dr.async_get(hass)
-	get_by_identifier = getattr(registry, "async_get_device_by_identifier", None)
-	device = (
-		get_by_identifier((DOMAIN, entry_id), entry_id)
-		if get_by_identifier is not None
-		else registry.async_get_device(identifiers={(DOMAIN, entry_id)})
-	)
+	device = _get_device_by_identifier(registry, (DOMAIN, entry_id), entry_id)
 	return device.id if device is not None else None
 
 
@@ -151,6 +148,7 @@ async def _async_consolidate_category_entries(
 	if category not in APPLIANCE_CATEGORIES:
 		hass.config_entries.async_update_entry(entry, version=8)
 		return True
+	register_appliance_category_devices(hass, entry)
 
 	matching_entries = []
 	for candidate in hass.config_entries.async_entries(DOMAIN):
@@ -193,14 +191,45 @@ async def _async_consolidate_category_entries(
 			)
 
 		device_registry = dr.async_get(hass)
-		for device in tuple(
-			device_registry.devices.get_devices_for_config_entry_id(candidate.entry_id)
-		):
-			device_registry.async_update_device(
-				device.id,
-				add_config_entry_id=entry.entry_id,
-				remove_config_entry_id=candidate.entry_id,
-			)
+		category_identifier = _category_device_identifier(category)
+		target_category_device = _get_device_by_identifier(
+			device_registry, category_identifier, entry.entry_id
+		)
+		candidate_devices = dr.async_entries_for_config_entry(
+			device_registry, candidate.entry_id
+		)
+		duplicate_category_device_ids = {
+			device.id
+			for device in candidate_devices
+			if category_identifier in device.identifiers
+		}
+		for device in candidate_devices:
+			if device.id in duplicate_category_device_ids:
+				if (
+					target_category_device is not None
+					and device.id != target_category_device.id
+				):
+					for child in candidate_devices:
+						if child.via_device_id == device.id:
+							device_registry.async_update_device(
+								child.id,
+								via_device_id=target_category_device.id,
+							)
+				device_registry.async_update_device(
+					device.id,
+					remove_config_entry_id=candidate.entry_id,
+				)
+				continue
+			updates = {
+				"add_config_entry_id": entry.entry_id,
+				"remove_config_entry_id": candidate.entry_id,
+			}
+			if (
+				target_category_device is not None
+				and device.via_device_id in duplicate_category_device_ids
+			):
+				updates["via_device_id"] = target_category_device.id
+			device_registry.async_update_device(device.id, **updates)
 		hass.config_entries.async_update_entry(
 			candidate,
 			data={"_merged_into": entry.entry_id},
@@ -216,9 +245,7 @@ async def _async_consolidate_category_entries(
 	data = {"category": category, "appliances": records}
 	device_registry = dr.async_get(hass)
 	category_identifier = (DOMAIN, f"category:{category}")
-	for device in tuple(
-		device_registry.devices.get_devices_for_config_entry_id(entry.entry_id)
-	):
+	for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
 		if any(
 			domain == DOMAIN
 			and identifier.startswith("category:")

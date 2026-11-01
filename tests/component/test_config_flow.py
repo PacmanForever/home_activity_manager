@@ -589,7 +589,9 @@ async def test_migrate_future_config_entry_version_is_rejected(hass):
 
 
 @pytest.mark.asyncio
-async def test_migrate_merges_same_category_entries_and_preserves_registry_state(hass):
+async def test_migrate_merges_same_category_entries_and_preserves_registry_state(
+    hass, monkeypatch
+):
     entries = [
         MockConfigEntry(
             domain=DOMAIN,
@@ -608,6 +610,17 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
 
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
+    original_update_device = device_registry.async_update_device
+
+    def reject_category_parent_transfer(device_id, **updates):
+        device = device_registry.async_get(device_id)
+        if (DOMAIN, "category:washer") in device.identifiers:
+            assert "add_config_entry_id" not in updates
+        return original_update_device(device_id, **updates)
+
+    monkeypatch.setattr(
+        device_registry, "async_update_device", reject_category_parent_transfer
+    )
     appliance_devices = []
     for entry in entries:
         entity_registry.async_get_or_create(

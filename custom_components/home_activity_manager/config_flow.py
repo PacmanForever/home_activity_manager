@@ -70,6 +70,7 @@ from .const import (
     DEFAULT_START_POWER_W,
     DOMAIN,
 )
+from .device import _get_device_by_identifier
 
 CONF_NAME = "name"
 _ENTRY_DATA_KEYS = {
@@ -1055,8 +1056,10 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     ):
                         registry.async_remove(entity.entity_id)
                 device_registry = dr.async_get(self.hass)
-                device = device_registry.async_get_device(
-                    identifiers={(DOMAIN, appliance_id)}
+                device = _get_device_by_identifier(
+                    device_registry,
+                    (DOMAIN, appliance_id),
+                    self.config_entry.entry_id,
                 )
                 if device is not None:
                     device_registry.async_update_device(
