@@ -11,7 +11,7 @@
 [![Home Assistant](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FPacmanForever%2Fhome_activity_manager%2Fmain%2Fdocs%2Fhome_assistant_compatibility.json&query=%24.tested_version&suffix=%20tested&label=home%20assistant&color=blue)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 [![Daily HA compatibility](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml/badge.svg?branch=main)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 
-Home Activity Manager brings compatible Home Assistant entities together under a dedicated device, making it easier to monitor household equipment and manage its activity, actions, reminders, and alarms. It is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles currently cover washers, dishwashers, dryers, air conditioners, refrigerators, and mailboxes, with room for additional device types. It needs no cloud service, credentials, external helpers, or automations.
+Home Activity Manager brings compatible Home Assistant entities together under a dedicated device, making it easier to monitor household equipment and manage its activity, actions, reminders, and alarms. It is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles cover laundry appliances, air conditioners, refrigerators, mailboxes, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
 
 ## Features
 
@@ -25,7 +25,7 @@ Home Activity Manager brings compatible Home Assistant entities together under a
 	- Detect cycles from power thresholds and configurable confirmation times.
 	- Optionally monitor the door and control a smart plug; track pending unloading and reminders.
 - **Air conditioner**
-	- **Climate-entity option:** use an existing climate entity with no parent device as the activity source. The original entity and controls are assigned directly to the managed device; no wrapper is created. Activity follows the climate mode (`off` versus any active mode), including periods when `hvac_action` is idle. Replacing the entity or removing the managed device returns it to no device if it is still assigned to this device.
+	- **Climate-entity option:** use an existing climate entity as the activity source. A native climate proxy is added to the managed device; the original entity remains on its existing device and is not changed. The proxy mirrors standard climate state and controls and forwards standard climate actions to the original entity. Vendor-specific services are not proxied. Activity follows climate mode (`off` versus any active mode), including periods when `hvac_action` is idle.
 	- **Contact/opening-sensor option:** detect activity from a binary contact/opening sensor.
 	- **Power option:** detect activity from power readings and configurable thresholds.
 	- The contact/opening sensor is required in contact mode and is not offered in climate or power mode. Other auxiliary sensors and smart-plug controls are available according to each mode. Only the selected activity source determines running state.
@@ -36,6 +36,11 @@ Home Activity Manager brings compatible Home Assistant entities together under a
 	- **Interior-motion option:** detect incoming mail with a motion sensor inside the mailbox.
 	- **Mail-slot option:** detect incoming mail with a contact on the letter flap and expose its open/closed state as **Mail slot**.
 	- Both options track the mailbox cycle from detected arrival until collection. Cycle-start actions run on arrival; cycle-end actions run when the main door opens or pending collection is cleared. Reminders remain separate, and both options use a separate main-door contact.
+- **Opening**
+	- Detect activity from a required binary contact sensor. An optional lock is represented by a native lock proxy on the managed device; its standard controls forward to the original lock, which remains unchanged on its existing device.
+- **Sun protection**
+	- **Contact-sensor option:** use a binary sensor where `on` means open/active and `off` means closed/inactive.
+	- **Cover option:** use a cover entity; open, opening, and closing states are active, while closed is inactive. A native cover proxy is added to the managed device and forwards standard cover controls to the original entity without moving or modifying it. Vendor-specific services are not proxied.
 - **Across all profiles**
 	- Configure consistent actions when a cycle starts and ends, plus any profile-specific reminders or alarms; restore cycle, reminder, and alarm state after Home Assistant restarts.
 	- On washer, dishwasher, dryer, and mailbox profiles, configure a separate action for when pending contents are removed or collected; it runs when the main door opens or pending status is cleared.
@@ -63,15 +68,13 @@ The integration works on supported Home Assistant versions; displaying its local
 
 ## Configuration
 
-Each configured device has a separate config entry. Its general type and activity mode are fixed after setup and shown when editing; create a new device to change either. Setup uses five steps:
+Each configured device has a separate config entry. Its profile and any available activity mode are fixed after setup and shown when editing; create a new device to change them. Setup asks for:
 
-1. Select a device profile and enter a name.
-2. Select the activity mode available for that type.
-3. Select the required activity source and optional compatible sensors and controls. A refrigerator also requires a door contact; a mailbox requires a separate main-door contact.
-4. Configure the mode's thresholds, delays, and reminder parameters.
-5. Configure the available actions.
+1. A device profile, name, and activity mode when that profile offers a choice.
+2. The required activity source and any optional compatible sensors or controls. A refrigerator requires a door contact; a mailbox requires a separate main-door contact; opening can optionally include a lock.
+3. The profile's parameters and actions, when available. Empty parameter forms are skipped.
 
-Editing shows the fixed type and mode alongside the name, followed by sensors, parameters and actions. The activity source can be replaced with a compatible entity; a climate source must be replaced rather than cleared. A running cycle retains its start time after replacement unless the new source confirms it has stopped. An unavailable source does not cause a transition.
+Editing shows the fixed profile and mode alongside the name, followed by that profile's sensors, parameters, and actions. The activity source can be replaced with a compatible entity. A running cycle retains its start time after replacement unless the new source confirms it has stopped. An unavailable source does not cause a transition.
 
 Each device-type-and-mode profile uses its own sensor, parameter and action fields. Cycle-start and cycle-end actions use the same labels across profiles; optional fields are marked explicitly in the selected profile's form.
 
@@ -81,9 +84,9 @@ Power-cycle defaults are 4 W for 15 seconds to start and 1 W for 60 seconds to f
 
 ## Entities and automations
 
-Outputs depend on the selected profile and configured inputs. A selected power sensor provides a power entity; an energy sensor or power sensor provides an energy entity. Cycle-based profiles provide activity state and last-activity duration; estimated remaining time is limited to laundry profiles. Both refrigerator modes expose activity and a door-open alarm; neither has a compressor-inactivity or plug-off alarm. Mailboxes expose their main-door and pending-collection states, plus a button to clear pending status. Detecting mail starts the mailbox cycle and runs its start actions; opening the main door or pressing the clear button ends the cycle, runs its end actions, and cancels reminders. A selected smart plug is exposed as a switch on the managed device.
+Outputs depend on the selected profile and configured inputs. A selected power sensor provides a power entity; an energy sensor or power sensor provides an energy entity. Cycle-based profiles provide activity state and last-activity duration; estimated remaining time is limited to laundry profiles. Both refrigerator modes expose activity and a door-open alarm; neither has a compressor-inactivity or plug-off alarm. Mailboxes expose their main-door and pending-collection states, plus a button to clear pending status. Detecting mail starts the mailbox cycle and runs its start actions; opening the main door or pressing the clear button ends the cycle, runs its end actions, and cancels reminders. A selected smart plug is exposed as a switch on the managed device. Climate, cover, and optional opening-lock sources are represented by native-domain proxy entities on the managed device.
 
-Configured inputs are represented by their corresponding integration output when one exists. The air conditioner's louver sensor is represented by its running state, without a separate input entity. Mailbox sensors likewise do not create standalone input wrappers; the main-door, pending-collection, and mail-slot outputs remain available. The air conditioner's original climate entity is associated directly with the managed device so its controls are preserved.
+Configured inputs are represented by their corresponding integration output when one exists. The air conditioner's louver sensor is represented by its running state, without a separate input entity. Mailbox sensors likewise do not create standalone input wrappers; the main-door, pending-collection, and mail-slot outputs remain available. Climate, cover, and lock proxies mirror standard state and supported features and forward standard actions to their configured source entities. The source entities are never reassigned or modified by normal setup, editing, or removal of the managed device. Entries created by older versions that assigned the original climate entity are migrated to use a proxy and release that legacy device association.
 
 Integration outputs update with their sources, including unknown, unavailable, missing, and recovered states. Power and energy are displayed in W and kWh. When a power source is unavailable, its output does not present the previous reading as current; the integration retains its internal state without falsely ending the cycle.
 

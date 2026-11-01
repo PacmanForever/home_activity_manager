@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -163,12 +164,31 @@ async def async_setup_entry(
             None,
         ),
     }
+    input_outputs = {
+        input_config.output_entity: input_config.config_key
+        for input_config in runtime.profile.sensor_inputs
+        if input_config.output_entity is not None
+    }
+    expected_keys = set()
+    for key in sensors:
+        config_key = input_outputs.get(key)
+        if (
+            config_key is not None
+            and runtime.config.get(config_key)
+        ) or (
+            config_key is None
+            and key in runtime.profile.output_entities
+        ):
+            expected_keys.add(key)
+
+    registry = er.async_get(hass)
+    for key in set(sensors) - expected_keys:
+        entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{entry.entry_id}_{key}"
+        )
+        if entity_id is not None:
+            registry.async_remove(entity_id)
+
     async_add_entities(
-        [
-            sensor
-            for key, sensor in sensors.items()
-            if key in runtime.profile.output_entities
-            or (key in ("power", "total_energy") and runtime.config.get(CONF_POWER_ENTITY))
-            or (key == "total_energy" and runtime.config.get(CONF_ENERGY_ENTITY))
-        ]
+        [sensor for key, sensor in sensors.items() if key in expected_keys]
     )

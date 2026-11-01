@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.9.13 - 2026-11-01
+
+### Added
+
+- Add contact-sensor and cover profiles for sun protection, plus an opening profile with an optional lock.
+- Add native climate, cover, and lock proxies that preserve original entity ownership and forward standard domain actions.
+
+### Changed
+
+- Migrate climate profiles to proxy entities instead of assigning the original climate entity to the managed device.
+- Update profile forms and translations for the new profiles and proxy entities.
+- Use native duration controls for configurable times, support values over 24 hours, and continue storing durations in seconds.
+- Remove the `HH:MM:SS` format hint from duration labels.
+
 ## v0.9.12 - 2026-11-01
 
 ### Changed

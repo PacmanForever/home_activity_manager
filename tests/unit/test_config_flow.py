@@ -240,6 +240,20 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 sensor_schema = _sensor_schema(_sensor_form_values(values, profile), profile)
                 parameter_schema = _threshold_schema(values, profile)
                 action_schema = _action_schema(values, profile)
+                duration_selectors = {
+                    marker.schema: field_selector
+                    for marker, field_selector in parameter_schema.schema.items()
+                    if marker.schema.endswith("_seconds")
+                }
+                self.assertTrue(
+                    all(
+                        field_selector.selector_type == "duration"
+                        and field_selector.config.get("enable_day")
+                        and not field_selector.config.get("allow_negative", True)
+                        for field_selector in duration_selectors.values()
+                    ),
+                    appliance_type,
+                )
 
                 expected_source = next(
                     item.form_key
@@ -441,34 +455,93 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertIn(CONF_ALARM_REPEAT_COUNT, options)
         self.assertIn(CONF_ALARM_REPEAT_INTERVAL_SECONDS, options)
 
-    def test_duration_parameters_use_hh_mm_ss_and_store_seconds(self) -> None:
+    def test_duration_parameters_use_native_selector_and_store_seconds(self) -> None:
         schema = _threshold_schema(
-            {CONF_DOOR_ENTITY: "binary_sensor.washer_door"},
+            {
+                CONF_DOOR_ENTITY: "binary_sensor.washer_door",
+                CONF_MAX_RUNTIME_SECONDS: 90061,
+            },
             get_appliance_profile("washer"),
         )
         defaults = {
             marker.schema: marker.default()
             for marker in schema.schema
-            if marker.schema in ("start_duration_seconds", CONF_PENDING_DELAY_SECONDS)
+            if marker.schema
+            in (
+                "start_duration_seconds",
+                CONF_PENDING_DELAY_SECONDS,
+                CONF_MAX_RUNTIME_SECONDS,
+            )
         }
-        self.assertEqual(defaults["start_duration_seconds"], "00:00:15")
-        self.assertEqual(defaults[CONF_PENDING_DELAY_SECONDS], "00:15:00")
+        self.assertEqual(
+            defaults["start_duration_seconds"],
+            {"days": 0, "hours": 0, "minutes": 0, "seconds": 15},
+        )
+        self.assertEqual(
+            defaults[CONF_PENDING_DELAY_SECONDS],
+            {"days": 0, "hours": 0, "minutes": 15, "seconds": 0},
+        )
+        self.assertEqual(
+            defaults[CONF_MAX_RUNTIME_SECONDS],
+            {"days": 1, "hours": 1, "minutes": 1, "seconds": 1},
+        )
 
         values = schema(
             {
                 "start_power_w": 4,
-                "start_duration_seconds": "00:00:30",
+                "start_duration_seconds": {
+                    "days": 0,
+                    "hours": 0,
+                    "minutes": 0,
+                    "seconds": 30,
+                },
                 "finish_power_w": 1,
-                "finish_duration_seconds": "00:02:30",
-                CONF_PENDING_DELAY_SECONDS: "01:02:03",
-                CONF_PENDING_INTERVAL_SECONDS: "00:15:00",
+                "finish_duration_seconds": {"minutes": 2, "seconds": 30},
+                CONF_MAX_RUNTIME_SECONDS: {
+                    "days": 1,
+                    "hours": 1,
+                    "minutes": 1,
+                    "seconds": 1,
+                },
+                CONF_PENDING_DELAY_SECONDS: {
+                    "hours": 1,
+                    "minutes": 2,
+                    "seconds": 3,
+                },
+                CONF_PENDING_INTERVAL_SECONDS: {"minutes": 15},
                 CONF_PENDING_REPEATS: 3,
             }
         )
         self.assertEqual(values["start_duration_seconds"], 30)
         self.assertEqual(values["finish_duration_seconds"], 150)
+        self.assertEqual(values[CONF_MAX_RUNTIME_SECONDS], 90061)
         self.assertEqual(values[CONF_PENDING_DELAY_SECONDS], 3723)
         self.assertEqual(values[CONF_PENDING_INTERVAL_SECONDS], 900)
+
+        duration_selector = next(
+            field_selector
+            for marker, field_selector in schema.schema.items()
+            if marker.schema == "start_duration_seconds"
+        )
+        with self.assertRaises(vol.Invalid):
+            duration_selector({"seconds": -1})
+
+        optional_schema = _threshold_schema(
+            {}, get_appliance_profile("washer")
+        )
+        optional_values = optional_schema(
+            {"start_power_w": 4, "finish_power_w": 1}
+        )
+        self.assertNotIn(CONF_MAX_RUNTIME_SECONDS, optional_values)
+
+        with self.assertRaises(vol.Invalid):
+            schema(
+                {
+                    "start_power_w": 4,
+                    "finish_power_w": 1,
+                    "start_duration_seconds": "not a duration",
+                }
+            )
 
     def test_duration_parameter_accepts_stored_seconds(self) -> None:
         schema = _threshold_schema({}, get_appliance_profile("washer"))
@@ -599,6 +672,24 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                     }
                     self.assertEqual(len(labels), 1, (path, flow, group))
 
+    def test_duration_translation_labels_do_not_describe_text_format(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        paths = (
+            root / "strings.json",
+            root / "translations" / "en.json",
+            root / "translations" / "es.json",
+            root / "translations" / "ca.json",
+        )
+        for path in paths:
+            translation = json.loads(path.read_text(encoding="utf-8"))
+            for flow in ("config", "options"):
+                for step_name, step in translation[flow]["step"].items():
+                    if not step_name.startswith("parameters_"):
+                        continue
+                    for key, label in step["data"].items():
+                        if key.endswith("_seconds"):
+                            self.assertNotIn("HH:MM:SS", label, (path, flow, key))
+
     def test_all_translation_files_have_matching_keys(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
         translations = [
@@ -687,6 +778,8 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                             self.assertIn(key, labels)
                             self.assertTrue(labels[key].strip())
                             self.assertNotEqual(labels[key], key)
+                            if key.endswith("_seconds"):
+                                self.assertNotIn("HH:MM:SS", labels[key])
                         if step.startswith("sensors_air_conditioner_"):
                             descriptions = translation[flow]["step"][step][
                                 "data_description"

@@ -1,12 +1,9 @@
 """Home Activity Manager integration."""
 
-import logging
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
 from homeassistant.helpers.storage import Store
 
 from .const import (
@@ -22,9 +19,10 @@ from .const import (
 )
 from .runtime import ApplianceRuntime
 
-_LOGGER = logging.getLogger(__name__)
-
 PLATFORMS = [
+	Platform.CLIMATE,
+	Platform.COVER,
+	Platform.LOCK,
 	Platform.SENSOR,
 	Platform.BINARY_SENSOR,
 	Platform.SWITCH,
@@ -50,26 +48,6 @@ def _async_appliance_device_id(
 	return device.id if device is not None else None
 
 
-def _async_assign_climate_entity(
-	hass: HomeAssistant, entry: ConfigEntry, climate_entity_id: str | None
-) -> None:
-	if climate_entity_id is None:
-		return
-
-	entity_registry = er.async_get(hass)
-	entity_entry = entity_registry.async_get(climate_entity_id)
-	device_id = _async_appliance_device_id(hass, entry)
-	if entity_entry is None or device_id is None:
-		return
-	if entity_entry.device_id is None:
-		entity_registry.async_update_entity(climate_entity_id, device_id=device_id)
-	elif entity_entry.device_id != device_id:
-		_LOGGER.warning(
-			"Climate input %s has been assigned to a different device; leaving it unchanged",
-			climate_entity_id,
-		)
-
-
 def _async_release_climate_entity(
 	hass: HomeAssistant, entry: ConfigEntry, climate_entity_id: str | None
 ) -> None:
@@ -87,27 +65,6 @@ def _async_release_climate_entity(
 		entity_registry.async_update_entity(climate_entity_id, device_id=None)
 
 
-def _async_climate_entity_registry_listener(
-	hass: HomeAssistant, entry: ConfigEntry
-):
-	@callback
-	def _handle_registry_update(event: Event) -> None:
-		climate_entity_id = {**entry.data, **entry.options}.get(CONF_CLIMATE_ENTITY)
-		if (
-			event.data.get("action") != "update"
-			or event.data.get("entity_id") != climate_entity_id
-		):
-			return
-		if "device_id" not in event.data.get("changes", {}):
-			return
-		entity_registry = er.async_get(hass)
-		entity_entry = entity_registry.async_get(climate_entity_id)
-		if entity_entry is not None and entity_entry.device_id is None:
-			_async_assign_climate_entity(hass, entry, climate_entity_id)
-
-	return _handle_registry_update
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	"""Set up one configured appliance."""
 	config = {**entry.data, **entry.options}
@@ -116,13 +73,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	entry.runtime_data = runtime
 	entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
 	await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-	climate_entity_id = config.get(CONF_CLIMATE_ENTITY)
-	if climate_entity_id is not None:
-		entry.runtime_data._unsubscribe_entity_registry = hass.bus.async_listen(
-			EVENT_ENTITY_REGISTRY_UPDATED,
-			_async_climate_entity_registry_listener(hass, entry),
-		)
-		_async_assign_climate_entity(hass, entry, climate_entity_id)
 	return True
 
 
@@ -131,30 +81,27 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
 		return False
 	runtime = entry.runtime_data
-	if runtime._unsubscribe_entity_registry is not None:
-		runtime._unsubscribe_entity_registry()
-		runtime._unsubscribe_entity_registry = None
-	_async_release_climate_entity(
-		hass, entry, runtime.config.get(CONF_CLIMATE_ENTITY)
-	)
 	await runtime.async_unload()
 	return True
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 	"""Remove this appliance's integration-owned persistent state."""
-	_async_release_climate_entity(
-		hass, entry, {**entry.data, **entry.options}.get(CONF_CLIMATE_ENTITY)
-	)
 	store = Store(hass, 1, f"{DOMAIN}_{entry.entry_id}")
 	await store.async_remove()
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	"""Migrate old durations and remove obsolete profile settings."""
-	if entry.version > 5:
+	if entry.version > 6:
 		return False
+	if entry.version == 6:
+		return True
 	if entry.version == 5:
+		_async_release_climate_entity(
+			hass, entry, {**entry.data, **entry.options}.get(CONF_CLIMATE_ENTITY)
+		)
+		hass.config_entries.async_update_entry(entry, version=6)
 		return True
 
 	data = dict(entry.data)
@@ -187,7 +134,10 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 			CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
 		):
 			options.pop(key, None)
+	_async_release_climate_entity(
+		hass, entry, {**data, **options}.get(CONF_CLIMATE_ENTITY)
+	)
 	hass.config_entries.async_update_entry(
-		entry, data=data, options=options, version=5
+		entry, data=data, options=options, version=6
 	)
 	return True

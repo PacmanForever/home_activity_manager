@@ -7,6 +7,7 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -86,5 +87,17 @@ async def async_setup_entry(
 ) -> None:
     """Set up the selected smart plug, if configured."""
     runtime: ApplianceRuntime = entry.runtime_data
-    if runtime.config.get(CONF_PLUG_ENTITY):
-        async_add_entities([AppliancePlugSwitch(runtime, entry)])
+    switches = (
+        [AppliancePlugSwitch(runtime, entry)]
+        if runtime.config.get(CONF_PLUG_ENTITY)
+        else []
+    )
+    registry = er.async_get(hass)
+    if not switches:
+        entity_id = registry.async_get_entity_id(
+            "switch", DOMAIN, f"{entry.entry_id}_plug"
+        )
+        if entity_id is not None:
+            registry.async_remove(entity_id)
+    if switches:
+        async_add_entities(switches)

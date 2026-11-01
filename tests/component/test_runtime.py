@@ -5,6 +5,9 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+from homeassistant.components.climate import ClimateEntityFeature, HVACMode
+from homeassistant.components.cover import CoverEntityFeature
+from homeassistant.components.lock import LockEntityFeature
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfPower
@@ -21,6 +24,8 @@ from custom_components.home_activity_manager.const import (
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
     CONF_CLIMATE_ENTITY,
+    CONF_COVER_ENTITY,
+    CONF_COVER_ENTITY,
     CONF_DOOR_ENTITY,
     CONF_ENERGY_ENTITY,
     CONF_DOOR_OPEN_ACTIONS,
@@ -30,6 +35,8 @@ from custom_components.home_activity_manager.const import (
     CONF_MAIL_ARRIVAL_ACTIONS,
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
+    CONF_LOCK_ENTITY,
+    CONF_LOCK_ENTITY,
     CONF_MAX_RUNTIME_ACTIONS,
     CONF_MAX_RUNTIME_SECONDS,
     CONF_PENDING_ACTIONS,
@@ -67,6 +74,9 @@ from custom_components.home_activity_manager.switch import (
     AppliancePlugSwitch,
     async_setup_entry as setup_switch_entry,
 )
+from custom_components.home_activity_manager.climate import ApplianceClimateProxy
+from custom_components.home_activity_manager.cover import ApplianceCoverProxy
+from custom_components.home_activity_manager.lock import ApplianceLockProxy
 
 
 @pytest.fixture
@@ -791,17 +801,18 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     unique_ids = {entity.unique_id for entity in entry_entities}
     assert unique_ids == {
         f"{entry.entry_id}_power",
-        f"{entry.entry_id}_total_energy",
         f"{entry.entry_id}_last_cycle_duration",
         f"{entry.entry_id}_estimated_remaining",
         f"{entry.entry_id}_running",
         f"{entry.entry_id}_energy_reset",
     }
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_total_energy"
+    ) is None
     created_entity_ids = [entity.entity_id for entity in entry_entities]
     assert all(hass.states.get(entity_id) is not None for entity_id in created_entity_ids)
     for key, icon in {
         "power": "mdi:flash",
-        "total_energy": "mdi:lightning-bolt",
         "last_cycle_duration": "mdi:timer-check-outline",
         "estimated_remaining": "mdi:timer-sand",
     }.items():
@@ -1049,10 +1060,9 @@ async def test_optional_plug_and_pending_button_controls(
     await reset_button.async_press()
     assert runtime.energy_kwh == 0
     assert hass.states.get(config[CONF_POWER_ENTITY]).state == "100"
-    energy_entity_id = er.async_get(hass).async_get_entity_id(
+    assert er.async_get(hass).async_get_entity_id(
         "sensor", DOMAIN, f"{entry.entry_id}_total_energy"
-    )
-    assert float(hass.states.get(energy_entity_id).state) == pytest.approx(0)
+    ) is None
 
     runtime.pending_unload = True
     runtime.pending_reminder_count = 2
@@ -1379,6 +1389,10 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             hass.states.async_set(
                 source.entity_id, "off", {"hvac_action": "idle"}
             )
+        elif input_config.domain == "cover":
+            hass.states.async_set(source.entity_id, "closed")
+        elif input_config.domain == "lock":
+            hass.states.async_set(source.entity_id, "locked")
         else:
             hass.states.async_set(source.entity_id, "off")
 
@@ -1399,8 +1413,18 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
     for input_config, source_entity_id, original_device_id in input_entities:
         source = source_registry.async_get(source_entity_id)
         assert source is not None
-        if input_config.domain == "climate":
-            assert source.device_id == device_id
+        if input_config.domain in ("climate", "cover", "lock"):
+            assert source.device_id == original_device_id
+            wrapper_id = integration_registry.async_get_entity_id(
+                input_config.domain,
+                DOMAIN,
+                f"{entry.entry_id}_{input_config.domain}_proxy",
+            )
+            assert wrapper_id is not None
+            wrapper = integration_registry.async_get(wrapper_id)
+            assert wrapper is not None
+            assert wrapper.device_id == device_id
+            assert hass.states.get(wrapper_id).attributes["source_entity"] == source_entity_id
             continue
 
         assert source.device_id == original_device_id
@@ -1573,6 +1597,25 @@ def test_air_conditioner_activity_icons_reflect_running_state(appliance_type):
     assert sensor.icon == "mdi:hvac"
 
 
+@pytest.mark.parametrize("cover_state", ("open", "opening", "closing", "closed"))
+def test_sun_protection_cover_running_sensor_availability(hass, cover_state):
+    cover_entity_id = "cover.sun_protection"
+    hass.states.async_set(cover_entity_id, cover_state)
+    runtime = SimpleNamespace(
+        config={
+            CONF_APPLIANCE_TYPE: "sun_protection_cover",
+            CONF_COVER_ENTITY: cover_entity_id,
+        },
+        profile=APPLIANCE_PROFILES["sun_protection_cover"],
+    )
+    sensor = ApplianceBinarySensor(
+        runtime, MockConfigEntry(domain=DOMAIN), "running", lambda: False
+    )
+    sensor.hass = hass
+
+    assert sensor.available
+
+
 @pytest.mark.parametrize(
     ("appliance_type", "source_key"),
     (
@@ -1731,7 +1774,6 @@ async def test_refrigerator_creates_only_its_declared_entities(
     }
     assert unique_ids == {
         f"{entry.entry_id}_power",
-        f"{entry.entry_id}_total_energy",
         f"{entry.entry_id}_last_cycle_duration",
         f"{entry.entry_id}_running",
         f"{entry.entry_id}_door",
@@ -2013,7 +2055,7 @@ async def test_plug_off_alarm_repeats_pauses_persists_and_rearms(
 
 
 @pytest.mark.asyncio
-async def test_climate_entity_is_assigned_reassociated_and_released(
+async def test_climate_wrapper_preserves_and_tracks_source_entity(
     hass, enable_custom_integrations
 ):
     climate_entry = MockConfigEntry(domain="climate_source")
@@ -2045,7 +2087,15 @@ async def test_climate_entity_is_assigned_reassociated_and_released(
     registered_climate = er.async_get(hass).async_get(climate_entity.entity_id)
     assert registered_climate is not None
     assert registered_climate.config_entry_id == climate_entry.entry_id
-    assert registered_climate.device_id == device_id
+    assert registered_climate.device_id is None
+    proxy_entity_id = er.async_get(hass).async_get_entity_id(
+        "climate", DOMAIN, f"{entry.entry_id}_climate_proxy"
+    )
+    assert proxy_entity_id is not None
+    registered_proxy = er.async_get(hass).async_get(proxy_entity_id)
+    assert registered_proxy is not None
+    assert registered_proxy.config_entry_id == entry.entry_id
+    assert registered_proxy.device_id == device_id
     assert entry.runtime_data.detector.is_running
 
     hass.states.async_set(
@@ -2068,20 +2118,14 @@ async def test_climate_entity_is_assigned_reassociated_and_released(
     await hass.async_block_till_done()
     assert entry.runtime_data.detector.is_running
 
-    er.async_get(hass).async_update_entity(climate_entity.entity_id, device_id=None)
-    assert (
-        er.async_get(hass).async_get(climate_entity.entity_id).device_id == device_id
-    )
+    assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
 
     updated_data = dict(entry.data)
     updated_data[CONF_CLIMATE_ENTITY] = replacement_climate.entity_id
     hass.config_entries.async_update_entry(entry, data=updated_data)
     await hass.async_block_till_done()
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
-    assert (
-        er.async_get(hass).async_get(replacement_climate.entity_id).device_id
-        == device_id
-    )
+    assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id is None
 
     updated_data = dict(entry.data)
     updated_data.pop(CONF_CLIMATE_ENTITY)
@@ -2089,13 +2133,123 @@ async def test_climate_entity_is_assigned_reassociated_and_released(
     await hass.async_block_till_done()
     assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id is None
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
+    assert (
+        er.async_get(hass).async_get_entity_id(
+            "climate", DOMAIN, f"{entry.entry_id}_climate_proxy"
+        )
+        is None
+    )
 
     assert await hass.config_entries.async_unload(entry.entry_id)
-    assert (
-        er.async_get(hass).async_get(replacement_climate.entity_id).device_id is None
-    )
+    assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id is None
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
     assert er.async_get(hass).async_get(climate_entity.entity_id).config_entry_id == climate_entry.entry_id
+
+
+@pytest.mark.asyncio
+async def test_domain_proxies_mirror_source_features_and_forward_actions(
+    hass, monkeypatch
+):
+    climate_entity_id = "climate.original_ac"
+    cover_entity_id = "cover.original_blind"
+    lock_entity_id = "lock.original_door"
+    hass.states.async_set(
+        climate_entity_id,
+        "cool",
+        {
+            "hvac_action": "cooling",
+            "hvac_modes": ["off", "cool"],
+            "current_temperature": 21.5,
+            "temperature": 23,
+            "temperature_unit": "°C",
+            "supported_features": int(ClimateEntityFeature.TARGET_TEMPERATURE),
+        },
+    )
+    hass.states.async_set(
+        cover_entity_id,
+        "open",
+        {
+            "current_position": 72,
+            "supported_features": int(
+                CoverEntityFeature.OPEN
+                | CoverEntityFeature.CLOSE
+                | CoverEntityFeature.SET_POSITION
+            ),
+        },
+    )
+    hass.states.async_set(
+        lock_entity_id,
+        "locked",
+        {
+            "code_format": r"^\d{4}$",
+            "supported_features": int(LockEntityFeature.OPEN),
+        },
+    )
+    climate_runtime = SimpleNamespace(
+        hass=hass,
+        config={
+            CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+            CONF_CLIMATE_ENTITY: climate_entity_id,
+        },
+    )
+    cover_runtime = SimpleNamespace(
+        hass=hass,
+        config={
+            CONF_APPLIANCE_TYPE: "sun_protection_cover",
+            CONF_COVER_ENTITY: cover_entity_id,
+        },
+    )
+    lock_runtime = SimpleNamespace(
+        hass=hass,
+        config={CONF_APPLIANCE_TYPE: "opening", CONF_LOCK_ENTITY: lock_entity_id},
+    )
+    climate_entry = MockConfigEntry(domain=DOMAIN, title="AC")
+    cover_entry = MockConfigEntry(domain=DOMAIN, title="Blind")
+    lock_entry = MockConfigEntry(domain=DOMAIN, title="Door")
+    climate = ApplianceClimateProxy(climate_runtime, climate_entry)
+    cover = ApplianceCoverProxy(cover_runtime, cover_entry)
+    lock = ApplianceLockProxy(lock_runtime, lock_entry)
+    climate.hass = cover.hass = lock.hass = hass
+
+    assert climate.hvac_mode is HVACMode.COOL
+    assert climate.native_current_temperature == 21.5
+    assert climate.native_target_temperature == 23
+    assert climate.supported_features == ClimateEntityFeature.TARGET_TEMPERATURE
+    assert cover.current_cover_position == 72
+    assert cover.supported_features == (
+        CoverEntityFeature.OPEN
+        | CoverEntityFeature.CLOSE
+        | CoverEntityFeature.SET_POSITION
+    )
+    assert lock.is_locked
+    assert lock.code_format == r"^\d{4}$"
+    assert lock.supported_features == LockEntityFeature.OPEN
+
+    calls = []
+
+    async def record_service_call(
+        _service_registry, domain, service, service_data, blocking=False
+    ):
+        calls.append((domain, service, service_data, blocking))
+
+    monkeypatch.setattr(type(hass.services), "async_call", record_service_call)
+    await climate.async_set_hvac_mode(HVACMode.OFF)
+    await climate.async_set_temperature(temperature=22)
+    await cover.async_set_cover_position(position=40)
+    await cover.async_close_cover()
+    await lock.async_unlock(code="1234")
+    await lock.async_lock()
+    await lock.async_open()
+
+    assert calls == [
+        ("climate", "set_hvac_mode", {"hvac_mode": HVACMode.OFF, "entity_id": climate_entity_id}, True),
+        ("climate", "set_temperature", {"temperature": 22, "entity_id": climate_entity_id}, True),
+        ("cover", "set_cover_position", {"position": 40, "entity_id": cover_entity_id}, True),
+        ("cover", "close_cover", {"entity_id": cover_entity_id}, True),
+        ("lock", "unlock", {"code": "1234", "entity_id": lock_entity_id}, True),
+        ("lock", "lock", {"entity_id": lock_entity_id}, True),
+        ("lock", "open", {"entity_id": lock_entity_id}, True),
+    ]
 
 
 @pytest.mark.asyncio
@@ -2567,3 +2721,83 @@ async def test_slow_pending_action_does_not_reschedule_after_unload(
     await hass.async_block_till_done()
 
     assert runtime._unsubscribe_timer is None
+
+
+@pytest.mark.parametrize("appliance_type", tuple(APPLIANCE_PROFILES))
+@pytest.mark.asyncio
+async def test_unconfigured_optional_outputs_are_not_exposed_for_every_profile(
+    hass, appliance_type, enable_custom_integrations
+):
+    profile = APPLIANCE_PROFILES[appliance_type]
+    config = {
+        CONF_APPLIANCE_TYPE: appliance_type,
+        "name": f"Test {appliance_type}",
+    }
+    for index, input_config in enumerate(profile.sensor_inputs):
+        if not input_config.required:
+            continue
+        source_entity_id = f"{input_config.domain}.{appliance_type}_{index}"
+        config[input_config.config_key] = source_entity_id
+        if input_config.domain == "sensor":
+            unit = "kWh" if "energy" in input_config.device_classes else "W"
+            hass.states.async_set(
+                source_entity_id,
+                "1",
+                {ATTR_UNIT_OF_MEASUREMENT: unit},
+            )
+        elif input_config.domain == "climate":
+            hass.states.async_set(
+                source_entity_id, "off", {"hvac_action": "idle"}
+            )
+        else:
+            hass.states.async_set(source_entity_id, "off")
+
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    stale_entities = []
+    for input_config in profile.sensor_inputs:
+        if input_config.required:
+            continue
+        if input_config.output_entity is not None:
+            platform = input_config.domain
+            unique_id = f"{entry.entry_id}_{input_config.output_entity}"
+        elif input_config in profile.inputs_requiring_wrapper:
+            platform = "binary_sensor"
+            input_name = input_config.config_key.removesuffix("_entity")
+            unique_id = f"{entry.entry_id}_input_{input_name}"
+        else:
+            continue
+        stale_entities.append(
+            registry.async_get_or_create(
+                platform,
+                DOMAIN,
+                unique_id,
+                config_entry=entry,
+            )
+        )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    for stale_entity in stale_entities:
+        assert registry.async_get(stale_entity.entity_id) is None
+
+    input_outputs = {
+        input_config.output_entity: input_config.config_key
+        for input_config in profile.sensor_inputs
+        if input_config.output_entity is not None
+    }
+    for key in ("power", "total_energy", "last_cycle_duration", "estimated_remaining"):
+        config_key = input_outputs.get(key)
+        expected = (
+            bool(config.get(config_key))
+            if config_key is not None
+            else key in profile.output_entities
+        )
+        entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{entry.entry_id}_{key}"
+        )
+        assert (entity_id is not None) == expected
+
+    assert await hass.config_entries.async_unload(entry.entry_id)

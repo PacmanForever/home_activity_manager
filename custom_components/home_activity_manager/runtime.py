@@ -40,6 +40,7 @@ from .const import (
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
     CONF_CLIMATE_ENTITY,
+    CONF_COVER_ENTITY,
     CONF_DOOR_ENTITY,
     CONF_ENERGY_ENTITY,
     CONF_DOOR_OPEN_ACTIONS,
@@ -89,6 +90,7 @@ _ENERGY_UPDATE_INTERVAL = timedelta(minutes=1)
 _ACTIVITY_SOURCE_KEYS = {
     "power": CONF_POWER_ENTITY,
     "climate": CONF_CLIMATE_ENTITY,
+    "cover": CONF_COVER_ENTITY,
     "running_sensor": CONF_RUNNING_ENTITY,
     "mail_motion": CONF_MAIL_MOTION_ENTITY,
     "mail_slot": CONF_MAIL_SLOT_ENTITY,
@@ -214,6 +216,8 @@ class ApplianceRuntime:
         )
         if "climate" in self.profile.detection_sources:
             self._apply_climate_state(source_state, now, initialize=True)
+        elif "cover" in self.profile.detection_sources:
+            self._apply_cover_state(source_state, now, initialize=True)
         elif "running_sensor" in self.profile.detection_sources:
             self._apply_running_state(source_state, now, initialize=True)
         elif "smart_plug" in self.profile.detection_sources:
@@ -385,6 +389,11 @@ class ApplianceRuntime:
         ):
             self._apply_climate_state(new_state, now)
         elif (
+            "cover" in self.profile.detection_sources
+            and entity_id == self.config.get(CONF_COVER_ENTITY)
+        ):
+            self._apply_cover_state(new_state, now)
+        elif (
             "running_sensor" in self.profile.detection_sources
             and entity_id == self.config.get(CONF_RUNNING_ENTITY)
         ):
@@ -486,6 +495,15 @@ class ApplianceRuntime:
         value = None
         if state is not None and state.state not in ("unknown", "unavailable"):
             value = "off" if state.state == "off" else "on"
+
+        self._apply_running_value(value, now, initialize)
+
+    def _apply_cover_state(
+        self, state: Any, now: datetime, initialize: bool = False
+    ) -> None:
+        value = None
+        if state is not None and state.state not in ("unknown", "unavailable"):
+            value = "off" if state.state == "closed" else "on"
 
         self._apply_running_value(value, now, initialize)
 

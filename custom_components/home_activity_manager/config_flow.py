@@ -11,7 +11,6 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er, selector
 
-from . import _async_appliance_device_id
 from .appliance_types import (
     APPLIANCE_CATEGORIES,
     APPLIANCE_TYPES,
@@ -23,6 +22,7 @@ from .const import (
     CONF_ALARM_REPEAT_COUNT,
     CONF_ALARM_REPEAT_INTERVAL_SECONDS,
     CONF_CLIMATE_ENTITY,
+    CONF_COVER_ENTITY,
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
     CONF_DOOR_ENTITY,
@@ -39,6 +39,7 @@ from .const import (
     CONF_MAIL_ARRIVAL_ACTIONS,
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
+    CONF_LOCK_ENTITY,
     CONF_MAX_RUNTIME_ACTIONS,
     CONF_MAX_RUNTIME_SECONDS,
     CONF_PENDING_ACTIONS,
@@ -74,6 +75,8 @@ _ENTRY_DATA_KEYS = {
     CONF_POWER_ENTITY,
     CONF_ENERGY_ENTITY,
     CONF_CLIMATE_ENTITY,
+    CONF_COVER_ENTITY,
+    CONF_LOCK_ENTITY,
     CONF_RUNNING_ENTITY,
     CONF_DOOR_ENTITY,
     CONF_PLUG_ENTITY,
@@ -110,23 +113,45 @@ class _LockedSelectSelector(selector.SelectSelector):
         return data
 
 
-class _DurationSelector(selector.TextSelector):
+class _DurationSelector(selector.DurationSelector):
+    def __init__(self) -> None:
+        super().__init__({"enable_day": True, "allow_negative": False})
+
     def __call__(self, data: Any) -> Any:
-        if not isinstance(data, str):
+        if data in (None, ""):
             return data
-        parts = data.split(":")
-        if (
-            len(parts) != 3
-            or len(parts[0]) < 2
-            or len(parts[1]) != 2
-            or len(parts[2]) != 2
-            or not all(part.isdigit() for part in parts)
-        ):
+
+        if isinstance(data, (int, float)):
             return data
-        hours, minutes, seconds = (int(part) for part in parts)
-        if minutes >= 60 or seconds >= 60:
-            return data
-        return hours * 3600 + minutes * 60 + seconds
+
+        if isinstance(data, str):
+            parts = data.split(":")
+            if (
+                len(parts) == 3
+                and len(parts[0]) >= 2
+                and len(parts[1]) == 2
+                and len(parts[2]) == 2
+                and all(part.isdigit() for part in parts)
+            ):
+                hours, minutes, seconds = (int(part) for part in parts)
+                if minutes < 60 and seconds < 60:
+                    return hours * 3600 + minutes * 60 + seconds
+            raise vol.Invalid("Invalid duration")
+
+        duration = super().__call__(data)
+        total_seconds = sum(
+            float(duration.get(unit, 0)) * multiplier
+            for unit, multiplier in (
+                ("days", 86400),
+                ("hours", 3600),
+                ("minutes", 60),
+                ("seconds", 1),
+                ("milliseconds", 0.001),
+            )
+        )
+        if not math.isfinite(total_seconds):
+            raise vol.Invalid("Invalid duration")
+        return round(total_seconds)
 
 
 def _number_selector(unit: str, step: float = 0.1) -> selector.NumberSelector:
@@ -139,7 +164,7 @@ def _number_selector(unit: str, step: float = 0.1) -> selector.NumberSelector:
     )
 
 
-def _format_duration_input(value: Any) -> Any:
+def _duration_components_from_seconds(value: Any) -> Any:
     if value in (None, ""):
         return value
     try:
@@ -149,9 +174,15 @@ def _format_duration_input(value: Any) -> Any:
     if not math.isfinite(numeric_seconds) or numeric_seconds < 0:
         return str(value)
     total_seconds = round(numeric_seconds)
-    hours, remainder = divmod(total_seconds, 3600)
+    days, remainder = divmod(total_seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
     minutes, seconds = divmod(remainder, 60)
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    return {
+        "days": days,
+        "hours": hours,
+        "minutes": minutes,
+        "seconds": seconds,
+    }
 
 
 def _duration_marker(
@@ -159,10 +190,12 @@ def _duration_marker(
 ) -> vol.Marker:
     if optional:
         if key in values:
-            return vol.Optional(key, default=_format_duration_input(values[key]))
+            return vol.Optional(
+                key, default=_duration_components_from_seconds(values[key])
+            )
         return vol.Optional(key)
     return vol.Required(
-        key, default=_format_duration_input(values.get(key, default))
+        key, default=_duration_components_from_seconds(values.get(key, default))
     )
 
 
@@ -299,22 +332,6 @@ def _sensor_schema(
                 for device_class in sensor_input.device_classes
             ]
             selector_config = selector.EntitySelectorConfig(filter=entity_filter)
-        elif sensor_input.domain == "climate":
-            selected_entity_id = values.get(sensor_input.config_key)
-            excluded_entities = (
-                [
-                    entity.entity_id
-                    for entity in er.async_get(hass).entities.values()
-                    if entity.domain == "climate"
-                    and entity.device_id is not None
-                    and entity.entity_id != selected_entity_id
-                ]
-                if hass is not None
-                else []
-            )
-            selector_config = selector.EntitySelectorConfig(
-                domain=sensor_input.domain, exclude_entities=excluded_entities
-            )
         else:
             selector_config = selector.EntitySelectorConfig(domain=sensor_input.domain)
         entity_selector = selector.EntitySelector(selector_config)
@@ -511,19 +528,12 @@ def _validate_sensor_values(
 
 
 def _validate_climate_entity(
-    hass: HomeAssistant, entity_id: str | None, config_entry_id: str | None = None
+    hass: HomeAssistant, entity_id: str | None
 ) -> bool:
     if entity_id is None:
         return False
     entity_entry = er.async_get(hass).async_get(entity_id)
-    if entity_entry is None or entity_entry.domain != "climate":
-        return False
-    if entity_entry.device_id is None:
-        return True
-    if config_entry_id is None:
-        return False
-    appliance_device_id = _async_appliance_device_id(hass, config_entry_id)
-    return appliance_device_id is not None and entity_entry.device_id == appliance_device_id
+    return entity_entry is not None and entity_entry.domain == "climate"
 
 
 def _validate_pending(values: dict[str, Any]) -> bool:
@@ -693,7 +703,7 @@ def _entry_options(values: dict[str, Any]) -> dict[str, Any]:
 class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle initial setup of one appliance."""
 
-    VERSION = 5
+    VERSION = 6
 
     def __init__(self) -> None:
         self._draft: dict[str, Any] = {}
@@ -833,6 +843,8 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_activity_mode_refrigerator = async_step_activity_mode
     async_step_activity_mode_washer = async_step_activity_mode
     async_step_activity_mode_dishwasher = async_step_activity_mode
+    async_step_activity_mode_opening = async_step_activity_mode
+    async_step_activity_mode_sun_protection = async_step_activity_mode
     async_step_sensors_air_conditioner_climate = async_step_sensors
     async_step_parameters_air_conditioner_climate = async_step_parameters
     async_step_actions_air_conditioner_climate = async_step_actions
@@ -863,6 +875,15 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_sensors_mailbox_slot = async_step_sensors
     async_step_parameters_mailbox_slot = async_step_parameters
     async_step_actions_mailbox_slot = async_step_actions
+    async_step_sensors_opening = async_step_sensors
+    async_step_parameters_opening = async_step_parameters
+    async_step_actions_opening = async_step_actions
+    async_step_sensors_sun_protection_contact = async_step_sensors
+    async_step_parameters_sun_protection_contact = async_step_parameters
+    async_step_actions_sun_protection_contact = async_step_actions
+    async_step_sensors_sun_protection_cover = async_step_sensors
+    async_step_parameters_sun_protection_cover = async_step_parameters
+    async_step_actions_sun_protection_cover = async_step_actions
 
     @staticmethod
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
@@ -929,9 +950,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             if (
                 "climate" in profile.detection_sources
                 and not _validate_climate_entity(
-                    self.hass,
-                    values.get(CONF_CLIMATE_ENTITY),
-                    self.config_entry.entry_id,
+                    self.hass, values.get(CONF_CLIMATE_ENTITY)
                 )
             ):
                 return self.async_show_form(
@@ -1047,3 +1066,12 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_sensors_mailbox_slot = async_step_sensors
     async_step_parameters_mailbox_slot = async_step_parameters
     async_step_actions_mailbox_slot = async_step_actions
+    async_step_sensors_opening = async_step_sensors
+    async_step_parameters_opening = async_step_parameters
+    async_step_actions_opening = async_step_actions
+    async_step_sensors_sun_protection_contact = async_step_sensors
+    async_step_parameters_sun_protection_contact = async_step_parameters
+    async_step_actions_sun_protection_contact = async_step_actions
+    async_step_sensors_sun_protection_cover = async_step_sensors
+    async_step_parameters_sun_protection_cover = async_step_parameters
+    async_step_actions_sun_protection_cover = async_step_actions

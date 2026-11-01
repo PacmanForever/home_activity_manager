@@ -28,6 +28,9 @@ _RUNNING_ICONS = {
     "air_conditioner_power": ("mdi:hvac", "mdi:hvac-off"),
     "refrigerator": ("mdi:fridge", "mdi:fridge-off"),
     "refrigerator_switch": ("mdi:fridge", "mdi:fridge-off"),
+    "sun_protection_contact": ("mdi:blinds-open", "mdi:blinds"),
+    "sun_protection_cover": ("mdi:blinds-open", "mdi:blinds"),
+    "opening": ("mdi:door-open", "mdi:door-closed"),
 }
 
 _DOOR_ICONS = {
@@ -85,7 +88,7 @@ class ApplianceBinarySensor(BinarySensorEntity):
             (
                 item
                 for item in self._runtime.profile.sensor_inputs
-                if item.detection_source == "running_sensor"
+                if item.detection_source in ("running_sensor", "cover")
             ),
             None,
         )
@@ -93,6 +96,11 @@ class ApplianceBinarySensor(BinarySensorEntity):
             state = self.hass.states.get(
                 self._runtime.config.get(source_input.config_key)
             )
+            if source_input.detection_source == "cover":
+                return state is not None and state.state not in (
+                    "unknown",
+                    "unavailable",
+                )
             return state is not None and state.state in ("on", "off")
         return super().available
 
@@ -288,14 +296,17 @@ async def async_setup_entry(
     )
     registry = er.async_get(hass)
     expected_unique_ids = {
+        entity.unique_id for entity in entities
+    } | {
         f"{entry.entry_id}_input_{input_config.config_key.removesuffix('_entity')}"
         for input_config in input_wrappers
     }
-    input_prefix = f"{entry.entry_id}_input_"
+    entity_prefix = f"{entry.entry_id}_"
     for registered_entity in tuple(registry.entities.values()):
         if (
             registered_entity.config_entry_id == entry.entry_id
-            and registered_entity.unique_id.startswith(input_prefix)
+            and registered_entity.domain == "binary_sensor"
+            and registered_entity.unique_id.startswith(entity_prefix)
             and registered_entity.unique_id not in expected_unique_ids
         ):
             registry.async_remove(registered_entity.entity_id)

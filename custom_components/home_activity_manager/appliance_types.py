@@ -6,6 +6,8 @@ from .const import (
     CONF_DOOR_ENTITY,
     CONF_ENERGY_ENTITY,
     CONF_CLIMATE_ENTITY,
+    CONF_COVER_ENTITY,
+    CONF_LOCK_ENTITY,
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
     CONF_PLUG_ENTITY,
@@ -391,6 +393,68 @@ APPLIANCE_PROFILES = {
             estimates_remaining=False,
             supports_max_runtime=False,
         ),
+    "sun_protection_contact": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="sun_protection_contact_sensor",
+                config_key=CONF_RUNNING_ENTITY,
+                domain="binary_sensor",
+                device_classes=("opening",),
+                required=True,
+                detection_source="running_sensor",
+                output_entity="running",
+            ),
+        ),
+        parameter_groups=(),
+        action_groups=("cycle_start", "cycle_finish"),
+        output_entities=("last_cycle_duration", "running"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
+    "sun_protection_cover": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="sun_protection_cover_entity",
+                config_key=CONF_COVER_ENTITY,
+                domain="cover",
+                required=True,
+                detection_source="cover",
+                create_wrapper=False,
+            ),
+        ),
+        parameter_groups=(),
+        action_groups=("cycle_start", "cycle_finish"),
+        output_entities=("last_cycle_duration", "running"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
+    "opening": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="opening_sensor",
+                config_key=CONF_RUNNING_ENTITY,
+                domain="binary_sensor",
+                device_classes=("opening",),
+                required=True,
+                detection_source="running_sensor",
+                output_entity="running",
+            ),
+            SensorInput(
+                form_key="opening_lock_entity",
+                config_key=CONF_LOCK_ENTITY,
+                domain="lock",
+                create_wrapper=False,
+            ),
+        ),
+        parameter_groups=(),
+        action_groups=("cycle_start", "cycle_finish"),
+        output_entities=("last_cycle_duration", "running"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
     "mailbox_motion": ApplianceTypeProfile(
         sensor_inputs=(
             SensorInput(
@@ -407,7 +471,6 @@ APPLIANCE_PROFILES = {
                 config_key=CONF_DOOR_ENTITY,
                 domain="binary_sensor",
                 device_classes=("door",),
-                required=True,
                 output_entity="door",
             ),
         ),
@@ -434,7 +497,6 @@ APPLIANCE_PROFILES = {
                 config_key=CONF_DOOR_ENTITY,
                 domain="binary_sensor",
                 device_classes=("door",),
-                required=True,
                 output_entity="door",
             ),
         ),
@@ -455,7 +517,12 @@ APPLIANCE_CATEGORIES = {
     },
     "dryer": {"power": "dryer"},
     "mailbox": {"mail_slot": "mailbox_slot", "mail_motion": "mailbox_motion"},
+    "opening": {"running_sensor": "opening"},
     "refrigerator": {"smart_plug": "refrigerator_switch", "power": "refrigerator"},
+    "sun_protection": {
+        "running_sensor": "sun_protection_contact",
+        "cover": "sun_protection_cover",
+    },
     "washer": {"power": "washer"},
     "dishwasher": {"power": "dishwasher"},
 }
@@ -469,10 +536,13 @@ APPLIANCE_TYPES = (
     "dryer",
     "mailbox_slot",
     "mailbox_motion",
-        "refrigerator_switch",
-        "refrigerator",
-        "washer",
-        "dishwasher",
+    "refrigerator_switch",
+    "refrigerator",
+    "opening",
+    "sun_protection_cover",
+    "sun_protection_contact",
+    "washer",
+    "dishwasher",
 )
 
 
@@ -487,6 +557,9 @@ APPLIANCE_MODEL_NAMES = {
     "refrigerator_switch": "Refrigerator (smart switch)",
     "mailbox_motion": "Mailbox (interior motion sensor)",
     "mailbox_slot": "Mailbox (mail-slot contact/opening sensor)",
+    "opening": "Opening (contact sensor)",
+    "sun_protection_contact": "Sun protection (contact sensor)",
+    "sun_protection_cover": "Sun protection (cover)",
 }
 
 
