@@ -164,6 +164,8 @@ class ApplianceRuntime:
         self.max_runtime_fired = False
         self._energy_power_w: float | None = None
         self._energy_updated_at: datetime | None = None
+        self._external_energy_reset_baseline_kwh: float | None = None
+        self._external_energy_reset_pending = False
         self._listeners: set[Callable[[], None]] = set()
         self._action_locks: dict[str, asyncio.Lock] = {}
         self._unsubscribe_states: Callable[[], None] | None = None
@@ -198,6 +200,11 @@ class ApplianceRuntime:
         for entity_id in entity_ids:
             self._update_input_availability(
                 entity_id, self.hass.states.get(entity_id)
+            )
+        energy_entity = self.config.get(CONF_ENERGY_ENTITY)
+        if energy_entity:
+            self._update_external_energy_reset_baseline(
+                self.hass.states.get(energy_entity)
             )
 
         now = dt_util.utcnow()
@@ -300,7 +307,19 @@ class ApplianceRuntime:
         entity_id = self.config.get(CONF_ENERGY_ENTITY)
         if not entity_id:
             return self.energy_kwh
-        state = self.hass.states.get(entity_id)
+        source_energy_kwh = self._external_energy_kwh(
+            self.hass.states.get(entity_id)
+        )
+        if source_energy_kwh is None:
+            return None
+        baseline = self._external_energy_reset_baseline_kwh
+        if baseline is None:
+            return source_energy_kwh
+        return max(source_energy_kwh - baseline, 0.0)
+
+    @staticmethod
+    def _external_energy_kwh(state: Any) -> float | None:
+        """Convert a valid external energy state to kWh."""
         if state is None:
             return None
         unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
@@ -313,12 +332,32 @@ class ApplianceRuntime:
             return None
         return converted if math.isfinite(converted) and converted >= 0 else None
 
+    def _update_external_energy_reset_baseline(self, state: Any) -> None:
+        """Capture a pending reset or follow a reset of the external counter."""
+        source_energy_kwh = self._external_energy_kwh(state)
+        if source_energy_kwh is None:
+            return
+        baseline = self._external_energy_reset_baseline_kwh
+        if self._external_energy_reset_pending or (
+            baseline is not None and source_energy_kwh < baseline
+        ):
+            self._external_energy_reset_baseline_kwh = source_energy_kwh
+            self._external_energy_reset_pending = False
+            self._schedule_save()
+
     def reset_local_energy(self) -> None:
-        """Reset the locally calculated total without changing an external source."""
+        """Reset the integration's energy total without changing its source."""
         if not self.config.get(CONF_POWER_ENTITY):
             return
         self._integrate_energy_to(dt_util.utcnow())
         self.energy_kwh = 0.0
+        energy_entity = self.config.get(CONF_ENERGY_ENTITY)
+        if energy_entity:
+            source_energy_kwh = self._external_energy_kwh(
+                self.hass.states.get(energy_entity)
+            )
+            self._external_energy_reset_baseline_kwh = source_energy_kwh
+            self._external_energy_reset_pending = source_energy_kwh is None
         self._schedule_save()
         self._notify()
 
@@ -370,6 +409,7 @@ class ApplianceRuntime:
         elif entity_id == self.config.get(CONF_PLUG_ENTITY):
             self._notify()
         elif entity_id == self.config.get(CONF_ENERGY_ENTITY):
+            self._update_external_energy_reset_baseline(new_state)
             self._notify()
         elif entity_id in self._configured_inputs.values():
             self._notify()
@@ -968,6 +1008,11 @@ class ApplianceRuntime:
             "power_entity": self.config.get(CONF_POWER_ENTITY),
             "last_valid_power_w": self._last_valid_power_w,
             "energy_kwh": self.energy_kwh,
+            "energy_entity": self.config.get(CONF_ENERGY_ENTITY),
+            "external_energy_reset_baseline_kwh": (
+                self._external_energy_reset_baseline_kwh
+            ),
+            "external_energy_reset_pending": self._external_energy_reset_pending,
             "door_open": self.door_open,
             "pending_unload": self.pending_unload,
             "pending_reminder_count": self.pending_reminder_count,
@@ -1033,6 +1078,23 @@ class ApplianceRuntime:
             if not math.isfinite(energy) or energy < 0:
                 raise ValueError("Invalid stored energy")
             self.energy_kwh = energy
+            if stored.get("energy_entity", self.config.get(CONF_ENERGY_ENTITY)) == self.config.get(
+                CONF_ENERGY_ENTITY
+            ):
+                baseline = stored.get("external_energy_reset_baseline_kwh")
+                if baseline is not None:
+                    if isinstance(baseline, bool):
+                        raise ValueError("Invalid stored energy baseline")
+                    baseline = float(baseline)
+                    if not math.isfinite(baseline) or baseline < 0:
+                        raise ValueError("Invalid stored energy baseline")
+                self._external_energy_reset_baseline_kwh = baseline
+                self._external_energy_reset_pending = bool(
+                    stored.get("external_energy_reset_pending", False)
+                )
+            else:
+                self._external_energy_reset_baseline_kwh = None
+                self._external_energy_reset_pending = False
             door_open = stored.get("door_open")
             self.door_open = door_open if isinstance(door_open, bool) else None
             self.pending_unload = bool(stored.get("pending_unload", False))
@@ -1084,6 +1146,8 @@ class ApplianceRuntime:
             )
             self._last_valid_power_w = None
             self.energy_kwh = 0.0
+            self._external_energy_reset_baseline_kwh = None
+            self._external_energy_reset_pending = False
             self.door_open = None
             self.pending_unload = False
             self.pending_reminder_count = 0

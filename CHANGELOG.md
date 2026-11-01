@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.9.11 - 2026-11-01
+
+### Changed
+
+- Reset the integration's displayed energy total to zero without changing an external energy sensor; show later increases from the reset baseline.
+
+### Removed
+
+- Remove the obsolete generic HACS integration creation guide.
+
 ## v0.9.10 - 2026-10-31
 
 ### Changed
