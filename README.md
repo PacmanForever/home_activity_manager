@@ -71,7 +71,7 @@ The integration works on supported Home Assistant versions; displaying its local
 
 Each configured device has a separate config entry. Its profile and any available activity mode are fixed after setup and shown when editing; create a new device to change them. Setup asks for:
 
-In Home Assistant's device registry, appliances are grouped under a shared parent for their exact profile, such as "Thermostat (climate entity)". Each appliance remains an independent child device with its own entities, runtime state, and configuration. Removing an appliance leaves the group while other appliances use it; removing the last appliance removes the empty group.
+In Home Assistant's device registry, every supported profile has a shared parent device, such as "Thermostat (climate entity)". All profile groups appear as soon as at least one Home Activity Manager appliance is configured, even when a profile has no appliances yet. Each appliance remains an independent child device with its own entities, runtime state, and configuration. The profile groups remain while any Home Activity Manager appliance is configured and are removed when the last appliance is deleted.
 
 1. A device profile, name, and activity mode when that profile offers a choice.
 2. The required activity source and any optional compatible sensors or controls. A refrigerator requires a door contact; a mailbox requires a separate main-door contact; opening can optionally include a lock.

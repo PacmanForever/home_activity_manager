@@ -61,7 +61,10 @@ from custom_components.home_activity_manager import (
 from custom_components.home_activity_manager import runtime as runtime_module
 from custom_components.home_activity_manager.appliance import ApplianceCycleDetector
 from custom_components.home_activity_manager.sensor import _format_duration
-from custom_components.home_activity_manager.appliance_types import APPLIANCE_PROFILES
+from custom_components.home_activity_manager.appliance_types import (
+    APPLIANCE_PROFILES,
+    APPLIANCE_TYPES,
+)
 from custom_components.home_activity_manager.runtime import ApplianceRuntime
 from custom_components.home_activity_manager.binary_sensor import (
     ApplianceBinarySensor,
@@ -805,7 +808,15 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     assert appliance_device is not None
     assert profile_device is not None
     assert appliance_device.via_device_id == profile_device.id
-    assert profile_device.name == "Washer"
+    profile_identifiers = {
+        identifier[1]
+        for device in device_registry.devices.values()
+        for identifier in device.identifiers
+        if identifier[0] == DOMAIN and identifier[1].startswith("profile:")
+    }
+    assert profile_identifiers == {
+        f"profile:{appliance_type}" for appliance_type in APPLIANCE_TYPES
+    }
 
     registry = er.async_get(hass)
     entry_entities = [
@@ -853,7 +864,7 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
 
 
 @pytest.mark.asyncio
-async def test_appliances_share_profile_device_until_last_removal(
+async def test_appliances_share_profile_devices_and_keep_all_profiles_visible(
     hass, enable_custom_integrations
 ):
     entries = []
@@ -879,14 +890,15 @@ async def test_appliances_share_profile_device_until_last_removal(
         identifiers={(DOMAIN, "profile:washer")}
     )
     assert profile_device is not None
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, "profile:thermostat_climate")}
+    ) is not None
     appliance_devices = [
         device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
         for entry in entries
     ]
     assert all(device is not None for device in appliance_devices)
-    assert {device.via_device_id for device in appliance_devices} == {
-        profile_device.id
-    }
+    assert all(device.via_device_id == profile_device.id for device in appliance_devices)
 
     await hass.config_entries.async_remove(entries[0].entry_id)
     assert (

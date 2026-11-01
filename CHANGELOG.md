@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.17 - 2026-11-01
+
+### Changed
+
+- Keep appliances grouped under their profile devices and register every profile group, including types without configured appliances, while the integration has at least one appliance entry.
+
 ## v0.9.16 - 2026-11-01
 
 ### Added
