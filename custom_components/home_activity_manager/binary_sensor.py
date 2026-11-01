@@ -16,6 +16,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .appliance_types import SensorInput, get_appliance_model
 from .const import CONF_DOOR_ENTITY, CONF_MAIL_SLOT_ENTITY, DOMAIN
+from .entity_proxy import _suggested_proxy_object_id
 from .runtime import ApplianceRuntime
 
 
@@ -190,6 +191,11 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
             self._attr_device_class = BinarySensorDeviceClass(
                 input_config.device_classes[0]
             )
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Suggest a binary sensor ID derived from the wrapped input."""
+        return _suggested_proxy_object_id(self._source_entity_id)
 
     @property
     def is_on(self) -> bool | None:

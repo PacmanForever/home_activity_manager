@@ -21,7 +21,7 @@
       "activity_mode_washer": {"title": "Washer detection mode", "data": {"activity_mode": "How this washer detects activity"}, "data_description": {"activity_mode": "Choose the dedicated detection method for this washer."}},
       "activity_mode_dishwasher": {"title": "Dishwasher detection mode", "data": {"activity_mode": "How this dishwasher detects activity"}, "data_description": {"activity_mode": "Choose the dedicated detection method for this dishwasher."}},
       "activity_mode_opening": {"title": "Opening detection mode", "data": {"activity_mode": "How this opening reports its state"}, "data_description": {"activity_mode": "Choose the contact sensor that reports open and closed states."}},
-      "activity_mode_sun_protection": {"title": "Sun-protection detection mode", "data": {"activity_mode": "How this sun protection reports its state"}, "data_description": {"activity_mode": "Choose a contact sensor or a cover entity."}},
+      "activity_mode_sun_protection": {"title": "Sun-protection detection mode", "data": {"activity_mode": "How this sun protection reports its state"}, "data_description": {"activity_mode": "Contact sensors report open/closed position, not whether the motor is moving. Cover entities provide their current cover state."}},
       "sensors_opening": {"title": "Opening sensors", "data": {"opening_sensor": "Opening contact sensor (required)", "opening_lock_entity": "Lock (optional)"}},
       "parameters_opening": {"title": "Opening parameters", "data": {}},
       "actions_opening": {"title": "Opening actions", "data": {"start_actions": "Actions when the cycle starts (optional)", "finish_actions": "Actions when the cycle ends (optional)"}},
@@ -145,8 +145,8 @@
     "activity_mode_refrigerator": {"options": {"smart_plug": "Smart switch (on = refrigerator active)", "power": "Power sensor (follows start and stop thresholds)"}},
     "activity_mode_washer": {"options": {"power": "Power sensor (follows start and stop thresholds)"}},
     "activity_mode_dishwasher": {"options": {"power": "Power sensor (follows start and stop thresholds)"}},
-    "activity_mode_opening": {"options": {"running_sensor": "Contact sensor (open = opening active)"}},
-    "activity_mode_sun_protection": {"options": {"running_sensor": "Contact sensor (open = active)", "cover": "Cover entity (not closed = active)"}},
+    "activity_mode_opening": {"options": {"running_sensor": "Contact sensor (reports open/closed state, not movement)"}},
+    "activity_mode_sun_protection": {"options": {"running_sensor": "Contact sensor (reports open/closed, not motor motion)", "cover": "Cover entity (not closed = active)"}},
     "appliance_type": {
       "options": {
         "washer": "Washer",
@@ -177,7 +177,7 @@
     },
     "binary_sensor": {
       "running": {"name": "Running"},
-      "input_running": {"name": "Contact/opening sensor"},
+      "input_running": {"name": "Open/closed contact state"},
       "input_mail_motion": {"name": "Motion sensor"},
       "input_door": {"name": "Main-door contact/opening sensor"},
       "input_mail_slot": {"name": "Mail-slot contact/opening sensor"},

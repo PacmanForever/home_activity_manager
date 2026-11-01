@@ -210,7 +210,10 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             "compressor_inactive_alarm": CONF_COMPRESSOR_INACTIVE_ACTIONS,
             "plug_off_alarm": CONF_PLUG_OFF_ACTIONS,
         }
-        expected_input_wrappers = {}
+        expected_input_wrappers = {
+            "opening": {CONF_RUNNING_ENTITY},
+            "sun_protection_contact": {CONF_RUNNING_ENTITY},
+        }
         for appliance_type, profile in APPLIANCE_PROFILES.items():
             with self.subTest(appliance_type=appliance_type):
                 self.assertEqual(
@@ -387,6 +390,18 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                         }
                         for device_class in profile.door_sensor_input.device_classes
                     ],
+                )
+
+        for appliance_type in ("opening", "sun_protection_contact"):
+            with self.subTest(appliance_type=appliance_type):
+                contact_input = next(
+                    item
+                    for item in APPLIANCE_PROFILES[appliance_type].sensor_inputs
+                    if item.detection_source is not None
+                )
+                self.assertEqual(
+                    contact_input.device_classes,
+                    ("opening", "door", "window"),
                 )
 
     def test_refrigerator_requires_door_and_valid_alarm_limits(self) -> None:

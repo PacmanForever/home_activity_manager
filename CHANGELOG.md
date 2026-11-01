@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.9.15 - 2026-11-01
+
+### Changed
+
+- Expose contact-based openings and sun protection as open/closed state instead of reporting them as running; retain contact-driven cycle tracking.
+- Accept opening, door, and window binary-sensor classes in contact selectors.
+- Derive proxy entity IDs from their wrapped source entities.
+
 ## v0.9.14 - 2026-11-01
 
 ### Changed

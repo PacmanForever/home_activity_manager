@@ -13,6 +13,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .appliance_types import get_appliance_model
 from .const import CONF_PLUG_ENTITY, DOMAIN
+from .entity_proxy import _suggested_proxy_object_id
 from .runtime import ApplianceRuntime
 
 
@@ -32,6 +33,11 @@ class AppliancePlugSwitch(SwitchEntity):
             name=runtime.config.get("name", entry.title),
             model=get_appliance_model(runtime.config.get("appliance_type")),
         )
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Suggest a switch entity ID derived from the wrapped plug."""
+        return _suggested_proxy_object_id(self._entity_id)
 
     @property
     def is_on(self) -> bool | None:

@@ -21,7 +21,7 @@
       "activity_mode_washer": {"title": "Modalidad de detección de la lavadora", "data": {"activity_mode": "Cómo detecta la actividad esta lavadora"}, "data_description": {"activity_mode": "Elige la modalidad de detección propia de la lavadora."}},
       "activity_mode_dishwasher": {"title": "Modalidad de detección del lavavajillas", "data": {"activity_mode": "Cómo detecta la actividad este lavavajillas"}, "data_description": {"activity_mode": "Elige la modalidad de detección propia del lavavajillas."}},
       "activity_mode_opening": {"title": "Modalidad de detección de la apertura", "data": {"activity_mode": "Cómo informa de su estado esta apertura"}, "data_description": {"activity_mode": "Elige el sensor de contacto que informa de los estados abierto y cerrado."}},
-      "activity_mode_sun_protection": {"title": "Modalidad de detección de la protección solar", "data": {"activity_mode": "Cómo informa de su estado esta protección solar"}, "data_description": {"activity_mode": "Elige un sensor de contacto o una entidad cover."}},
+      "activity_mode_sun_protection": {"title": "Modalidad de detección de la protección solar", "data": {"activity_mode": "Cómo informa de su estado esta protección solar"}, "data_description": {"activity_mode": "El contacto informa de la posición abierto/cerrado, no de si el motor se está moviendo. La entidad cover informa de su estado."}},
       "sensors_opening": {"title": "Sensores de la apertura", "data": {"opening_sensor": "Sensor de contacto de la apertura (obligatorio)", "opening_lock_entity": "Cerradura (opcional)"}},
       "parameters_opening": {"title": "Parámetros de la apertura", "data": {}},
       "actions_opening": {"title": "Acciones de la apertura", "data": {"start_actions": "Acciones cuando empieza el ciclo (opcional)", "finish_actions": "Acciones cuando termina el ciclo (opcional)"}},
@@ -145,8 +145,8 @@
     "activity_mode_refrigerator": {"options": {"smart_plug": "Interruptor inteligente (encendido = frigorífico activo)", "power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
     "activity_mode_washer": {"options": {"power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
     "activity_mode_dishwasher": {"options": {"power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
-    "activity_mode_opening": {"options": {"running_sensor": "Sensor de contacto (abierto = apertura activa)"}},
-    "activity_mode_sun_protection": {"options": {"running_sensor": "Sensor de contacto (abierto = activo)", "cover": "Entidad cover (cualquier estado salvo cerrado = activa)"}},
+    "activity_mode_opening": {"options": {"running_sensor": "Sensor de contacto (indica estado abierto/cerrado, no movimiento)"}},
+    "activity_mode_sun_protection": {"options": {"running_sensor": "Sensor de contacto (indica abierto/cerrado, no el movimiento del motor)", "cover": "Entidad cover (cualquier estado salvo cerrado = activa)"}},
     "appliance_type": {
       "options": {
         "washer": "Lavadora",
@@ -177,7 +177,7 @@
     },
     "binary_sensor": {
       "running": {"name": "En funcionamiento"},
-      "input_running": {"name": "Sensor de contacto/apertura"},
+      "input_running": {"name": "Estado del contacto abierto/cerrado"},
       "input_mail_motion": {"name": "Sensor de movimiento"},
       "input_door": {"name": "Sensor de contacto/apertura de la puerta principal"},
       "input_mail_slot": {"name": "Sensor de contacto/apertura de la trampilla"},

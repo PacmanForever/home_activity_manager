@@ -869,12 +869,19 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
     plug_id = registry.async_get_entity_id("switch", DOMAIN, f"{entry.entry_id}_plug")
     assert energy_id is not None
     assert float(hass.states.get(energy_id).state) == pytest.approx(2.5)
+    assert energy_id == "sensor.air_conditioner_total_energy"
     reset_button_id = registry.async_get_entity_id(
         "button", DOMAIN, f"{entry.entry_id}_energy_reset"
     )
     assert (reset_button_id is not None) == with_power
     assert (power_id is not None) == with_power
+    if power_id is not None:
+        assert power_id == "sensor.air_conditioner_current_power"
     assert plug_id is not None
+    assert plug_id == (
+        "switch.air_conditioner_"
+        f"{config[CONF_PLUG_ENTITY].split('.', maxsplit=1)[1]}_ham_proxy"
+    )
     if reset_button_id is not None:
         entry.runtime_data.energy_kwh = 1.25
         await hass.services.async_call(
@@ -1279,6 +1286,90 @@ async def test_contact_profile_tracks_louver_sensor_without_power_entities(
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
+@pytest.mark.asyncio
+async def test_sun_protection_contact_tracks_position_without_running_output(
+    hass, monkeypatch, enable_custom_integrations
+):
+    current_time = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: current_time[0])
+    config = {
+        CONF_APPLIANCE_TYPE: "sun_protection_contact",
+        CONF_RUNNING_ENTITY: "binary_sensor.awning_contact",
+        "name": "Awning",
+    }
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    registry = er.async_get(hass)
+    position_entity_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_input_running"
+    )
+    assert position_entity_id is not None
+    assert position_entity_id == (
+        "binary_sensor.awning_"
+        f"{config[CONF_RUNNING_ENTITY].split('.', maxsplit=1)[1]}_ham_proxy"
+    )
+    assert hass.states.get(position_entity_id).state == "off"
+    assert hass.states.get(position_entity_id).attributes["device_class"] == "opening"
+    assert registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_running"
+    ) is None
+
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
+    await hass.async_block_till_done()
+    assert entry.runtime_data.detector.is_running
+    assert hass.states.get(position_entity_id).state == "on"
+
+    current_time[0] += timedelta(seconds=12)
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    await hass.async_block_till_done()
+    assert not entry.runtime_data.detector.is_running
+    assert entry.runtime_data.detector.last_cycle_duration == timedelta(seconds=12)
+    assert hass.states.get(position_entity_id).state == "off"
+
+
+@pytest.mark.asyncio
+async def test_opening_contact_tracks_position_without_running_output(
+    hass, monkeypatch, enable_custom_integrations
+):
+    current_time = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: current_time[0])
+    config = {
+        CONF_APPLIANCE_TYPE: "opening",
+        CONF_RUNNING_ENTITY: "binary_sensor.front_door_contact",
+        "name": "Front door",
+    }
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    registry = er.async_get(hass)
+    position_entity_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_input_running"
+    )
+    assert position_entity_id is not None
+    assert hass.states.get(position_entity_id).state == "off"
+    assert hass.states.get(position_entity_id).attributes["device_class"] == "opening"
+    assert registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_running"
+    ) is None
+
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
+    await hass.async_block_till_done()
+    assert entry.runtime_data.detector.is_running
+    assert hass.states.get(position_entity_id).state == "on"
+
+    current_time[0] += timedelta(seconds=12)
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    await hass.async_block_till_done()
+    assert not entry.runtime_data.detector.is_running
+    assert entry.runtime_data.detector.last_cycle_duration == timedelta(seconds=12)
+    assert hass.states.get(position_entity_id).state == "off"
+
+
 @pytest.mark.parametrize(
     ("appliance_type", "inputs", "hidden_keys", "visible_keys"),
     (
@@ -1287,6 +1378,12 @@ async def test_contact_profile_tracks_louver_sensor_without_power_entities(
             {CONF_RUNNING_ENTITY: "binary_sensor.ac_louver"},
             ("input_running",),
             ("running",),
+        ),
+        (
+            "opening",
+            {CONF_RUNNING_ENTITY: "binary_sensor.opening_contact"},
+            ("running",),
+            ("input_running",),
         ),
         (
             "mailbox_motion",
@@ -1406,12 +1503,26 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
     device_id = _async_appliance_device_id(hass, entry)
     assert device_id is not None
     integration_registry = er.async_get(hass)
-    status_key = "pending_unload" if appliance_type.startswith("mailbox_") else "running"
-    status_entity_id = integration_registry.async_get_entity_id(
-        "binary_sensor", DOMAIN, f"{entry.entry_id}_{status_key}"
+    if appliance_type.startswith("mailbox_"):
+        status_key = "pending_unload"
+    elif appliance_type in ("opening", "sun_protection_contact"):
+        status_key = None
+    else:
+        status_key = "running"
+    status_entity_id = (
+        integration_registry.async_get_entity_id(
+            "binary_sensor", DOMAIN, f"{entry.entry_id}_{status_key}"
+        )
+        if status_key is not None
+        else None
     )
-    assert status_entity_id is not None
-    assert integration_registry.async_get(status_entity_id).device_id == device_id
+    if status_key is None:
+        assert integration_registry.async_get_entity_id(
+            "binary_sensor", DOMAIN, f"{entry.entry_id}_running"
+        ) is None
+    else:
+        assert status_entity_id is not None
+        assert integration_registry.async_get(status_entity_id).device_id == device_id
 
     for input_config, source_entity_id, original_device_id in input_entities:
         source = source_registry.async_get(source_entity_id)
@@ -1427,6 +1538,9 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             wrapper = integration_registry.async_get(wrapper_id)
             assert wrapper is not None
             assert wrapper.device_id == device_id
+            assert wrapper_id.endswith(
+                f"{source_entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
+            )
             assert hass.states.get(wrapper_id).attributes["source_entity"] == source_entity_id
             continue
 
@@ -1455,14 +1569,23 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             None,
         )
         assert wrapper is not None
-        if input_config.output_entity == status_key:
+        if status_key is not None and input_config.output_entity == status_key:
             assert wrapper.entity_id == status_entity_id
         else:
             assert wrapper.entity_id != status_entity_id
         assert wrapper.device_id == device_id
         wrapper_state = hass.states.get(wrapper.entity_id)
         assert wrapper_state is not None
+        if (
+            input_config.domain == "binary_sensor"
+            and input_config in profile.inputs_requiring_wrapper
+        ):
+            assert wrapper.entity_id.endswith(
+                f"{source_entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
+            )
         assert wrapper_state.attributes["source_entity"] == source_entity_id
+        if appliance_type in ("opening", "sun_protection_contact"):
+            assert wrapper_state.attributes["device_class"] == "opening"
         input_name = input_config.config_key.removesuffix("_entity")
         if input_config.domain in ("binary_sensor", "switch"):
             if input_config.output_entity == "running":
@@ -2100,6 +2223,14 @@ async def test_climate_wrapper_preserves_and_tracks_source_entity(
     assert registered_proxy.config_entry_id == entry.entry_id
     assert registered_proxy.device_id == device_id
     assert registered_proxy.hidden_by == er.RegistryEntryHider.INTEGRATION
+    assert proxy_entity_id == (
+        "climate.air_conditioner_"
+        f"{climate_entity.entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
+    )
+    custom_proxy_entity_id = "climate.custom_air_conditioner_proxy"
+    er.async_get(hass).async_update_entity(
+        proxy_entity_id, new_entity_id=custom_proxy_entity_id
+    )
     assert entry.runtime_data.detector.is_running
 
     hass.states.async_set(
@@ -2128,6 +2259,12 @@ async def test_climate_wrapper_preserves_and_tracks_source_entity(
     updated_data[CONF_CLIMATE_ENTITY] = replacement_climate.entity_id
     hass.config_entries.async_update_entry(entry, data=updated_data)
     await hass.async_block_till_done()
+    assert (
+        er.async_get(hass).async_get_entity_id(
+            "climate", DOMAIN, f"{entry.entry_id}_climate_proxy"
+        )
+        == custom_proxy_entity_id
+    )
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
     assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id is None
 
@@ -2236,6 +2373,9 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     lock = ApplianceLockProxy(lock_runtime, lock_entry)
     climate.hass = cover.hass = lock.hass = hass
 
+    assert climate.suggested_object_id == "original_ac_ham_proxy"
+    assert cover.suggested_object_id == "original_blind_ham_proxy"
+    assert lock.suggested_object_id == "original_door_ham_proxy"
     assert climate.hvac_mode is HVACMode.COOL
     assert [mode.value for mode in climate.hvac_modes] == ["off", "cool"]
     assert climate.hvac_action.value == "cooling"

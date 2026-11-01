@@ -13,10 +13,23 @@ from .const import DOMAIN
 from .runtime import ApplianceRuntime
 
 
+def _suggested_proxy_object_id(source_entity_id: str) -> str:
+    """Return an object ID that identifies this source-backed proxy."""
+    _, separator, object_id = source_entity_id.partition(".")
+    if not separator:
+        object_id = source_entity_id
+    return f"{object_id}_ham_proxy"
+
+
 class EntityProxyMixin:
     """Share source lookup, device association, and forwarding helpers."""
 
     _attr_entity_registry_visible_default = False
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Suggest an entity ID derived from the source entity."""
+        return _suggested_proxy_object_id(self._source_entity_id)
 
     def _init_proxy(
         self,

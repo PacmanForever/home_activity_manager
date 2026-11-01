@@ -37,14 +37,14 @@ Home Activity Manager brings compatible Home Assistant entities together under a
 	- **Mail-slot option:** detect incoming mail with a contact on the letter flap and expose its open/closed state as **Mail slot**.
 	- Both options track the mailbox cycle from detected arrival until collection. Cycle-start actions run on arrival; cycle-end actions run when the main door opens or pending collection is cleared. Reminders remain separate, and both options use a separate main-door contact.
 - **Opening**
-	- Detect activity from a required binary contact sensor. An optional lock is represented by a native lock proxy on the managed device; its standard controls forward to the original lock, which remains unchanged on its existing device.
+	- Expose the required binary contact's open/closed position; it does not report whether the opening is moving. Contact transitions still track cycle actions and duration. An optional lock is represented by a native lock proxy on the managed device; its standard controls forward to the original lock, which remains unchanged on its existing device.
 - **Sun protection**
-	- **Contact-sensor option:** use a binary sensor where `on` means open/active and `off` means closed/inactive.
+	- **Contact-sensor option:** expose the binary sensor's open/closed position. It does not indicate motor movement, so this mode has no `running` entity; contact transitions still track cycle actions and duration.
 	- **Cover option:** use a cover entity; open, opening, and closing states are active, while closed is inactive. A native cover proxy is added to the managed device and forwards standard cover controls to the original entity without moving or modifying it. Vendor-specific services are not proxied.
 - **Across all profiles**
 	- Configure consistent actions when a cycle starts and ends, plus any profile-specific reminders or alarms; restore cycle, reminder, and alarm state after Home Assistant restarts.
 	- On washer, dishwasher, dryer, and mailbox profiles, configure a separate action for when pending contents are removed or collected; it runs when the main door opens or pending status is cleared.
-	- See running state and last-active duration for cycle-based profiles; estimated remaining time is limited to laundry profiles.
+	- See running state when a profile can infer motion or activity. Opening and contact-only sun-protection profiles show open/closed position instead; last-cycle duration is available for cycle-based profiles.
 	- Monitor power and energy independently of activity detection for profiles with a selected power sensor. Use a cumulative energy sensor's total or calculate energy from power.
 	- Get a Repairs issue when a configured input is missing or unavailable; the issue clears when the input recovers.
 	- Run configured actions in order. Reminders and alarms wait for the previous run to finish before repeating.

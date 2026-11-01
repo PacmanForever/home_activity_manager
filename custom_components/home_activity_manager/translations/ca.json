@@ -21,7 +21,7 @@
       "activity_mode_washer": {"title": "Modalitat de detecció de la rentadora", "data": {"activity_mode": "Com detecta l’activitat aquesta rentadora"}, "data_description": {"activity_mode": "Tria la modalitat de detecció pròpia de la rentadora."}},
       "activity_mode_dishwasher": {"title": "Modalitat de detecció del rentaplats", "data": {"activity_mode": "Com detecta l’activitat aquest rentaplats"}, "data_description": {"activity_mode": "Tria la modalitat de detecció pròpia del rentaplats."}},
       "activity_mode_opening": {"title": "Modalitat de detecció de l’obertura", "data": {"activity_mode": "Com informa del seu estat aquesta obertura"}, "data_description": {"activity_mode": "Tria el sensor de contacte que informa dels estats obert i tancat."}},
-      "activity_mode_sun_protection": {"title": "Modalitat de detecció de la protecció solar", "data": {"activity_mode": "Com informa del seu estat aquesta protecció solar"}, "data_description": {"activity_mode": "Tria un sensor de contacte o una entitat cover."}},
+      "activity_mode_sun_protection": {"title": "Modalitat de detecció de la protecció solar", "data": {"activity_mode": "Com informa del seu estat aquesta protecció solar"}, "data_description": {"activity_mode": "El contacte informa de la posició obert/tancat, no del moviment del motor. L’entitat cover informa del seu estat."}},
       "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)"}},
       "parameters_opening": {"title": "Paràmetres de l’obertura", "data": {}},
       "actions_opening": {"title": "Accions de l’obertura", "data": {"start_actions": "Accions quan comença el cicle (opcional)", "finish_actions": "Accions quan acaba el cicle (opcional)"}},
@@ -145,8 +145,8 @@
     "activity_mode_refrigerator": {"options": {"smart_plug": "Interruptor intel·ligent (encès = nevera activa)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
     "activity_mode_washer": {"options": {"power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
     "activity_mode_dishwasher": {"options": {"power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
-    "activity_mode_opening": {"options": {"running_sensor": "Sensor de contacte (obert = obertura activa)"}},
-    "activity_mode_sun_protection": {"options": {"running_sensor": "Sensor de contacte (obert = actiu)", "cover": "Entitat cover (qualsevol estat excepte tancat = activa)"}},
+    "activity_mode_opening": {"options": {"running_sensor": "Sensor de contacte (informa de l’estat obert/tancat, no del moviment)"}},
+    "activity_mode_sun_protection": {"options": {"running_sensor": "Sensor de contacte (informa obert/tancat, no del moviment del motor)", "cover": "Entitat cover (qualsevol estat excepte tancat = activa)"}},
     "appliance_type": {
       "options": {
         "washer": "Rentadora",
@@ -177,7 +177,7 @@
     },
     "binary_sensor": {
       "running": {"name": "En funcionament"},
-      "input_running": {"name": "Sensor de contacte/obertura"},
+      "input_running": {"name": "Estat del contacte obert/tancat"},
       "input_mail_motion": {"name": "Sensor de moviment"},
       "input_door": {"name": "Sensor de contacte/obertura de la porta principal"},
       "input_mail_slot": {"name": "Sensor de contacte/obertura de la portella"},
