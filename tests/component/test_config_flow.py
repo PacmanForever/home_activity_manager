@@ -527,7 +527,7 @@ async def test_migrate_saved_duration_options_from_minutes_to_seconds(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 6
+    assert entry.version == 7
     assert entry.options == {
         "start_duration_seconds": 15,
         "finish_duration_seconds": 60,
@@ -538,11 +538,46 @@ async def test_migrate_saved_duration_options_from_minutes_to_seconds(hass):
 
 @pytest.mark.asyncio
 async def test_migrate_future_config_entry_version_is_rejected(hass):
-    entry = MockConfigEntry(domain=DOMAIN, version=7)
+    entry = MockConfigEntry(domain=DOMAIN, version=8)
     entry.add_to_hass(hass)
 
     assert not await async_migrate_entry(hass, entry)
+    assert entry.version == 8
+
+
+@pytest.mark.parametrize(
+    ("initial_hidden_by", "expected_hidden_by"),
+    (
+        (None, er.RegistryEntryHider.INTEGRATION),
+        (er.RegistryEntryHider.USER, er.RegistryEntryHider.USER),
+    ),
+)
+@pytest.mark.asyncio
+async def test_migrate_hides_existing_proxies_without_overriding_user_choice(
+    hass, initial_hidden_by, expected_hidden_by
+):
+    entry = MockConfigEntry(domain=DOMAIN, version=6)
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    proxy = registry.async_get_or_create(
+        "climate",
+        DOMAIN,
+        f"{entry.entry_id}_climate_proxy",
+        config_entry=entry,
+    )
+    if initial_hidden_by is not None:
+        registry.async_update_entity(proxy.entity_id, hidden_by=initial_hidden_by)
+
+    assert await async_migrate_entry(hass, entry)
+
+    migrated_proxy = registry.async_get(proxy.entity_id)
+    assert migrated_proxy.hidden_by == expected_hidden_by
     assert entry.version == 7
+
+    if expected_hidden_by == er.RegistryEntryHider.INTEGRATION:
+        registry.async_update_entity(proxy.entity_id, hidden_by=None)
+        assert await async_migrate_entry(hass, entry)
+        assert registry.async_get(proxy.entity_id).hidden_by is None
 
 
 @pytest.mark.asyncio
@@ -576,7 +611,7 @@ async def test_migrate_releases_legacy_climate_device_assignment(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 6
+    assert entry.version == 7
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
 
 
@@ -604,7 +639,7 @@ async def test_migrate_removes_unsupported_ac_contact_sensor(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 6
+    assert entry.version == 7
     assert entry.data == {
         CONF_APPLIANCE_TYPE: appliance_type,
         source_key: source_entity,
@@ -637,7 +672,7 @@ async def test_migrate_removes_refrigerator_compressor_and_plug_alarms(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 6
+    assert entry.version == 7
     assert entry.options == {
         CONF_START_ACTIONS: [{"action": "test.start"}],
         CONF_FINISH_ACTIONS: [{"action": "test.finish"}],
@@ -815,3 +850,72 @@ async def test_every_profile_supports_config_entry_crud(
 
     await hass.config_entries.async_remove(entry.entry_id)
     assert entry not in hass.config_entries.async_entries(DOMAIN)
+
+
+@pytest.mark.asyncio
+async def test_options_flow_keeps_optional_climate_inputs_cleared(
+    hass, enable_custom_integrations
+):
+    climate_entry = MockConfigEntry(domain="climate_source")
+    climate_entry.add_to_hass(hass)
+    climate_entity = er.async_get(hass).async_get_or_create(
+        "climate",
+        climate_entry.domain,
+        "living_room",
+        config_entry=climate_entry,
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "name": "Air conditioner",
+            CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+            CONF_CLIMATE_ENTITY: climate_entity.entity_id,
+            CONF_POWER_ENTITY: "sensor.ac_power",
+            CONF_PLUG_ENTITY: "switch.ac_plug",
+            CONF_ENERGY_ENTITY: "sensor.ac_energy",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        flow_id,
+        {
+            "name": "Air conditioner",
+            CONF_APPLIANCE_TYPE: "air_conditioner",
+            "activity_mode": "climate",
+        },
+    )
+    assert result["step_id"] == "sensors_air_conditioner_climate"
+
+    result = await hass.config_entries.options.async_configure(
+        flow_id,
+        {
+            "air_conditioner_climate_climate_entity": climate_entity.entity_id,
+        },
+    )
+    assert result["step_id"] == "actions_air_conditioner_climate"
+    await hass.config_entries.options.async_configure(
+        flow_id,
+        {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: []},
+    )
+
+    assert entry.data[CONF_POWER_ENTITY] is None
+    assert entry.data[CONF_PLUG_ENTITY] is None
+    assert entry.data[CONF_ENERGY_ENTITY] is None
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        flow_id,
+        {
+            "name": "Air conditioner",
+            CONF_APPLIANCE_TYPE: "air_conditioner",
+            "activity_mode": "climate",
+        },
+    )
+    defaults = result["data_schema"]({})
+    assert "air_conditioner_climate_power_entity" not in defaults
+    assert "air_conditioner_climate_plug_entity" not in defaults
+    assert "air_conditioner_climate_energy_entity" not in defaults

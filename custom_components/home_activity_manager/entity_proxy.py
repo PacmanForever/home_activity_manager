@@ -16,6 +16,8 @@ from .runtime import ApplianceRuntime
 class EntityProxyMixin:
     """Share source lookup, device association, and forwarding helpers."""
 
+    _attr_entity_registry_visible_default = False
+
     def _init_proxy(
         self,
         runtime: ApplianceRuntime,

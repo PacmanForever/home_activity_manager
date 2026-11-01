@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.14 - 2026-11-01
+
+### Changed
+
+- Hide climate, cover, and lock proxies by default; migrate existing visible proxies once, while preserving proxies already hidden by the user.
+- Limit configurable durations to 24 hours and use an hours-based duration selector without a separate day field.
+
+### Fixed
+
+- Clear optional sensor selections when an options form omits them.
+
 ## v0.9.13 - 2026-11-01
 
 ### Added

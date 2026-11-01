@@ -63,7 +63,7 @@
       "actions_mailbox_slot": {"title": "Mailbox flap actions","data": {"start_actions": "Actions when the cycle starts (optional)","finish_actions": "Actions when the cycle ends (optional)","pending_actions": "Actions while mail is waiting to be collected (optional)","emptied_actions": "Actions when mail is collected (optional)"},"data_description": {"start_actions": "Runs when the arrival sensor detects mail, starting the mailbox cycle.","finish_actions": "Runs when the main door opens to collect mail, ending the mailbox cycle.","emptied_actions": "Runs when the main door opens or pending mail is cleared with the button."}}
     },
     "error": {
-      "invalid_thresholds": "Check that finish power is below start power and all times are valid.",
+      "invalid_thresholds": "Check that finish power is below start power, all times are valid, and no duration exceeds 24 hours.",
       "invalid_pending_settings": "The initial delay must be a positive whole number and repetitions a non-negative whole number.",
       "invalid_alarm_settings": "Alarm delays and repeat interval must be positive whole numbers. Additional repeats must be a non-negative whole number.",
       "invalid_plug_off_alarm_settings": "The plug-off repeat interval must be a positive whole number and additional alarms a non-negative whole number.",
@@ -123,7 +123,7 @@
       "actions_mailbox_slot": {"title": "Mailbox flap actions","data": {"start_actions": "Actions when the cycle starts (optional)","finish_actions": "Actions when the cycle ends (optional)","pending_actions": "Actions while mail is waiting to be collected (optional)","emptied_actions": "Actions when mail is collected (optional)"},"data_description": {"start_actions": "Runs when the arrival sensor detects mail, starting the mailbox cycle.","finish_actions": "Runs when the main door opens to collect mail, ending the mailbox cycle.","emptied_actions": "Runs when the main door opens or pending mail is cleared with the button."}}
     },
     "error": {
-      "invalid_thresholds": "Check that finish power is below start power and all times are valid.",
+      "invalid_thresholds": "Check that finish power is below start power, all times are valid, and no duration exceeds 24 hours.",
       "invalid_pending_settings": "The initial delay must be a positive whole number and repetitions a non-negative whole number.",
       "invalid_alarm_settings": "Alarm delays and repeat interval must be positive whole numbers. Additional repeats must be a non-negative whole number.",
       "invalid_plug_off_alarm_settings": "The plug-off repeat interval must be a positive whole number and additional alarms a non-negative whole number.",

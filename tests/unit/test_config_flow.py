@@ -21,6 +21,7 @@ from custom_components.home_activity_manager.config_flow import (
     _threshold_schema,
     _clear_pending_settings,
     _validate_alarm_settings,
+    _validate_duration_limits,
     _validate_plug_off_alarm_settings,
     _validate_pending,
     _validate_thresholds,
@@ -113,7 +114,11 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         profile = get_appliance_profile("dishwasher")
         schema = _sensor_schema(_sensor_form_values(values, profile), profile)
 
-        form_values = schema({})
+        form_values = {
+            marker.schema: marker.default()
+            for marker in schema.schema
+            if marker.default is not vol.UNDEFINED
+        }
         self.assertEqual(
             form_values["dishwasher_power_entity"], "sensor.dishwasher_power"
         )
@@ -248,7 +253,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 self.assertTrue(
                     all(
                         field_selector.selector_type == "duration"
-                        and field_selector.config.get("enable_day")
+                        and not field_selector.config.get("enable_day", False)
                         and not field_selector.config.get("allow_negative", True)
                         for field_selector in duration_selectors.values()
                     ),
@@ -475,15 +480,15 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         }
         self.assertEqual(
             defaults["start_duration_seconds"],
-            {"days": 0, "hours": 0, "minutes": 0, "seconds": 15},
+            {"hours": 0, "minutes": 0, "seconds": 15},
         )
         self.assertEqual(
             defaults[CONF_PENDING_DELAY_SECONDS],
-            {"days": 0, "hours": 0, "minutes": 15, "seconds": 0},
+            {"hours": 0, "minutes": 15, "seconds": 0},
         )
         self.assertEqual(
             defaults[CONF_MAX_RUNTIME_SECONDS],
-            {"days": 1, "hours": 1, "minutes": 1, "seconds": 1},
+            {"hours": 25, "minutes": 1, "seconds": 1},
         )
 
         values = schema(
@@ -498,8 +503,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 "finish_power_w": 1,
                 "finish_duration_seconds": {"minutes": 2, "seconds": 30},
                 CONF_MAX_RUNTIME_SECONDS: {
-                    "days": 1,
-                    "hours": 1,
+                    "hours": 25,
                     "minutes": 1,
                     "seconds": 1,
                 },
@@ -525,6 +529,20 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         )
         with self.assertRaises(vol.Invalid):
             duration_selector({"seconds": -1})
+
+        for duration_key in (
+            "start_duration_seconds",
+            "finish_duration_seconds",
+            CONF_MAX_RUNTIME_SECONDS,
+            CONF_PENDING_DELAY_SECONDS,
+            CONF_PENDING_INTERVAL_SECONDS,
+            CONF_DOOR_OPEN_DELAY_SECONDS,
+            CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
+            CONF_ALARM_REPEAT_INTERVAL_SECONDS,
+            CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
+        ):
+            self.assertTrue(_validate_duration_limits({duration_key: 86400}))
+            self.assertFalse(_validate_duration_limits({duration_key: 86401}))
 
         optional_schema = _threshold_schema(
             {}, get_appliance_profile("washer")
@@ -913,6 +931,20 @@ async def test_pending_settings_are_validated_on_parameters_step():
     result = await flow.async_step_parameters(
         {
             "start_power_w": 4,
+            "start_duration_seconds": 86401,
+            "finish_power_w": 1,
+            "finish_duration_seconds": 60,
+            CONF_PENDING_DELAY_SECONDS: 1200,
+            CONF_PENDING_INTERVAL_SECONDS: 1800,
+            CONF_PENDING_REPEATS: 2,
+        }
+    )
+    assert result["step_id"] == "parameters_washer"
+    assert result["errors"] == {"base": "invalid_thresholds"}
+
+    result = await flow.async_step_parameters(
+        {
+            "start_power_w": 4,
             "start_duration_seconds": 15,
             "finish_power_w": 1,
             "finish_duration_seconds": 60,
@@ -1005,6 +1037,16 @@ async def test_options_flow_edits_four_steps_and_clears_removed_door_settings(
         {"washer_power_entity": "sensor.new_power", "washer_door_entity": None}
     )
     assert parameters_result["step_id"] == "parameters_washer"
+    invalid_result = await flow.async_step_parameters(
+        {
+            "start_power_w": 5,
+            "start_duration_seconds": 86401,
+            "finish_power_w": 1,
+            "finish_duration_seconds": 60,
+        }
+    )
+    assert invalid_result["step_id"] == "parameters_washer"
+    assert invalid_result["errors"] == {"base": "invalid_thresholds"}
     actions_result = await flow.async_step_parameters(
         {
             "start_power_w": 5,
@@ -1021,6 +1063,7 @@ async def test_options_flow_edits_four_steps_and_clears_removed_door_settings(
     assert [result["step_id"] for result in shown_steps] == [
         "init",
         "sensors_washer",
+        "parameters_washer",
         "parameters_washer",
         "actions_washer",
     ]

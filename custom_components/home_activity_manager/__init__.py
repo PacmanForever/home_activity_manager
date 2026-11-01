@@ -65,6 +65,20 @@ def _async_release_climate_entity(
 		entity_registry.async_update_entity(climate_entity_id, device_id=None)
 
 
+def _async_hide_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+	entity_registry = er.async_get(hass)
+	proxy_unique_ids = {
+		f"{entry.entry_id}_{domain}_proxy"
+		for domain in ("climate", "cover", "lock")
+	}
+	for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
+		if entity.unique_id in proxy_unique_ids and entity.hidden_by is None:
+			entity_registry.async_update_entity(
+				entity.entity_id,
+				hidden_by=er.RegistryEntryHider.INTEGRATION,
+			)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	"""Set up one configured appliance."""
 	config = {**entry.data, **entry.options}
@@ -92,16 +106,21 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-	"""Migrate old durations and remove obsolete profile settings."""
-	if entry.version > 6:
+	"""Migrate old settings and hide the integration's native-domain proxies."""
+	if entry.version > 7:
 		return False
+	if entry.version == 7:
+		return True
 	if entry.version == 6:
+		_async_hide_proxy_entities(hass, entry)
+		hass.config_entries.async_update_entry(entry, version=7)
 		return True
 	if entry.version == 5:
 		_async_release_climate_entity(
 			hass, entry, {**entry.data, **entry.options}.get(CONF_CLIMATE_ENTITY)
 		)
-		hass.config_entries.async_update_entry(entry, version=6)
+		_async_hide_proxy_entities(hass, entry)
+		hass.config_entries.async_update_entry(entry, version=7)
 		return True
 
 	data = dict(entry.data)
@@ -137,7 +156,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	_async_release_climate_entity(
 		hass, entry, {**data, **options}.get(CONF_CLIMATE_ENTITY)
 	)
+	_async_hide_proxy_entities(hass, entry)
 	hass.config_entries.async_update_entry(
-		entry, data=data, options=options, version=6
+		entry, data=data, options=options, version=7
 	)
 	return True

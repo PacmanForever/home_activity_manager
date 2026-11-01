@@ -63,7 +63,7 @@
       "actions_mailbox_slot": {"title": "Acciones del buzón por trampilla","data": {"start_actions": "Acciones cuando empieza el ciclo (opcional)","finish_actions": "Acciones cuando termina el ciclo (opcional)","pending_actions": "Acciones mientras hay correo pendiente de recoger (opcional)","emptied_actions": "Acciones cuando se recoge el correo (opcional)"},"data_description": {"start_actions": "Se ejecutan cuando el sensor detecta la llegada de correo y empieza el ciclo del buzón.","finish_actions": "Se ejecutan cuando se abre la puerta principal para recoger el correo y termina el ciclo del buzón.","emptied_actions": "Se ejecutan al abrir la puerta principal o vaciar el correo con el botón."}}
     },
     "error": {
-      "invalid_thresholds": "Comprueba que la potencia de finalización sea inferior a la de inicio y que los tiempos sean válidos.",
+      "invalid_thresholds": "Comprueba que la potencia de finalización sea inferior a la de inicio, que todos los tiempos sean válidos y que ninguna duración supere las 24 horas.",
       "invalid_pending_settings": "El retraso debe ser un entero positivo y las repeticiones un entero no negativo.",
       "invalid_alarm_settings": "Los retrasos y el intervalo deben ser enteros positivos. Las repeticiones adicionales deben ser un entero no negativo.",
       "invalid_plug_off_alarm_settings": "El intervalo de repetición con el enchufe apagado debe ser un entero positivo y los avisos adicionales, un entero no negativo.",
@@ -123,7 +123,7 @@
       "actions_mailbox_slot": {"title": "Acciones del buzón por trampilla","data": {"start_actions": "Acciones cuando empieza el ciclo (opcional)","finish_actions": "Acciones cuando termina el ciclo (opcional)","pending_actions": "Acciones mientras hay correo pendiente de recoger (opcional)","emptied_actions": "Acciones cuando se recoge el correo (opcional)"},"data_description": {"start_actions": "Se ejecutan cuando el sensor detecta la llegada de correo y empieza el ciclo del buzón.","finish_actions": "Se ejecutan cuando se abre la puerta principal para recoger el correo y termina el ciclo del buzón.","emptied_actions": "Se ejecutan al abrir la puerta principal o vaciar el correo con el botón."}}
     },
     "error": {
-      "invalid_thresholds": "Comprueba que la potencia de finalización sea inferior a la de inicio y que los tiempos sean válidos.",
+      "invalid_thresholds": "Comprueba que la potencia de finalización sea inferior a la de inicio, que todos los tiempos sean válidos y que ninguna duración supere las 24 horas.",
       "invalid_pending_settings": "El retraso debe ser un entero positivo y las repeticiones un entero no negativo.",
       "invalid_alarm_settings": "Los retrasos y el intervalo deben ser enteros positivos. Las repeticiones adicionales deben ser un entero no negativo.",
       "invalid_plug_off_alarm_settings": "El intervalo de repetición con el enchufe apagado debe ser un entero positivo y los avisos adicionales, un entero no negativo.",

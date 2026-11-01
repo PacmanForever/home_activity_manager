@@ -63,7 +63,7 @@
       "actions_mailbox_slot": {"title": "Accions de bústia amb portella","data": {"start_actions": "Accions quan comença el cicle (opcional)","finish_actions": "Accions quan acaba el cicle (opcional)","pending_actions": "Accions a cada avís mentre hi ha correu pendent (opcional)","emptied_actions": "Accions quan es recull el correu (opcional)"},"data_description": {"start_actions": "S’executen quan el sensor detecta l’arribada de correu i comença el cicle de la bústia.","finish_actions": "S’executen quan s’obre la porta principal per recollir el correu i acaba el cicle de la bústia.","emptied_actions": "S’executen quan s’obre la porta principal o es buida el correu amb el botó."}}
     },
     "error": {
-      "invalid_thresholds": "Comprova que la potència de finalització sigui inferior a la d’inici i que els temps siguin vàlids.",
+      "invalid_thresholds": "Comprova que la potència de finalització sigui inferior a la d’inici, que tots els temps siguin vàlids i que cap durada superi les 24 hores.",
       "invalid_pending_settings": "El retard ha de ser un enter positiu i les repeticions un enter no negatiu.",
       "invalid_alarm_settings": "Els retards i l’interval han de ser enters positius. Les repeticions addicionals han de ser un enter no negatiu.",
       "invalid_plug_off_alarm_settings": "L’interval de repetició amb l’endoll apagat ha de ser un enter positiu i les alarmes addicionals, un enter no negatiu.",
@@ -123,7 +123,7 @@
       "actions_mailbox_slot": {"title": "Accions de bústia amb portella","data": {"start_actions": "Accions quan comença el cicle (opcional)","finish_actions": "Accions quan acaba el cicle (opcional)","pending_actions": "Accions a cada avís mentre hi ha correu pendent (opcional)","emptied_actions": "Accions quan es recull el correu (opcional)"},"data_description": {"start_actions": "S’executen quan el sensor detecta l’arribada de correu i comença el cicle de la bústia.","finish_actions": "S’executen quan s’obre la porta principal per recollir el correu i acaba el cicle de la bústia.","emptied_actions": "S’executen quan s’obre la porta principal o es buida el correu amb el botó."}}
     },
     "error": {
-      "invalid_thresholds": "Comprova que la potència de finalització sigui inferior a la d’inici i que els temps siguin vàlids.",
+      "invalid_thresholds": "Comprova que la potència de finalització sigui inferior a la d’inici, que tots els temps siguin vàlids i que cap durada superi les 24 hores.",
       "invalid_pending_settings": "El retard ha de ser un enter positiu i les repeticions un enter no negatiu.",
       "invalid_alarm_settings": "Els retards i l’interval han de ser enters positius. Les repeticions addicionals han de ser un enter no negatiu.",
       "invalid_plug_off_alarm_settings": "L’interval de repetició amb l’endoll apagat ha de ser un enter positiu i les alarmes addicionals, un enter no negatiu.",

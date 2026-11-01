@@ -63,7 +63,10 @@ from custom_components.home_activity_manager.appliance import ApplianceCycleDete
 from custom_components.home_activity_manager.sensor import _format_duration
 from custom_components.home_activity_manager.appliance_types import APPLIANCE_PROFILES
 from custom_components.home_activity_manager.runtime import ApplianceRuntime
-from custom_components.home_activity_manager.binary_sensor import ApplianceBinarySensor
+from custom_components.home_activity_manager.binary_sensor import (
+    ApplianceBinarySensor,
+    ApplianceInputBinarySensor,
+)
 from custom_components.home_activity_manager.sensor import ApplianceSensor
 from custom_components.home_activity_manager.button import (
     ClearPendingButton,
@@ -2096,6 +2099,7 @@ async def test_climate_wrapper_preserves_and_tracks_source_entity(
     assert registered_proxy is not None
     assert registered_proxy.config_entry_id == entry.entry_id
     assert registered_proxy.device_id == device_id
+    assert registered_proxy.hidden_by == er.RegistryEntryHider.INTEGRATION
     assert entry.runtime_data.detector.is_running
 
     hass.states.async_set(
@@ -2158,9 +2162,26 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
         "cool",
         {
             "hvac_action": "cooling",
-            "hvac_modes": ["off", "cool"],
+            "hvac_modes": ["off", "cool", "invalid"],
             "current_temperature": 21.5,
             "temperature": 23,
+            "target_temp_low": 19,
+            "target_temp_high": 25,
+            "current_humidity": 45,
+            "target_humidity": 55,
+            "min_temp": 10,
+            "max_temp": 32,
+            "min_humidity": 20,
+            "max_humidity": 80,
+            "target_temp_step": 0.5,
+            "preset_mode": "eco",
+            "preset_modes": ["eco", 1],
+            "fan_mode": "quiet",
+            "fan_modes": ["quiet", 1],
+            "swing_mode": "on",
+            "swing_modes": ["on"],
+            "swing_horizontal_mode": "left",
+            "swing_horizontal_modes": ["left"],
             "temperature_unit": "°C",
             "supported_features": int(ClimateEntityFeature.TARGET_TEMPERATURE),
         },
@@ -2169,7 +2190,10 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
         cover_entity_id,
         "open",
         {
+            "device_class": "blind",
             "current_position": 72,
+            "current_tilt_position": 35,
+            "supported_speeds": ["slow", "fast", 1],
             "supported_features": int(
                 CoverEntityFeature.OPEN
                 | CoverEntityFeature.CLOSE
@@ -2182,6 +2206,7 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
         "locked",
         {
             "code_format": r"^\d{4}$",
+            "changed_by": "keypad",
             "supported_features": int(LockEntityFeature.OPEN),
         },
     )
@@ -2212,17 +2237,52 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     climate.hass = cover.hass = lock.hass = hass
 
     assert climate.hvac_mode is HVACMode.COOL
+    assert [mode.value for mode in climate.hvac_modes] == ["off", "cool"]
+    assert climate.hvac_action.value == "cooling"
+    assert climate.native_temperature_unit.value == "°C"
     assert climate.native_current_temperature == 21.5
     assert climate.native_target_temperature == 23
+    assert climate.native_target_temperature_low == 19
+    assert climate.native_target_temperature_high == 25
+    assert climate.current_humidity == 45
+    assert climate.target_humidity == 55
+    assert climate.min_temp == 10
+    assert climate.max_temp == 32
+    assert climate.min_humidity == 20
+    assert climate.max_humidity == 80
+    assert climate.target_temperature_step == 0.5
+    assert climate.preset_mode == "eco"
+    assert climate.preset_modes == ["eco"]
+    assert climate.fan_mode == "quiet"
+    assert climate.fan_modes == ["quiet"]
+    assert climate.swing_mode == "on"
+    assert climate.swing_modes == ["on"]
+    assert climate.swing_horizontal_mode == "left"
+    assert climate.swing_horizontal_modes == ["left"]
+    assert climate.extra_state_attributes["source_entity"] == climate_entity_id
     assert climate.supported_features == ClimateEntityFeature.TARGET_TEMPERATURE
+    assert cover.device_class.value == "blind"
+    assert cover.is_closed is False
+    assert cover.is_opening is False
+    assert cover.is_closing is False
     assert cover.current_cover_position == 72
+    assert cover.current_cover_tilt_position == 35
+    assert cover.supported_speeds == ["slow", "fast"]
+    assert cover.extra_state_attributes["source_entity"] == cover_entity_id
     assert cover.supported_features == (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
         | CoverEntityFeature.SET_POSITION
     )
     assert lock.is_locked
+    assert lock.is_locking is False
+    assert lock.is_unlocking is False
+    assert lock.is_open is False
+    assert lock.is_opening is False
+    assert lock.is_jammed is False
+    assert lock.changed_by == "keypad"
     assert lock.code_format == r"^\d{4}$"
+    assert lock.extra_state_attributes["source_entity"] == lock_entity_id
     assert lock.supported_features == LockEntityFeature.OPEN
 
     calls = []
@@ -2235,8 +2295,21 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     monkeypatch.setattr(type(hass.services), "async_call", record_service_call)
     await climate.async_set_hvac_mode(HVACMode.OFF)
     await climate.async_set_temperature(temperature=22)
+    await climate.async_set_humidity(50)
+    await climate.async_set_fan_mode("auto")
+    await climate.async_set_preset_mode("comfort")
+    await climate.async_set_swing_mode("off")
+    await climate.async_set_swing_horizontal_mode("right")
+    await climate.async_turn_on()
+    await climate.async_turn_off()
+    await cover.async_open_cover()
+    await cover.async_stop_cover()
     await cover.async_set_cover_position(position=40)
     await cover.async_close_cover()
+    await cover.async_open_cover_tilt()
+    await cover.async_close_cover_tilt()
+    await cover.async_set_cover_tilt_position(tilt_position=50)
+    await cover.async_stop_cover_tilt()
     await lock.async_unlock(code="1234")
     await lock.async_lock()
     await lock.async_open()
@@ -2244,12 +2317,150 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     assert calls == [
         ("climate", "set_hvac_mode", {"hvac_mode": HVACMode.OFF, "entity_id": climate_entity_id}, True),
         ("climate", "set_temperature", {"temperature": 22, "entity_id": climate_entity_id}, True),
+        ("climate", "set_humidity", {"humidity": 50, "entity_id": climate_entity_id}, True),
+        ("climate", "set_fan_mode", {"fan_mode": "auto", "entity_id": climate_entity_id}, True),
+        ("climate", "set_preset_mode", {"preset_mode": "comfort", "entity_id": climate_entity_id}, True),
+        ("climate", "set_swing_mode", {"swing_mode": "off", "entity_id": climate_entity_id}, True),
+        ("climate", "set_swing_horizontal_mode", {"swing_horizontal_mode": "right", "entity_id": climate_entity_id}, True),
+        ("climate", "turn_on", {"entity_id": climate_entity_id}, True),
+        ("climate", "turn_off", {"entity_id": climate_entity_id}, True),
+        ("cover", "open_cover", {"entity_id": cover_entity_id}, True),
+        ("cover", "stop_cover", {"entity_id": cover_entity_id}, True),
         ("cover", "set_cover_position", {"position": 40, "entity_id": cover_entity_id}, True),
         ("cover", "close_cover", {"entity_id": cover_entity_id}, True),
+        ("cover", "open_cover_tilt", {"entity_id": cover_entity_id}, True),
+        ("cover", "close_cover_tilt", {"entity_id": cover_entity_id}, True),
+        ("cover", "set_cover_tilt_position", {"tilt_position": 50, "entity_id": cover_entity_id}, True),
+        ("cover", "stop_cover_tilt", {"entity_id": cover_entity_id}, True),
         ("lock", "unlock", {"code": "1234", "entity_id": lock_entity_id}, True),
         ("lock", "lock", {"entity_id": lock_entity_id}, True),
         ("lock", "open", {"entity_id": lock_entity_id}, True),
     ]
+
+    hass.states.async_set(cover_entity_id, "opening", {"supported_features": "bad"})
+    assert cover.is_closed is False
+    assert cover.is_opening is True
+    assert cover.is_closing is False
+    assert cover.device_class is None
+    assert cover.supported_features == CoverEntityFeature(0)
+    hass.states.async_set(cover_entity_id, "closing")
+    assert cover.is_closing is True
+    hass.states.async_set(cover_entity_id, "unknown")
+    assert cover.is_closed is None
+    hass.states.async_remove(cover_entity_id)
+    assert cover.is_closed is None
+    assert cover.current_cover_position is None
+    assert cover.supported_speeds is None
+
+    for state, locked, locking, unlocking, opened, opening, jammed in (
+        ("locking", True, True, False, False, False, False),
+        ("unlocked", False, False, False, False, False, False),
+        ("unlocking", False, False, True, False, False, False),
+        ("open", False, False, False, True, False, False),
+        ("opening", False, False, False, False, True, False),
+        ("jammed", None, False, False, False, False, True),
+        ("unknown", None, None, None, None, None, None),
+    ):
+        hass.states.async_set(lock_entity_id, state)
+        assert (
+            lock.is_locked,
+            lock.is_locking,
+            lock.is_unlocking,
+            lock.is_open,
+            lock.is_opening,
+            lock.is_jammed,
+        ) == (locked, locking, unlocking, opened, opening, jammed)
+    hass.states.async_remove(lock_entity_id)
+    assert lock.is_locked is None
+    assert lock.supported_features == LockEntityFeature(0)
+    assert lock.changed_by is None
+    assert lock.code_format is None
+    hass.states.async_set(
+        lock_entity_id, "locked", {"supported_features": "invalid", "changed_by": 7}
+    )
+    assert lock.supported_features == LockEntityFeature(0)
+    assert lock.changed_by is None
+
+    hass.states.async_set(
+        climate_entity_id,
+        "not_a_mode",
+        {
+            "hvac_action": "invalid",
+            "hvac_modes": None,
+            "temperature_unit": "invalid",
+            "supported_features": "invalid",
+            "current_temperature": True,
+            "preset_mode": 7,
+            "preset_modes": "invalid",
+        },
+    )
+    assert climate.hvac_mode is None
+    assert climate.hvac_action is None
+    assert climate.hvac_modes == []
+    assert climate.native_temperature_unit == hass.config.units.temperature_unit
+    assert climate.supported_features == ClimateEntityFeature(0)
+    assert climate.native_current_temperature is None
+    assert climate.preset_mode is None
+    assert climate.preset_modes is None
+
+
+def test_input_and_runtime_binary_sensor_states_and_attributes(hass):
+    entity_id = "binary_sensor.protection_contact"
+    runtime = SimpleNamespace(
+        hass=hass,
+        config={
+            CONF_APPLIANCE_TYPE: "sun_protection_contact",
+            CONF_RUNNING_ENTITY: entity_id,
+            CONF_DOOR_ENTITY: entity_id,
+        },
+        profile=APPLIANCE_PROFILES["sun_protection_contact"],
+    )
+    entry = MockConfigEntry(domain=DOMAIN, title="Blind")
+    input_sensor = ApplianceInputBinarySensor(
+        runtime, entry, runtime.profile.sensor_inputs[0]
+    )
+    input_sensor.hass = hass
+
+    assert input_sensor.available is False
+    assert input_sensor.is_on is None
+    assert input_sensor.icon == "mdi:door-sliding"
+    assert input_sensor.extra_state_attributes == {"source_entity": entity_id}
+
+    hass.states.async_set(entity_id, "unknown")
+    assert input_sensor.available is True
+    assert input_sensor.is_on is None
+    hass.states.async_set(entity_id, "unavailable")
+    assert input_sensor.available is False
+    hass.states.async_set(entity_id, "off")
+    assert input_sensor.available is True
+    assert input_sensor.is_on is False
+    assert input_sensor.icon == "mdi:door-sliding"
+    hass.states.async_set(entity_id, "on")
+    assert input_sensor.is_on is True
+    assert input_sensor.icon == "mdi:door-sliding-open"
+
+    running_value = [None]
+    running_sensor = ApplianceBinarySensor(
+        runtime, entry, "running", lambda: running_value[0]
+    )
+    running_sensor.hass = hass
+    assert running_sensor.available is True
+    assert running_sensor.is_on is None
+    assert running_sensor.icon == "mdi:blinds-open"
+    assert running_sensor.extra_state_attributes == {"source_entity": entity_id}
+    running_value[0] = False
+    assert running_sensor.icon == "mdi:blinds"
+    running_value[0] = True
+    assert running_sensor.icon == "mdi:blinds-open"
+
+    door_sensor = ApplianceBinarySensor(runtime, entry, "door", lambda: None)
+    door_sensor.hass = hass
+    assert door_sensor.available is True
+    assert door_sensor.icon == "mdi:door"
+    assert door_sensor.extra_state_attributes == {"source_entity": entity_id}
+    hass.states.async_set(entity_id, "unavailable")
+    assert door_sensor.available is False
+    assert door_sensor.icon == "mdi:door"
 
 
 @pytest.mark.asyncio

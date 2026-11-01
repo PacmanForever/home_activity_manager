@@ -83,6 +83,18 @@ _ENTRY_DATA_KEYS = {
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
 }
+_DURATION_CONFIG_KEYS = (
+    CONF_START_DURATION_SECONDS,
+    CONF_FINISH_DURATION_SECONDS,
+    CONF_MAX_RUNTIME_SECONDS,
+    CONF_PENDING_DELAY_SECONDS,
+    CONF_PENDING_INTERVAL_SECONDS,
+    CONF_DOOR_OPEN_DELAY_SECONDS,
+    CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
+    CONF_ALARM_REPEAT_INTERVAL_SECONDS,
+    CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
+)
+_MAX_DURATION_SECONDS = 24 * 60 * 60
 
 
 def _required(key: str, values: dict[str, Any]) -> vol.Required:
@@ -108,6 +120,19 @@ class _OptionalEntitySelector(selector.EntitySelector):
         return super().__call__(data)
 
 
+class _SensorSchema(vol.Schema):
+    def __init__(self, schema: dict[Any, Any], optional_keys: set[str]) -> None:
+        super().__init__(schema)
+        self._optional_keys = optional_keys
+
+    def __call__(self, data: Any) -> Any:
+        normalized = super().__call__(data)
+        if isinstance(data, dict):
+            for key in self._optional_keys - data.keys():
+                normalized.pop(key, None)
+        return normalized
+
+
 class _LockedSelectSelector(selector.SelectSelector):
     def __call__(self, data: Any) -> Any:
         return data
@@ -115,7 +140,7 @@ class _LockedSelectSelector(selector.SelectSelector):
 
 class _DurationSelector(selector.DurationSelector):
     def __init__(self) -> None:
-        super().__init__({"enable_day": True, "allow_negative": False})
+        super().__init__({"enable_day": False, "allow_negative": False})
 
     def __call__(self, data: Any) -> Any:
         if data in (None, ""):
@@ -174,11 +199,9 @@ def _duration_components_from_seconds(value: Any) -> Any:
     if not math.isfinite(numeric_seconds) or numeric_seconds < 0:
         return str(value)
     total_seconds = round(numeric_seconds)
-    days, remainder = divmod(total_seconds, 86400)
-    hours, remainder = divmod(remainder, 3600)
+    hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return {
-        "days": days,
         "hours": hours,
         "minutes": minutes,
         "seconds": seconds,
@@ -320,12 +343,15 @@ def _sensor_schema(
     hass: HomeAssistant | None = None,
 ) -> vol.Schema:
     schema: dict[Any, Any] = {}
+    optional_keys = set()
     for sensor_input in profile.sensor_inputs:
         marker = (
             _required(sensor_input.form_key, values)
             if sensor_input.required
             else _optional(sensor_input.form_key, values)
         )
+        if not sensor_input.required:
+            optional_keys.add(sensor_input.form_key)
         if sensor_input.device_classes:
             entity_filter = [
                 {"domain": sensor_input.domain, "device_class": device_class}
@@ -340,7 +366,7 @@ def _sensor_schema(
             if sensor_input.required
             else _OptionalEntitySelector(selector_config)
         )
-    return vol.Schema(schema)
+    return _SensorSchema(schema, optional_keys)
 
 
 def _threshold_schema(
@@ -507,6 +533,24 @@ def _validate_thresholds(
         )
         and (max_runtime is None or (math.isfinite(max_runtime) and max_runtime > 0))
     )
+
+
+def _validate_duration_limits(values: dict[str, Any]) -> bool:
+    for key in _DURATION_CONFIG_KEYS:
+        value = values.get(key)
+        if value in (None, ""):
+            continue
+        try:
+            duration_seconds = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return False
+        if (
+            not math.isfinite(duration_seconds)
+            or duration_seconds < 0
+            or duration_seconds > _MAX_DURATION_SECONDS
+        ):
+            return False
+    return True
 
 
 def _validate_sensor_values(
@@ -703,7 +747,7 @@ def _entry_options(values: dict[str, Any]) -> dict[str, Any]:
 class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle initial setup of one appliance."""
 
-    VERSION = 6
+    VERSION = 7
 
     def __init__(self) -> None:
         self._draft: dict[str, Any] = {}
@@ -788,7 +832,9 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_actions()
         errors: dict[str, str] = {}
         if user_input is not None:
-            if not _validate_thresholds(user_input, profile):
+            if not _validate_duration_limits(user_input):
+                errors["base"] = "invalid_thresholds"
+            elif not _validate_thresholds(user_input, profile):
                 errors["base"] = "invalid_thresholds"
             elif (
                 "pending_unload" in profile.parameter_groups
@@ -981,7 +1027,9 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             return await self.async_step_actions()
         errors: dict[str, str] = {}
         if user_input is not None:
-            if not _validate_thresholds(user_input, profile):
+            if not _validate_duration_limits(user_input):
+                errors["base"] = "invalid_thresholds"
+            elif not _validate_thresholds(user_input, profile):
                 errors["base"] = "invalid_thresholds"
             elif (
                 "pending_unload" in profile.parameter_groups
