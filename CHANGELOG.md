@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.12 - 2026-11-01
+
+### Changed
+
+- Display configurable durations as `HH:MM:SS` while storing them in seconds.
+- Clear optional sensor selections when they are removed while editing an appliance.
+
 ## v0.9.11 - 2026-11-01
 
 ### Changed

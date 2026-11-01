@@ -110,6 +110,25 @@ class _LockedSelectSelector(selector.SelectSelector):
         return data
 
 
+class _DurationSelector(selector.TextSelector):
+    def __call__(self, data: Any) -> Any:
+        if not isinstance(data, str):
+            return data
+        parts = data.split(":")
+        if (
+            len(parts) != 3
+            or len(parts[0]) < 2
+            or len(parts[1]) != 2
+            or len(parts[2]) != 2
+            or not all(part.isdigit() for part in parts)
+        ):
+            return data
+        hours, minutes, seconds = (int(part) for part in parts)
+        if minutes >= 60 or seconds >= 60:
+            return data
+        return hours * 3600 + minutes * 60 + seconds
+
+
 def _number_selector(unit: str, step: float = 0.1) -> selector.NumberSelector:
     return selector.NumberSelector(
         selector.NumberSelectorConfig(
@@ -117,6 +136,33 @@ def _number_selector(unit: str, step: float = 0.1) -> selector.NumberSelector:
             step=step,
             unit_of_measurement=unit,
         )
+    )
+
+
+def _format_duration_input(value: Any) -> Any:
+    if value in (None, ""):
+        return value
+    try:
+        numeric_seconds = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return str(value)
+    if not math.isfinite(numeric_seconds) or numeric_seconds < 0:
+        return str(value)
+    total_seconds = round(numeric_seconds)
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _duration_marker(
+    key: str, values: dict[str, Any], default: Any = None, *, optional: bool = False
+) -> vol.Marker:
+    if optional:
+        if key in values:
+            return vol.Optional(key, default=_format_duration_input(values[key]))
+        return vol.Optional(key)
+    return vol.Required(
+        key, default=_format_duration_input(values.get(key, default))
     )
 
 
@@ -208,7 +254,10 @@ def _sensor_form_values(
 
 
 def _normalize_sensor_values(
-    values: dict[str, Any], profile: ApplianceTypeProfile
+    values: dict[str, Any],
+    profile: ApplianceTypeProfile,
+    *,
+    clear_missing_optional: bool = False,
 ) -> dict[str, Any]:
     normalized = dict(values)
     for sensor_input in profile.sensor_inputs:
@@ -217,6 +266,18 @@ def _normalize_sensor_values(
                 normalized[sensor_input.config_key] = normalized.pop(
                     sensor_input.form_key
                 )
+            elif (
+                sensor_input.config_key not in normalized
+                and clear_missing_optional
+                and not sensor_input.required
+            ):
+                normalized[sensor_input.config_key] = None
+        elif (
+            sensor_input.form_key not in normalized
+            and clear_missing_optional
+            and not sensor_input.required
+        ):
+            normalized[sensor_input.config_key] = None
     return normalized
 
 
@@ -281,35 +342,34 @@ def _threshold_schema(
         schema.update(
             {
                 vol.Required(CONF_START_POWER_W, default=start_power): _number_selector("W"),
-                vol.Required(CONF_START_DURATION_SECONDS, default=start_duration): (
-                    _number_selector("s", step=1)
-                ),
+                _duration_marker(
+                    CONF_START_DURATION_SECONDS, values, start_duration
+                ): _DurationSelector(),
                 vol.Required(CONF_FINISH_POWER_W, default=finish_power): _number_selector("W"),
-                vol.Required(CONF_FINISH_DURATION_SECONDS, default=finish_duration): (
-                    _number_selector("s", step=1)
-                ),
+                _duration_marker(
+                    CONF_FINISH_DURATION_SECONDS, values, finish_duration
+                ): _DurationSelector(),
             }
         )
     if "max_runtime" in profile.parameter_groups:
-        schema[_optional(CONF_MAX_RUNTIME_SECONDS, values)] = _number_selector(
-            "s", step=1
-        )
+        schema[
+            _duration_marker(
+                CONF_MAX_RUNTIME_SECONDS, values, optional=True
+            )
+        ] = _DurationSelector()
     if "pending_unload" in profile.parameter_groups and values.get(CONF_DOOR_ENTITY):
         schema.update(
             {
-                vol.Required(
+                _duration_marker(
                     CONF_PENDING_DELAY_SECONDS,
-                    default=values.get(
-                        CONF_PENDING_DELAY_SECONDS, DEFAULT_PENDING_DELAY_SECONDS
-                    ),
-                ): _number_selector("s", step=1),
-                vol.Required(
+                    values,
+                    DEFAULT_PENDING_DELAY_SECONDS,
+                ): _DurationSelector(),
+                _duration_marker(
                     CONF_PENDING_INTERVAL_SECONDS,
-                    default=values.get(
-                        CONF_PENDING_INTERVAL_SECONDS,
-                        DEFAULT_PENDING_INTERVAL_SECONDS,
-                    ),
-                ): _number_selector("s", step=1),
+                    values,
+                    DEFAULT_PENDING_INTERVAL_SECONDS,
+                ): _DurationSelector(),
                 vol.Required(
                     CONF_PENDING_REPEATS,
                     default=values.get(CONF_PENDING_REPEATS, DEFAULT_PENDING_REPEATS),
@@ -317,40 +377,41 @@ def _threshold_schema(
             }
         )
     if "door_alarm" in profile.parameter_groups:
-        schema[vol.Required(
-            CONF_DOOR_OPEN_DELAY_SECONDS,
-            default=values.get(
-                CONF_DOOR_OPEN_DELAY_SECONDS, DEFAULT_DOOR_OPEN_DELAY_SECONDS
-            ),
-        )] = _number_selector("s", step=1)
+        schema[
+            _duration_marker(
+                CONF_DOOR_OPEN_DELAY_SECONDS,
+                values,
+                DEFAULT_DOOR_OPEN_DELAY_SECONDS,
+            )
+        ] = _DurationSelector()
     if "compressor_alarm" in profile.parameter_groups:
-        schema[vol.Required(
-            CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
-            default=values.get(
+        schema[
+            _duration_marker(
                 CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
+                values,
                 DEFAULT_COMPRESSOR_INACTIVE_DELAY_SECONDS,
-            ),
-        )] = _number_selector("s", step=1)
+            )
+        ] = _DurationSelector()
     if "alarm_repeats" in profile.parameter_groups:
-        schema[vol.Required(
-            CONF_ALARM_REPEAT_INTERVAL_SECONDS,
-            default=values.get(
+        schema[
+            _duration_marker(
                 CONF_ALARM_REPEAT_INTERVAL_SECONDS,
+                values,
                 DEFAULT_ALARM_REPEAT_INTERVAL_SECONDS,
-            ),
-        )] = _number_selector("s", step=1)
+            )
+        ] = _DurationSelector()
         schema[vol.Required(
             CONF_ALARM_REPEAT_COUNT,
             default=values.get(CONF_ALARM_REPEAT_COUNT, DEFAULT_ALARM_REPEAT_COUNT),
         )] = _number_selector("", step=1)
     if "plug_off_alarm" in profile.parameter_groups and values.get(CONF_PLUG_ENTITY):
-        schema[vol.Required(
-            CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
-            default=values.get(
+        schema[
+            _duration_marker(
                 CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
+                values,
                 DEFAULT_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
-            ),
-        )] = _number_selector("s", step=1)
+            )
+        ] = _DurationSelector()
         schema[vol.Required(
             CONF_PLUG_OFF_REPEAT_COUNT,
             default=values.get(
@@ -850,7 +911,11 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         values = {**self._saved, **self._draft}
         if user_input is not None:
             profile = get_appliance_profile(values[CONF_APPLIANCE_TYPE])
-            self._draft.update(_normalize_sensor_values(user_input, profile))
+            self._draft.update(
+                _normalize_sensor_values(
+                    user_input, profile, clear_missing_optional=True
+                )
+            )
             values = {**self._saved, **self._draft}
             if not _validate_sensor_values(values, profile):
                 return self.async_show_form(

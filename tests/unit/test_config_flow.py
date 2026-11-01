@@ -13,6 +13,7 @@ from custom_components.home_activity_manager.config_flow import (
     ApplianceCycleMonitorOptionsFlow,
     _action_schema,
     _identity_schema,
+    _entry_data,
     _entry_options,
     _normalize_sensor_values,
     _sensor_form_values,
@@ -126,6 +127,27 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             "binary_sensor.dishwasher_door",
         )
         self.assertEqual(normalized[CONF_POWER_ENTITY], "sensor.dishwasher_power")
+
+    def test_omitted_optional_sensors_are_cleared_for_every_profile(self) -> None:
+        for appliance_type, profile in APPLIANCE_PROFILES.items():
+            with self.subTest(appliance_type=appliance_type):
+                form_values = {
+                    sensor_input.form_key: "sensor.required"
+                    for sensor_input in profile.sensor_inputs
+                    if sensor_input.required
+                }
+                normalized = _normalize_sensor_values(
+                    form_values, profile, clear_missing_optional=True
+                )
+                entry_data = _entry_data(
+                    {CONF_APPLIANCE_TYPE: appliance_type, **normalized}
+                )
+
+                for sensor_input in profile.sensor_inputs:
+                    if sensor_input.required:
+                        continue
+                    self.assertIsNone(normalized[sensor_input.config_key])
+                    self.assertIsNone(entry_data[sensor_input.config_key])
 
     def test_ac_profiles_offer_auxiliary_sources(self) -> None:
         contact_profile = get_appliance_profile("air_conditioner_contact")
@@ -418,6 +440,48 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertNotIn(CONF_PLUG_OFF_REPEAT_COUNT, options)
         self.assertIn(CONF_ALARM_REPEAT_COUNT, options)
         self.assertIn(CONF_ALARM_REPEAT_INTERVAL_SECONDS, options)
+
+    def test_duration_parameters_use_hh_mm_ss_and_store_seconds(self) -> None:
+        schema = _threshold_schema(
+            {CONF_DOOR_ENTITY: "binary_sensor.washer_door"},
+            get_appliance_profile("washer"),
+        )
+        defaults = {
+            marker.schema: marker.default()
+            for marker in schema.schema
+            if marker.schema in ("start_duration_seconds", CONF_PENDING_DELAY_SECONDS)
+        }
+        self.assertEqual(defaults["start_duration_seconds"], "00:00:15")
+        self.assertEqual(defaults[CONF_PENDING_DELAY_SECONDS], "00:15:00")
+
+        values = schema(
+            {
+                "start_power_w": 4,
+                "start_duration_seconds": "00:00:30",
+                "finish_power_w": 1,
+                "finish_duration_seconds": "00:02:30",
+                CONF_PENDING_DELAY_SECONDS: "01:02:03",
+                CONF_PENDING_INTERVAL_SECONDS: "00:15:00",
+                CONF_PENDING_REPEATS: 3,
+            }
+        )
+        self.assertEqual(values["start_duration_seconds"], 30)
+        self.assertEqual(values["finish_duration_seconds"], 150)
+        self.assertEqual(values[CONF_PENDING_DELAY_SECONDS], 3723)
+        self.assertEqual(values[CONF_PENDING_INTERVAL_SECONDS], 900)
+
+    def test_duration_parameter_accepts_stored_seconds(self) -> None:
+        schema = _threshold_schema({}, get_appliance_profile("washer"))
+        values = schema(
+            {
+                "start_power_w": 4,
+                "start_duration_seconds": 15,
+                "finish_power_w": 1,
+                "finish_duration_seconds": 60,
+            }
+        )
+        self.assertEqual(values["start_duration_seconds"], 15)
+        self.assertEqual(values["finish_duration_seconds"], 60)
 
     def test_default_thresholds_and_coherence_validation(self) -> None:
         values = _threshold_schema({}, get_appliance_profile("washer"))(
@@ -873,6 +937,67 @@ async def test_options_flow_edits_four_steps_and_clears_removed_door_settings(
     assert CONF_PENDING_DELAY_SECONDS not in created["data"]
     assert CONF_PENDING_INTERVAL_SECONDS not in created["data"]
     assert CONF_PENDING_REPEATS not in created["data"]
+
+
+@pytest.mark.asyncio
+async def test_options_flow_clears_omitted_air_conditioner_sensors(monkeypatch):
+    entry = SimpleNamespace(
+        entry_id="air-conditioner-entry",
+        data={
+            "name": "Air conditioner",
+            "appliance_type": "air_conditioner_climate",
+            "climate_entity": "climate.living_room",
+            "power_entity": "sensor.ac_power",
+            "plug_entity": "switch.ac_plug",
+            "energy_entity": "sensor.ac_energy",
+        },
+        options={},
+        title="Air conditioner",
+    )
+    updated: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        ApplianceCycleMonitorOptionsFlow,
+        "config_entry",
+        property(lambda _self: entry),
+    )
+    monkeypatch.setattr(
+        "custom_components.home_activity_manager.config_flow._validate_climate_entity",
+        lambda *_args: True,
+    )
+    monkeypatch.setattr(
+        "custom_components.home_activity_manager.config_flow._sensor_schema",
+        lambda *_args: vol.Schema({}),
+    )
+    flow = ApplianceCycleMonitorOptionsFlow()
+    flow.hass = SimpleNamespace(
+        config_entries=SimpleNamespace(
+            async_update_entry=lambda _entry, **kwargs: updated.append(kwargs)
+        )
+    )
+    flow.async_show_form = lambda **result: result
+    flow.async_create_entry = lambda **result: result
+
+    await flow.async_step_init({"name": "Air conditioner"})
+    actions_form = await flow.async_step_sensors(
+        {"air_conditioner_climate_climate_entity": "climate.living_room"}
+    )
+    assert actions_form["step_id"] == "actions_air_conditioner_climate"
+
+    result = await flow.async_step_actions(
+        {"start_actions": [], "finish_actions": [], "plug_off_actions": []}
+    )
+
+    assert updated[0]["data"] == {
+        "name": "Air conditioner",
+        "appliance_type": "air_conditioner_climate",
+        "climate_entity": "climate.living_room",
+        "power_entity": None,
+        "plug_entity": None,
+        "energy_entity": None,
+    }
+    assert "power_entity" not in result["data"]
+    assert "plug_entity" not in result["data"]
+    assert "energy_entity" not in result["data"]
 
 
 if __name__ == "__main__":
