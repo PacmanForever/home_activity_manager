@@ -70,6 +70,8 @@ The integration works on supported Home Assistant versions; displaying its local
 
 Each configured device has a separate config entry. Its profile and any available activity mode are fixed after setup and shown when editing; create a new device to change them. Setup asks for:
 
+In Home Assistant's device registry, appliances are grouped under a shared parent for their exact profile, such as "Air conditioner (climate entity)". Each appliance remains an independent child device with its own entities, runtime state, and configuration. Removing an appliance leaves the group while other appliances use it; removing the last appliance removes the empty group.
+
 1. A device profile, name, and activity mode when that profile offers a choice.
 2. The required activity source and any optional compatible sensors or controls. A refrigerator requires a door contact; a mailbox requires a separate main-door contact; opening can optionally include a lock.
 3. The profile's parameters and actions, when available. Empty parameter forms are skipped.

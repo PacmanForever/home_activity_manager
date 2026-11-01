@@ -6,11 +6,10 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .appliance_types import get_appliance_model
 from .const import CONF_DOOR_ENTITY, CONF_ENERGY_ENTITY, CONF_POWER_ENTITY, DOMAIN
+from .device import appliance_device_info
 from .runtime import ApplianceRuntime
 
 
@@ -24,11 +23,7 @@ class ClearPendingButton(ButtonEntity):
     def __init__(self, runtime: ApplianceRuntime, entry: ConfigEntry) -> None:
         self._runtime = runtime
         self._attr_unique_id = f"{entry.entry_id}_clear_pending"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=runtime.config.get("name", entry.title),
-            model=get_appliance_model(runtime.config.get("appliance_type")),
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     async def async_press(self) -> None:
         """Clear the pending state and cancel its reminders."""
@@ -45,11 +40,7 @@ class ResetEnergyButton(ButtonEntity):
     def __init__(self, runtime: ApplianceRuntime, entry: ConfigEntry) -> None:
         self._runtime = runtime
         self._attr_unique_id = f"{entry.entry_id}_energy_reset"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=runtime.config.get("name", entry.title),
-            model=get_appliance_model(runtime.config.get("appliance_type")),
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     async def async_press(self) -> None:
         """Reset only the integration's locally calculated energy total."""

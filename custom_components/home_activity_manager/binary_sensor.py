@@ -11,11 +11,11 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .appliance_types import SensorInput, get_appliance_model
+from .appliance_types import SensorInput
 from .const import CONF_DOOR_ENTITY, CONF_MAIL_SLOT_ENTITY, DOMAIN
+from .device import appliance_device_info
 from .entity_proxy import _suggested_proxy_object_id
 from .runtime import ApplianceRuntime
 
@@ -24,7 +24,7 @@ _RUNNING_ICONS = {
     "washer": ("mdi:washing-machine", "mdi:washing-machine-off"),
     "dishwasher": ("mdi:dishwasher", "mdi:dishwasher-off"),
     "dryer": ("mdi:tumble-dryer", "mdi:tumble-dryer-off"),
-    "air_conditioner_climate": ("mdi:hvac", "mdi:hvac-off"),
+    "thermostat_climate": ("mdi:hvac", "mdi:hvac-off"),
     "air_conditioner_contact": ("mdi:hvac", "mdi:hvac-off"),
     "air_conditioner_power": ("mdi:hvac", "mdi:hvac-off"),
     "refrigerator": ("mdi:fridge", "mdi:fridge-off"),
@@ -65,11 +65,7 @@ class ApplianceBinarySensor(BinarySensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_translation_key = key
         self._attr_device_class = device_class
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=runtime.config.get("name", entry.title),
-            model=get_appliance_model(runtime.config.get("appliance_type")),
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     @property
     def is_on(self) -> bool | None:
@@ -182,11 +178,7 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
         self._input_name = input_name
         self._attr_unique_id = f"{entry.entry_id}_input_{input_name}"
         self._attr_translation_key = f"input_{input_name}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=runtime.config.get("name", entry.title),
-            model=get_appliance_model(runtime.config.get("appliance_type")),
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
         if input_config.device_classes:
             self._attr_device_class = BinarySensorDeviceClass(
                 input_config.device_classes[0]

@@ -153,7 +153,7 @@ async def test_activity_modes_follow_the_selected_category(
     assert result["step_id"] == "activity_mode_air_conditioner"
     mode_selector = next(iter(result["data_schema"].schema.values()))
     assert set(mode_selector.config["options"]) == {
-        "running_sensor", "climate", "power"
+        "running_sensor", "power"
     }
     result = await hass.config_entries.flow.async_configure(
         flow_id, {"activity_mode": "running_sensor"}
@@ -204,7 +204,7 @@ async def test_add_air_conditioner_with_opening_sensor(hass, enable_custom_integ
 
 
 @pytest.mark.asyncio
-async def test_air_conditioner_climate_accepts_parented_entity(
+async def test_thermostat_climate_accepts_parented_entity(
     hass, enable_custom_integrations
 ):
     climate_entry = MockConfigEntry(domain="climate_source")
@@ -233,7 +233,7 @@ async def test_air_conditioner_climate_accepts_parented_entity(
     flow_id = result["flow_id"]
     await hass.config_entries.flow.async_configure(
         flow_id,
-        {"name": "Climate AC", CONF_APPLIANCE_TYPE: "air_conditioner"},
+        {"name": "Thermostat", CONF_APPLIANCE_TYPE: "thermostat"},
     )
     sensor_step = await hass.config_entries.flow.async_configure(
         flow_id, {"activity_mode": "climate"}
@@ -241,12 +241,12 @@ async def test_air_conditioner_climate_accepts_parented_entity(
     climate_selector = next(
         value
         for marker, value in sensor_step["data_schema"].schema.items()
-        if marker.schema == "air_conditioner_climate_climate_entity"
+        if marker.schema == "thermostat_climate_climate_entity"
     )
     sensor_form = await hass.config_entries.flow.async_configure(
-        flow_id, {"air_conditioner_climate_climate_entity": parented_entity.entity_id}
+        flow_id, {"thermostat_climate_climate_entity": parented_entity.entity_id}
     )
-    assert sensor_form["step_id"] == "actions_air_conditioner_climate"
+    assert sensor_form["step_id"] == "actions_thermostat_climate"
     assert isinstance(climate_selector, selector.EntitySelector)
     assert climate_selector.config["domain"] == ["climate"]
     assert "exclude_entities" not in climate_selector.config
@@ -262,7 +262,7 @@ async def test_air_conditioner_climate_accepts_parented_entity(
     flow_id = result["flow_id"]
     await hass.config_entries.flow.async_configure(
         flow_id,
-        {"name": "Climate AC 2", CONF_APPLIANCE_TYPE: "air_conditioner"},
+        {"name": "Thermostat 2", CONF_APPLIANCE_TYPE: "thermostat"},
     )
     await hass.config_entries.flow.async_configure(
         flow_id, {"activity_mode": "climate"}
@@ -288,7 +288,7 @@ async def test_climate_entity_must_be_replaced_in_options(
         title="Climate AC",
         data={
             "name": "Climate AC",
-            CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+            CONF_APPLIANCE_TYPE: "thermostat_climate",
             CONF_CLIMATE_ENTITY: climate_entity.entity_id,
         },
     )
@@ -299,22 +299,22 @@ async def test_climate_entity_must_be_replaced_in_options(
     result = await hass.config_entries.options.async_configure(
         flow_id, {"name": "Climate AC"}
     )
-    assert result["step_id"] == "sensors_air_conditioner_climate"
+    assert result["step_id"] == "sensors_thermostat_climate"
     climate_selector = next(
         value
         for marker, value in result["data_schema"].schema.items()
-        if marker.schema == "air_conditioner_climate_climate_entity"
+        if marker.schema == "thermostat_climate_climate_entity"
     )
     assert isinstance(climate_selector, selector.EntitySelector)
 
     with pytest.raises(InvalidData):
         await hass.config_entries.options.async_configure(
-            flow_id, {"air_conditioner_climate_climate_entity": None}
+            flow_id, {"thermostat_climate_climate_entity": None}
         )
     result = await hass.config_entries.options.async_configure(
-        flow_id, {"air_conditioner_climate_climate_entity": replacement.entity_id}
+        flow_id, {"thermostat_climate_climate_entity": replacement.entity_id}
     )
-    assert result["step_id"] == "actions_air_conditioner_climate"
+    assert result["step_id"] == "actions_thermostat_climate"
     result = await hass.config_entries.options.async_configure(
         flow_id, {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: []}
     )
@@ -588,7 +588,7 @@ async def test_migrate_releases_legacy_climate_device_assignment(hass):
         domain=DOMAIN,
         version=5,
         data={
-            CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+            CONF_APPLIANCE_TYPE: "thermostat_climate",
             CONF_CLIMATE_ENTITY: "climate.ac",
         },
     )
@@ -868,7 +868,7 @@ async def test_options_flow_keeps_optional_climate_inputs_cleared(
         domain=DOMAIN,
         data={
             "name": "Air conditioner",
-            CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+            CONF_APPLIANCE_TYPE: "thermostat_climate",
             CONF_CLIMATE_ENTITY: climate_entity.entity_id,
             CONF_POWER_ENTITY: "sensor.ac_power",
             CONF_PLUG_ENTITY: "switch.ac_plug",
@@ -882,20 +882,20 @@ async def test_options_flow_keeps_optional_climate_inputs_cleared(
     result = await hass.config_entries.options.async_configure(
         flow_id,
         {
-            "name": "Air conditioner",
-            CONF_APPLIANCE_TYPE: "air_conditioner",
+            "name": "Thermostat",
+            CONF_APPLIANCE_TYPE: "thermostat",
             "activity_mode": "climate",
         },
     )
-    assert result["step_id"] == "sensors_air_conditioner_climate"
+    assert result["step_id"] == "sensors_thermostat_climate"
 
     result = await hass.config_entries.options.async_configure(
         flow_id,
         {
-            "air_conditioner_climate_climate_entity": climate_entity.entity_id,
+            "thermostat_climate_climate_entity": climate_entity.entity_id,
         },
     )
-    assert result["step_id"] == "actions_air_conditioner_climate"
+    assert result["step_id"] == "actions_thermostat_climate"
     await hass.config_entries.options.async_configure(
         flow_id,
         {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: []},
@@ -916,6 +916,6 @@ async def test_options_flow_keeps_optional_climate_inputs_cleared(
         },
     )
     defaults = result["data_schema"]({})
-    assert "air_conditioner_climate_power_entity" not in defaults
-    assert "air_conditioner_climate_plug_entity" not in defaults
-    assert "air_conditioner_climate_energy_entity" not in defaults
+    assert "thermostat_climate_power_entity" not in defaults
+    assert "thermostat_climate_plug_entity" not in defaults
+    assert "thermostat_climate_energy_entity" not in defaults

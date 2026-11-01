@@ -795,6 +795,18 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
+    device_registry = dr.async_get(hass)
+    appliance_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, entry.entry_id)}
+    )
+    profile_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, "profile:washer")}
+    )
+    assert appliance_device is not None
+    assert profile_device is not None
+    assert appliance_device.via_device_id == profile_device.id
+    assert profile_device.name == "Washer"
+
     registry = er.async_get(hass)
     entry_entities = [
         entity
@@ -840,13 +852,62 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     assert hass.states.get(config[CONF_POWER_ENTITY]) is not None
 
 
+@pytest.mark.asyncio
+async def test_appliances_share_profile_device_until_last_removal(
+    hass, enable_custom_integrations
+):
+    entries = []
+    for name in ("Washer 1", "Washer 2"):
+        power_entity = f"sensor.{name.lower().replace(' ', '_')}_power"
+        hass.states.async_set(
+            power_entity, "0", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+        )
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={
+                CONF_POWER_ENTITY: power_entity,
+                "name": name,
+                "appliance_type": "washer",
+            },
+        )
+        entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        entries.append(entry)
+
+    device_registry = dr.async_get(hass)
+    profile_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, "profile:washer")}
+    )
+    assert profile_device is not None
+    appliance_devices = [
+        device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+        for entry in entries
+    ]
+    assert all(device is not None for device in appliance_devices)
+    assert {device.via_device_id for device in appliance_devices} == {
+        profile_device.id
+    }
+
+    await hass.config_entries.async_remove(entries[0].entry_id)
+    assert (
+        device_registry.async_get_device(identifiers={(DOMAIN, "profile:washer")})
+        is not None
+    )
+
+    await hass.config_entries.async_remove(entries[1].entry_id)
+    assert (
+        device_registry.async_get_device(identifiers={(DOMAIN, "profile:washer")})
+        is None
+    )
+
+
 @pytest.mark.parametrize("with_power", [False, True])
 @pytest.mark.asyncio
 async def test_climate_appliance_exposes_optional_electrical_entities(
     hass, enable_custom_integrations, with_power
 ):
     config = {
-        CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+        CONF_APPLIANCE_TYPE: "thermostat_climate",
         CONF_CLIMATE_ENTITY: "climate.ac",
         CONF_ENERGY_ENTITY: "sensor.ac_energy",
         CONF_PLUG_ENTITY: "switch.ac_plug",
@@ -1099,7 +1160,7 @@ async def test_optional_plug_and_pending_button_controls(
     (
         (appliance_type, with_external_energy)
         for appliance_type in (
-            "air_conditioner_climate",
+            "thermostat_climate",
             "air_conditioner_contact",
             "air_conditioner_power",
             "washer",
@@ -1141,7 +1202,7 @@ async def test_local_energy_reset_button_is_available_for_power_profiles(
         ("dryer", "clear_pending"),
         ("mailbox_motion", "clear_pending"),
         ("mailbox_slot", "clear_pending"),
-        ("air_conditioner_climate", "energy_reset"),
+        ("thermostat_climate", "energy_reset"),
         ("air_conditioner_contact", "energy_reset"),
         ("air_conditioner_power", "energy_reset"),
         ("washer", "energy_reset"),
@@ -1710,7 +1771,7 @@ def test_laundry_door_icons_follow_appliance_type(
 
 @pytest.mark.parametrize(
     "appliance_type",
-    ("air_conditioner_climate", "air_conditioner_contact", "air_conditioner_power"),
+    ("thermostat_climate", "air_conditioner_contact", "air_conditioner_power"),
 )
 def test_air_conditioner_activity_icons_reflect_running_state(appliance_type):
     runtime = type("Runtime", (), {"config": {CONF_APPLIANCE_TYPE: appliance_type}})()
@@ -2200,7 +2261,7 @@ async def test_climate_wrapper_preserves_and_tracks_source_entity(
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
-            CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+            CONF_APPLIANCE_TYPE: "thermostat_climate",
             CONF_CLIMATE_ENTITY: climate_entity.entity_id,
             "name": "Air conditioner",
         },
@@ -2350,7 +2411,7 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     climate_runtime = SimpleNamespace(
         hass=hass,
         config={
-            CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+            CONF_APPLIANCE_TYPE: "thermostat_climate",
             CONF_CLIMATE_ENTITY: climate_entity_id,
         },
     )
@@ -2614,7 +2675,7 @@ async def test_climate_mode_transitions_run_start_and_finish_actions(
     )
     hass.states.async_set(climate_entity.entity_id, "off", {"hvac_action": "off"})
     config = {
-        CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+        CONF_APPLIANCE_TYPE: "thermostat_climate",
         CONF_CLIMATE_ENTITY: climate_entity.entity_id,
         CONF_START_ACTIONS: [{"action": "climate.turn_on"}],
         CONF_FINISH_ACTIONS: [{"action": "climate.turn_off"}],
@@ -2663,7 +2724,7 @@ async def test_climate_entity_with_existing_parent_is_not_reassigned(
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
-            CONF_APPLIANCE_TYPE: "air_conditioner_climate",
+            CONF_APPLIANCE_TYPE: "thermostat_climate",
             CONF_CLIMATE_ENTITY: climate_entity.entity_id,
             "name": "Air conditioner",
         },

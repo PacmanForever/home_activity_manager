@@ -82,30 +82,30 @@ class ApplianceTypeProfile:
 
 
 APPLIANCE_PROFILES = {
-    "air_conditioner_climate": ApplianceTypeProfile(
+    "thermostat_climate": ApplianceTypeProfile(
         sensor_inputs=(
             SensorInput(
-                form_key="air_conditioner_climate_climate_entity",
+                form_key="thermostat_climate_climate_entity",
                 config_key=CONF_CLIMATE_ENTITY,
                 domain="climate",
                 required=True,
                 detection_source="climate",
             ),
             SensorInput(
-                form_key="air_conditioner_climate_power_entity",
+                form_key="thermostat_climate_power_entity",
                 config_key=CONF_POWER_ENTITY,
                 domain="sensor",
                 device_classes=("power",),
                 output_entity="power",
             ),
             SensorInput(
-                form_key="air_conditioner_climate_plug_entity",
+                form_key="thermostat_climate_plug_entity",
                 config_key=CONF_PLUG_ENTITY,
                 domain="switch",
                 output_entity="plug",
             ),
             SensorInput(
-                form_key="air_conditioner_climate_energy_entity",
+                form_key="thermostat_climate_energy_entity",
                 config_key=CONF_ENERGY_ENTITY,
                 domain="sensor",
                 device_classes=("energy",),
@@ -510,9 +510,9 @@ APPLIANCE_PROFILES = {
 APPLIANCE_CATEGORIES = {
     "air_conditioner": {
         "running_sensor": "air_conditioner_contact",
-        "climate": "air_conditioner_climate",
         "power": "air_conditioner_power",
     },
+    "thermostat": {"climate": "thermostat_climate"},
     "dryer": {"power": "dryer"},
     "mailbox": {"mail_slot": "mailbox_slot", "mail_motion": "mailbox_motion"},
     "opening": {"running_sensor": "opening"},
@@ -528,7 +528,6 @@ APPLIANCE_CATEGORIES = {
 
 # Keep the selector alphabetized by its Catalan display labels.
 APPLIANCE_TYPES = (
-    "air_conditioner_climate",
     "air_conditioner_contact",
     "air_conditioner_power",
     "dryer",
@@ -541,11 +540,12 @@ APPLIANCE_TYPES = (
     "sun_protection_contact",
     "washer",
     "dishwasher",
+    "thermostat_climate",
 )
 
 
 APPLIANCE_MODEL_NAMES = {
-    "air_conditioner_climate": "Air conditioner (climate entity)",
+    "thermostat_climate": "Thermostat (climate entity)",
     "washer": "Washer",
     "dishwasher": "Dishwasher",
     "dryer": "Dryer",

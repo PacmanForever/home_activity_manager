@@ -156,7 +156,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
 
     def test_ac_profiles_offer_auxiliary_sources(self) -> None:
         contact_profile = get_appliance_profile("air_conditioner_contact")
-        climate_profile = get_appliance_profile("air_conditioner_climate")
+        climate_profile = get_appliance_profile("thermostat_climate")
         power_profile = get_appliance_profile("air_conditioner_power")
         contact_schema = _sensor_schema({}, contact_profile)
         climate_schema = _sensor_schema({}, climate_profile)
@@ -164,8 +164,8 @@ class ConfigFlowSchemaTests(unittest.TestCase):
 
         self.assertIn("air_conditioner_contact_running_entity", contact_schema.schema)
         self.assertIn("air_conditioner_contact_power_entity", contact_schema.schema)
-        self.assertIn("air_conditioner_climate_climate_entity", climate_schema.schema)
-        self.assertNotIn("air_conditioner_climate_running_entity", climate_schema.schema)
+        self.assertIn("thermostat_climate_climate_entity", climate_schema.schema)
+        self.assertNotIn("thermostat_climate_running_entity", climate_schema.schema)
         self.assertIn("air_conditioner_power_power_entity", power_schema.schema)
         self.assertNotIn("air_conditioner_power_running_entity", power_schema.schema)
         self.assertIn("air_conditioner_contact_plug_entity", contact_schema.schema)
@@ -1096,7 +1096,7 @@ async def test_options_flow_clears_omitted_air_conditioner_sensors(monkeypatch):
         entry_id="air-conditioner-entry",
         data={
             "name": "Air conditioner",
-            "appliance_type": "air_conditioner_climate",
+            "appliance_type": "thermostat_climate",
             "climate_entity": "climate.living_room",
             "power_entity": "sensor.ac_power",
             "plug_entity": "switch.ac_plug",
@@ -1130,9 +1130,9 @@ async def test_options_flow_clears_omitted_air_conditioner_sensors(monkeypatch):
 
     await flow.async_step_init({"name": "Air conditioner"})
     actions_form = await flow.async_step_sensors(
-        {"air_conditioner_climate_climate_entity": "climate.living_room"}
+        {"thermostat_climate_climate_entity": "climate.living_room"}
     )
-    assert actions_form["step_id"] == "actions_air_conditioner_climate"
+    assert actions_form["step_id"] == "actions_thermostat_climate"
 
     result = await flow.async_step_actions(
         {"start_actions": [], "finish_actions": [], "plug_off_actions": []}
@@ -1140,7 +1140,7 @@ async def test_options_flow_clears_omitted_air_conditioner_sensors(monkeypatch):
 
     assert updated[0]["data"] == {
         "name": "Air conditioner",
-        "appliance_type": "air_conditioner_climate",
+        "appliance_type": "thermostat_climate",
         "climate_entity": "climate.living_room",
         "power_entity": None,
         "plug_entity": None,

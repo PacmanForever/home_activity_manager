@@ -884,6 +884,7 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async_step_activity_mode_air_conditioner = async_step_activity_mode
+    async_step_activity_mode_thermostat = async_step_activity_mode
     async_step_activity_mode_dryer = async_step_activity_mode
     async_step_activity_mode_mailbox = async_step_activity_mode
     async_step_activity_mode_refrigerator = async_step_activity_mode
@@ -891,9 +892,9 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_activity_mode_dishwasher = async_step_activity_mode
     async_step_activity_mode_opening = async_step_activity_mode
     async_step_activity_mode_sun_protection = async_step_activity_mode
-    async_step_sensors_air_conditioner_climate = async_step_sensors
-    async_step_parameters_air_conditioner_climate = async_step_parameters
-    async_step_actions_air_conditioner_climate = async_step_actions
+    async_step_sensors_thermostat_climate = async_step_sensors
+    async_step_parameters_thermostat_climate = async_step_parameters
+    async_step_actions_thermostat_climate = async_step_actions
     async_step_sensors_air_conditioner_contact = async_step_sensors
     async_step_parameters_air_conditioner_contact = async_step_parameters
     async_step_actions_air_conditioner_contact = async_step_actions
@@ -1084,9 +1085,9 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             ),
         )
 
-    async_step_sensors_air_conditioner_climate = async_step_sensors
-    async_step_parameters_air_conditioner_climate = async_step_parameters
-    async_step_actions_air_conditioner_climate = async_step_actions
+    async_step_sensors_thermostat_climate = async_step_sensors
+    async_step_parameters_thermostat_climate = async_step_parameters
+    async_step_actions_thermostat_climate = async_step_actions
     async_step_sensors_air_conditioner_contact = async_step_sensors
     async_step_parameters_air_conditioner_contact = async_step_parameters
     async_step_actions_air_conditioner_contact = async_step_actions

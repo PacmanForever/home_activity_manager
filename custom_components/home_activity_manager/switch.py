@@ -8,11 +8,10 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .appliance_types import get_appliance_model
 from .const import CONF_PLUG_ENTITY, DOMAIN
+from .device import appliance_device_info
 from .entity_proxy import _suggested_proxy_object_id
 from .runtime import ApplianceRuntime
 
@@ -28,11 +27,7 @@ class AppliancePlugSwitch(SwitchEntity):
         self._runtime = runtime
         self._entity_id = runtime.config[CONF_PLUG_ENTITY]
         self._attr_unique_id = f"{entry.entry_id}_plug"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=runtime.config.get("name", entry.title),
-            model=get_appliance_model(runtime.config.get("appliance_type")),
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     @property
     def suggested_object_id(self) -> str:

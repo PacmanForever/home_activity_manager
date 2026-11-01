@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.9.16 - 2026-11-01
+
+### Added
+
+- Group appliance devices under shared profile devices in Home Assistant's device registry.
+
+### Changed
+
+- Give climate-based appliances a dedicated thermostat category, separate from air conditioners configured by power or contact sensors.
+
 ## v0.9.15 - 2026-11-01
 
 ### Changed

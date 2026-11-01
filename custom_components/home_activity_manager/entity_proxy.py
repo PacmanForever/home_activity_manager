@@ -6,10 +6,8 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import callback
-from homeassistant.helpers.device_registry import DeviceInfo
 
-from .appliance_types import get_appliance_model
-from .const import DOMAIN
+from .device import appliance_device_info
 from .runtime import ApplianceRuntime
 
 
@@ -46,11 +44,7 @@ class EntityProxyMixin:
         self._attr_name = None
         self._attr_should_poll = False
         self._attr_translation_key = translation_key
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=runtime.config.get("name", entry.title),
-            model=get_appliance_model(runtime.config.get("appliance_type")),
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     @property
     def _source_state(self) -> Any:

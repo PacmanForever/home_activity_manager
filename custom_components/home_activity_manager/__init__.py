@@ -17,6 +17,7 @@ from .const import (
 	CONF_RUNNING_ENTITY,
 	DOMAIN,
 )
+from .device import register_appliance_profile_device
 from .runtime import ApplianceRuntime
 
 PLATFORMS = [
@@ -82,6 +83,7 @@ def _async_hide_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	"""Set up one configured appliance."""
 	config = {**entry.data, **entry.options}
+	register_appliance_profile_device(hass, entry, config)
 	runtime = ApplianceRuntime(hass, entry, config)
 	await runtime.async_setup()
 	entry.runtime_data = runtime
