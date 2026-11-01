@@ -508,11 +508,11 @@ APPLIANCE_PROFILES = {
 }
 
 APPLIANCE_CATEGORIES = {
-    "air_conditioner": {
+    "thermostat": {
         "running_sensor": "air_conditioner_contact",
         "power": "air_conditioner_power",
+        "climate": "thermostat_climate",
     },
-    "thermostat": {"climate": "thermostat_climate"},
     "dryer": {"power": "dryer"},
     "mailbox": {"mail_slot": "mailbox_slot", "mail_motion": "mailbox_motion"},
     "opening": {"running_sensor": "opening"},
@@ -523,6 +523,17 @@ APPLIANCE_CATEGORIES = {
     },
     "washer": {"power": "washer"},
     "dishwasher": {"power": "dishwasher"},
+}
+
+APPLIANCE_CATEGORY_NAMES = {
+    "thermostat": "Thermostat",
+    "dryer": "Dryer",
+    "mailbox": "Mailbox",
+    "opening": "Opening",
+    "refrigerator": "Refrigerator",
+    "sun_protection": "Sun protection",
+    "washer": "Washer",
+    "dishwasher": "Dishwasher",
 }
 
 
@@ -566,6 +577,20 @@ def get_appliance_model(appliance_type: str | None) -> str | None:
     if appliance_type is None:
         return None
     return APPLIANCE_MODEL_NAMES.get(appliance_type)
+
+
+def get_appliance_category(appliance_type: str | None) -> str | None:
+    """Return the general device category containing a concrete profile."""
+    if appliance_type is None:
+        return None
+    return next(
+        (
+            category
+            for category, modes in APPLIANCE_CATEGORIES.items()
+            if appliance_type in modes.values()
+        ),
+        None,
+    )
 
 
 def get_appliance_profile(appliance_type: str) -> ApplianceTypeProfile:

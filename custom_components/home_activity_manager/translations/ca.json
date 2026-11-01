@@ -14,8 +14,7 @@
           "appliance_type": "Tipus d’electrodomèstic"
         }
       },
-      "activity_mode_air_conditioner": {"title": "Modalitat de detecció de l’aire condicionat", "data": {"activity_mode": "Com detecta l’activitat aquest aire condicionat"}, "data_description": {"activity_mode": "Tria la detecció per contacte o potència d’aquest aire condicionat."}},
-      "activity_mode_thermostat": {"title": "Modalitat de detecció del termòstat", "data": {"activity_mode": "Com detecta l’activitat aquest termòstat"}, "data_description": {"activity_mode": "Tria l’entitat climate d’aquest termòstat."}},
+      "activity_mode_thermostat": {"title": "Modalitat de detecció del termòstat", "data": {"activity_mode": "Com detecta l’activitat aquest termòstat"}, "data_description": {"activity_mode": "Tria la font d’activitat d’aquest termòstat."}},
       "activity_mode_dryer": {"title": "Modalitat de detecció de l’assecadora", "data": {"activity_mode": "Com detecta l’activitat aquesta assecadora"}, "data_description": {"activity_mode": "Tria la modalitat de detecció pròpia de l’assecadora."}},
       "activity_mode_mailbox": {"title": "Modalitat de detecció de la bústia", "data": {"activity_mode": "Com detecta l’arribada de correu aquesta bústia"}, "data_description": {"activity_mode": "Tria el sensor d’arribada propi d’aquesta bústia."}},
       "activity_mode_refrigerator": {"title": "Modalitat de detecció de la nevera", "data": {"activity_mode": "Com detecta l’activitat aquesta nevera"}, "data_description": {"activity_mode": "Tria la modalitat de detecció pròpia de la nevera."}},
@@ -135,13 +134,12 @@
   },
   "selector": {
     "appliance_category": {
-      "options": {"air_conditioner": "Aire condicionat", "thermostat": "Termòstat", "dryer": "Assecadora", "mailbox": "Bústia", "refrigerator": "Nevera", "washer": "Rentadora", "dishwasher": "Rentaplats", "opening": "Obertura", "sun_protection": "Protecció solar"}
+      "options": {"thermostat": "Termòstat", "dryer": "Assecadora", "mailbox": "Bústia", "refrigerator": "Nevera", "washer": "Rentadora", "dishwasher": "Rentaplats", "opening": "Obertura", "sun_protection": "Protecció solar"}
     },
     "activity_mode": {
       "options": {"running_sensor": "1. Sensor binari (on = aire funcionant)", "climate": "2. Entitat clima (segueix l'activitat HVAC)", "power": "4. Sensor de potència (segueix els llindars d’inici i d’aturada)", "smart_plug": "Interruptor intel·ligent (encès = aparell actiu)", "mail_slot": "Sensor de contacte/obertura de portella (obrir = arriba correu)", "mail_motion": "Moviment interior (moviment = arriba correu)"}
     },
-    "activity_mode_air_conditioner": {"options": {"running_sensor": "Sensor de contacte/obertura (obert = aire condicionat actiu)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
-    "activity_mode_thermostat": {"options": {"climate": "Entitat climate (segueix l’activitat HVAC)"}},
+    "activity_mode_thermostat": {"options": {"running_sensor": "Sensor de contacte/obertura (on = aire condicionat actiu)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)", "climate": "Entitat climate (segueix el mode de climatització)"}},
     "activity_mode_dryer": {"options": {"power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
     "activity_mode_mailbox": {"options": {"mail_slot": "Sensor de contacte/obertura de la portella (detecta el correu)", "mail_motion": "Sensor de moviment interior (detecta el correu)"}},
     "activity_mode_refrigerator": {"options": {"smart_plug": "Interruptor intel·ligent (encès = nevera activa)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},

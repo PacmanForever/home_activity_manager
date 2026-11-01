@@ -14,8 +14,7 @@
           "appliance_type": "Tipo de electrodoméstico"
         }
       },
-      "activity_mode_air_conditioner": {"title": "Modalidad de detección del aire acondicionado", "data": {"activity_mode": "Cómo detecta la actividad este aire acondicionado"}, "data_description": {"activity_mode": "Elige la detección por contacto o potencia de este aire acondicionado."}},
-      "activity_mode_thermostat": {"title": "Modalidad de detección del termostato", "data": {"activity_mode": "Cómo detecta la actividad este termostato"}, "data_description": {"activity_mode": "Elige la entidad climate de este termostato."}},
+      "activity_mode_thermostat": {"title": "Modalidad de detección del termostato", "data": {"activity_mode": "Cómo detecta la actividad este termostato"}, "data_description": {"activity_mode": "Elige la fuente de actividad de este termostato."}},
       "activity_mode_dryer": {"title": "Modalidad de detección de la secadora", "data": {"activity_mode": "Cómo detecta la actividad esta secadora"}, "data_description": {"activity_mode": "Elige la modalidad de detección propia de la secadora."}},
       "activity_mode_mailbox": {"title": "Modalidad de detección del buzón", "data": {"activity_mode": "Cómo detecta la llegada de correo este buzón"}, "data_description": {"activity_mode": "Elige el sensor de llegada propio de este buzón."}},
       "activity_mode_refrigerator": {"title": "Modalidad de detección del frigorífico", "data": {"activity_mode": "Cómo detecta la actividad este frigorífico"}, "data_description": {"activity_mode": "Elige la modalidad de detección propia del frigorífico."}},
@@ -135,13 +134,12 @@
   },
   "selector": {
     "appliance_category": {
-      "options": {"air_conditioner": "Aire acondicionado", "thermostat": "Termostato", "dryer": "Secadora", "mailbox": "Buzón", "refrigerator": "Frigorífico", "washer": "Lavadora", "dishwasher": "Lavavajillas", "opening": "Apertura", "sun_protection": "Protección solar"}
+      "options": {"thermostat": "Termostato", "dryer": "Secadora", "mailbox": "Buzón", "refrigerator": "Frigorífico", "washer": "Lavadora", "dishwasher": "Lavavajillas", "opening": "Apertura", "sun_protection": "Protección solar"}
     },
     "activity_mode": {
       "options": {"running_sensor": "1. Sensor binario (encendido = aire en marcha)", "climate": "2. Entidad climate (sigue la actividad HVAC)", "power": "4. Sensor de potencia (sigue los umbrales de inicio y parada)", "smart_plug": "Interruptor inteligente (encendido = aparato activo)", "mail_slot": "Sensor de contacto/apertura de trampilla (abrir = llega correo)", "mail_motion": "Movimiento interior (movimiento = llega correo)"}
     },
-    "activity_mode_air_conditioner": {"options": {"running_sensor": "Sensor de contacto/apertura (abierto = aire acondicionado activo)", "power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
-    "activity_mode_thermostat": {"options": {"climate": "Entidad climate (sigue la actividad HVAC)"}},
+    "activity_mode_thermostat": {"options": {"running_sensor": "Sensor de contacto/apertura (on = aire acondicionado activo)", "power": "Sensor de potencia (sigue los umbrales de inicio y parada)", "climate": "Entidad climate (sigue el modo de climatización)"}},
     "activity_mode_dryer": {"options": {"power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
     "activity_mode_mailbox": {"options": {"mail_slot": "Sensor de contacto/apertura de la trampilla (detecta el correo)", "mail_motion": "Sensor de movimiento interior (detecta el correo)"}},
     "activity_mode_refrigerator": {"options": {"smart_plug": "Interruptor inteligente (encendido = frigorífico activo)", "power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},

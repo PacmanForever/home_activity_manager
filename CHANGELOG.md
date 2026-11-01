@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.18 - 2026-11-01
+
+### Changed
+
+- Group appliance devices under their general category instead of a separate parent for each profile.
+- Place contact-based, power-based, and climate-based air conditioners under the shared Thermostat category, and migrate devices from legacy profile parents.
+
 ## v0.9.17 - 2026-11-01
 
 ### Changed

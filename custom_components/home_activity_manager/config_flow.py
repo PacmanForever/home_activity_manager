@@ -883,7 +883,6 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
         )
 
-    async_step_activity_mode_air_conditioner = async_step_activity_mode
     async_step_activity_mode_thermostat = async_step_activity_mode
     async_step_activity_mode_dryer = async_step_activity_mode
     async_step_activity_mode_mailbox = async_step_activity_mode

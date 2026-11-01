@@ -148,12 +148,12 @@ async def test_activity_modes_follow_the_selected_category(
     )
     flow_id = result["flow_id"]
     result = await hass.config_entries.flow.async_configure(
-        flow_id, {"name": "Air conditioner", CONF_APPLIANCE_TYPE: "air_conditioner"}
+        flow_id, {"name": "Thermostat", CONF_APPLIANCE_TYPE: "thermostat"}
     )
-    assert result["step_id"] == "activity_mode_air_conditioner"
+    assert result["step_id"] == "activity_mode_thermostat"
     mode_selector = next(iter(result["data_schema"].schema.values()))
     assert set(mode_selector.config["options"]) == {
-        "running_sensor", "power"
+        "running_sensor", "power", "climate"
     }
     result = await hass.config_entries.flow.async_configure(
         flow_id, {"activity_mode": "running_sensor"}
@@ -171,11 +171,11 @@ async def test_add_air_conditioner_with_opening_sensor(hass, enable_custom_integ
     result = await hass.config_entries.flow.async_configure(
         flow_id,
         {
-            "name": "Air conditioner",
-            CONF_APPLIANCE_TYPE: "air_conditioner",
+            "name": "Thermostat",
+            CONF_APPLIANCE_TYPE: "thermostat",
         },
     )
-    assert result["step_id"] == "activity_mode_air_conditioner"
+    assert result["step_id"] == "activity_mode_thermostat"
     result = await hass.config_entries.flow.async_configure(
         flow_id, {"activity_mode": "running_sensor"}
     )
@@ -910,8 +910,8 @@ async def test_options_flow_keeps_optional_climate_inputs_cleared(
     result = await hass.config_entries.options.async_configure(
         flow_id,
         {
-            "name": "Air conditioner",
-            CONF_APPLIANCE_TYPE: "air_conditioner",
+            "name": "Thermostat",
+            CONF_APPLIANCE_TYPE: "thermostat",
             "activity_mode": "climate",
         },
     )

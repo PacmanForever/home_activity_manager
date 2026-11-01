@@ -62,8 +62,8 @@ from custom_components.home_activity_manager import runtime as runtime_module
 from custom_components.home_activity_manager.appliance import ApplianceCycleDetector
 from custom_components.home_activity_manager.sensor import _format_duration
 from custom_components.home_activity_manager.appliance_types import (
+    APPLIANCE_CATEGORIES,
     APPLIANCE_PROFILES,
-    APPLIANCE_TYPES,
 )
 from custom_components.home_activity_manager.runtime import ApplianceRuntime
 from custom_components.home_activity_manager.binary_sensor import (
@@ -131,6 +131,11 @@ async def test_auxiliary_switch_off_does_not_end_power_cycle(hass, config, monke
     hass.states.async_set(config[CONF_PLUG_ENTITY], "on")
     entry = MockConfigEntry(domain=DOMAIN, data=config)
     entry.add_to_hass(hass)
+    dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "profile:washer")},
+        name="Washer",
+    )
     runtime = ApplianceRuntime(hass, entry, config)
     await runtime.async_setup()
 
@@ -802,21 +807,24 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     appliance_device = device_registry.async_get_device(
         identifiers={(DOMAIN, entry.entry_id)}
     )
-    profile_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, "profile:washer")}
+    category_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, "category:washer")}
     )
     assert appliance_device is not None
-    assert profile_device is not None
-    assert appliance_device.via_device_id == profile_device.id
+    assert category_device is not None
+    assert appliance_device.via_device_id == category_device.id
     profile_identifiers = {
         identifier[1]
         for device in device_registry.devices.values()
         for identifier in device.identifiers
-        if identifier[0] == DOMAIN and identifier[1].startswith("profile:")
+        if identifier[0] == DOMAIN and identifier[1].startswith("category:")
     }
     assert profile_identifiers == {
-        f"profile:{appliance_type}" for appliance_type in APPLIANCE_TYPES
+        f"category:{category}" for category in APPLIANCE_CATEGORIES
     }
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, "profile:washer")}
+    ) is None
 
     registry = er.async_get(hass)
     entry_entities = [
@@ -864,7 +872,7 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
 
 
 @pytest.mark.asyncio
-async def test_appliances_share_profile_devices_and_keep_all_profiles_visible(
+async def test_appliances_share_category_devices_and_keep_all_categories_visible(
     hass, enable_custom_integrations
 ):
     entries = []
@@ -886,31 +894,82 @@ async def test_appliances_share_profile_devices_and_keep_all_profiles_visible(
         entries.append(entry)
 
     device_registry = dr.async_get(hass)
-    profile_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, "profile:washer")}
+    category_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, "category:washer")}
     )
-    assert profile_device is not None
+    assert category_device is not None
     assert device_registry.async_get_device(
-        identifiers={(DOMAIN, "profile:thermostat_climate")}
+        identifiers={(DOMAIN, "category:thermostat")}
     ) is not None
     appliance_devices = [
         device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
         for entry in entries
     ]
     assert all(device is not None for device in appliance_devices)
-    assert all(device.via_device_id == profile_device.id for device in appliance_devices)
+    assert all(device.via_device_id == category_device.id for device in appliance_devices)
 
     await hass.config_entries.async_remove(entries[0].entry_id)
     assert (
-        device_registry.async_get_device(identifiers={(DOMAIN, "profile:washer")})
+        device_registry.async_get_device(identifiers={(DOMAIN, "category:washer")})
         is not None
     )
 
     await hass.config_entries.async_remove(entries[1].entry_id)
     assert (
-        device_registry.async_get_device(identifiers={(DOMAIN, "profile:washer")})
+        device_registry.async_get_device(identifiers={(DOMAIN, "category:washer")})
         is None
     )
+
+
+@pytest.mark.asyncio
+async def test_thermostat_profiles_share_category_device(
+    hass, enable_custom_integrations
+):
+    profiles = (
+        ("air_conditioner_contact", CONF_RUNNING_ENTITY, "binary_sensor.ac_contact"),
+        ("air_conditioner_power", CONF_POWER_ENTITY, "sensor.ac_power"),
+        ("thermostat_climate", CONF_CLIMATE_ENTITY, "climate.ac"),
+    )
+    entries = []
+    for index, (appliance_type, source_key, source_entity) in enumerate(profiles):
+        attributes = (
+            {ATTR_UNIT_OF_MEASUREMENT: "W"}
+            if source_key == CONF_POWER_ENTITY
+            else {}
+        )
+        hass.states.async_set(
+            source_entity,
+            "0" if source_key == CONF_POWER_ENTITY else "off",
+            attributes,
+        )
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={
+                CONF_APPLIANCE_TYPE: appliance_type,
+                source_key: source_entity,
+                "name": f"Thermostat {index}",
+            },
+        )
+        entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        entries.append(entry)
+
+    device_registry = dr.async_get(hass)
+    category_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, "category:thermostat")}
+    )
+    assert category_device is not None
+    appliance_devices = [
+        device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+        for entry in entries
+    ]
+    assert all(device is not None for device in appliance_devices)
+    assert all(
+        device.via_device_id == category_device.id for device in appliance_devices
+    )
+
+    for entry in entries:
+        await hass.config_entries.async_remove(entry.entry_id)
 
 
 @pytest.mark.parametrize("with_power", [False, True])
