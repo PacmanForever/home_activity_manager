@@ -79,7 +79,9 @@ def test_move_device_to_config_entry_falls_back_to_legacy_api():
     assert calls == [("device", "new-entry", "old-entry")]
 
 
-def test_remove_appliance_group_devices_uses_public_registry_api(monkeypatch, hass):
+def test_remove_appliance_group_devices_uses_public_device_collection(
+    monkeypatch, hass
+):
     category_device = SimpleNamespace(
         id="category", identifiers={(DOMAIN, "category:laundry")}
     )
@@ -88,7 +90,8 @@ def test_remove_appliance_group_devices_uses_public_registry_api(monkeypatch, ha
     )
     removed = []
     registry = SimpleNamespace(
-        async_get_devices=lambda: [category_device, appliance_device],
+        async_get_devices=lambda: [],
+        devices=(category_device, appliance_device),
         async_remove_device=removed.append,
     )
     monkeypatch.setattr(device_module.dr, "async_get", lambda _: registry)
