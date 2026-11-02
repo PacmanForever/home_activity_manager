@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## v0.9.30 - 2026-11-02
+
+### Changed
+
+- Sort appliance-group choices by their localized display names.
+- Clarify group-action triggers, schedules, repeats, and template variables in the UI and documentation.
+- Explain how the integration adds activity tracking, actions, reminders, and alarms to compatible household devices.
+
+### Fixed
+
+- Prevent malformed translation arguments in the group-actions form and translate the last-appliance-removal message.
+- Use current Home Assistant device-registry APIs for device lookups and appliance detachment.
+
 ## v0.9.29 - 2026-11-02
 
 ### Added

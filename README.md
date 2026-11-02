@@ -11,7 +11,7 @@
 [![Home Assistant](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FPacmanForever%2Fhome_activity_manager%2Fmain%2Fdocs%2Fhome_assistant_compatibility.json&query=%24.tested_version&suffix=%20tested&label=home%20assistant&color=blue)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 [![Daily HA compatibility](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml/badge.svg?branch=main)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 
-Home Activity Manager brings compatible Home Assistant entities together under a dedicated device, making it easier to monitor household equipment and manage its activity, actions, reminders, and alarms. It is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles cover laundry appliances, thermostats (including air conditioners), refrigerators, mailboxes, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
+Home Activity Manager makes compatible household devices smarter by bringing their Home Assistant entities together under a dedicated device. It adds activity tracking, actions, reminders, and alarms, and is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles cover laundry appliances, thermostats (including air conditioners), refrigerators, mailboxes, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
 
 ## Installation
 
@@ -39,7 +39,12 @@ Climate control
 |   |-- Activity detection with a contact sensor
 |   `-- Activity detection with a power sensor
 `-- Thermostat
-	`-- Activity detection with a climate entity
+    `-- Activity detection with a climate entity
+
+Deliveries
+`-- Mailbox
+    |-- Activity detection with a mail-slot contact sensor
+    `-- Activity detection with an interior motion sensor
 
 Laundry and drying
 |-- Washer
@@ -47,40 +52,39 @@ Laundry and drying
 |-- Dryer
 |   `-- Activity detection with a power sensor
 `-- Dishwasher
-	`-- Activity detection with a power sensor
+    `-- Activity detection with a power sensor
 
 Openings
 |-- Door
 |   `-- Activity detection with a contact sensor
 `-- Window
-	`-- Activity detection with a contact sensor
-
-Sun protection
-|-- Blind
-|   |-- Activity detection with a contact sensor
-|   `-- Activity detection with a cover entity
-`-- Awning
-	|-- Activity detection with a contact sensor
-	`-- Activity detection with a cover entity
-
-Deliveries
-`-- Mailbox
-	|-- Activity detection with a mail-slot contact sensor
-	`-- Activity detection with an interior motion sensor
+    `-- Activity detection with a contact sensor
 
 Refrigeration
 |-- Refrigerator
 |   |-- Activity detection with a power sensor
 |   `-- Activity detection with a smart switch
 `-- Freezer
-	|-- Activity detection with a power sensor
-	`-- Activity detection with a smart switch
+    |-- Activity detection with a power sensor
+    `-- Activity detection with a smart switch
+
+Sun protection
+|-- Blind
+|   |-- Activity detection with a contact sensor
+|   `-- Activity detection with a cover entity
+`-- Awning
+    |-- Activity detection with a contact sensor
+    `-- Activity detection with a cover entity
 ```
 
 ### Climate control
 
 - **Air conditioner:** choose contact-sensor or power-based activity detection. Contact mode requires its binary sensor; power mode uses configurable thresholds and confirmation times.
 - **Thermostat:** use an existing climate entity as the activity source. A native climate proxy is added to the managed device; the original remains on its existing device and is not changed. The proxy mirrors standard climate state and controls and forwards standard climate actions; vendor-specific services are not proxied. Activity follows climate mode (`off` versus any active mode), including periods when `hvac_action` is idle.
+
+### Deliveries
+
+Mailbox profiles detect arrivals with either an interior motion sensor or a mail-slot contact. Mail-slot mode also exposes the contact's open/closed state as **Mail slot**. Both modes use a separate main-door contact and track the cycle until collection. Start actions run on arrival; finish actions run when the main door opens or pending collection is cleared. Reminders are separate.
 
 ### Laundry and drying
 
@@ -90,18 +94,14 @@ Washer, dryer, and dishwasher profiles detect cycles from power thresholds and c
 
 Door and window profiles expose the required contact's open/closed position; they do not report whether the opening is moving. Contact transitions track activity actions and duration. An optional lock is represented by a native lock proxy on the managed device; standard controls forward to the original lock, which remains unchanged on its existing device.
 
+### Refrigeration
+
+Refrigerator and freezer profiles offer the same two modes. Power mode requires a power sensor and door contact; start/end actions follow compressor activity. A controllable smart plug is optional and does not trigger an off alarm. Smart-switch mode requires a smart switch and separate door contact; start/end actions follow switch state, while optional power and energy sensors do not change activity. Both modes support the door-open alarm; neither switch mode nor the optional power-mode plug triggers a plug-off alarm.
+
 ### Sun protection
 
 - **Contact-sensor mode:** exposes open/closed position, not motor movement, so it has no `running` entity. Contact transitions still track actions and duration.
 - **Cover mode:** open, opening, and closing states are active; closed is inactive. A native cover proxy is added to the managed device and forwards standard controls without moving or modifying the original entity. Vendor-specific services are not proxied.
-
-### Deliveries
-
-Mailbox profiles detect arrivals with either an interior motion sensor or a mail-slot contact. Mail-slot mode also exposes the contact's open/closed state as **Mail slot**. Both modes use a separate main-door contact and track the cycle until collection. Start actions run on arrival; finish actions run when the main door opens or pending collection is cleared. Reminders are separate.
-
-### Refrigeration
-
-Refrigerator and freezer profiles offer the same two modes. Power mode requires a power sensor and door contact; start/end actions follow compressor activity. A controllable smart plug is optional and does not trigger an off alarm. Smart-switch mode requires a smart switch and separate door contact; start/end actions follow switch state, while optional power and energy sensors do not change activity. Both modes support the door-open alarm; neither switch mode nor the optional power-mode plug triggers a plug-off alarm.
 
 ### Shared behavior
 
@@ -113,16 +113,18 @@ Refrigerator and freezer profiles offer the same two modes. Power mode requires 
 
 ### Group actions
 
-Configure shared actions from the group's options. Only hooks supported by every activity profile under that group are offered. Each appliance runs the shared action when its own event occurs, before its device-specific actions; a group action is not a single once-per-group event.
+Configure shared actions from the group's options. Only hooks supported by every activity profile under that group are offered. Each appliance runs the shared action when its own event occurs, before its device-specific actions; a group action is not a single once-per-group event. Each event is determined by that appliance's own activity source and applicable parameters. For timed hooks, timers and repeat limits come from the appliance's parameters, not the group action settings. This applies to maximum-runtime actions, pending reminders, and door, compressor, or smart-plug alarms. A hook runs only when that appliance emits the corresponding event; for example, the maximum-runtime hook requires a maximum runtime to be configured. Omitted optional values use the integration's defaults. Repeat counts are additional runs after the first, so three additional repeats allow up to four runs for that appliance.
+
+For example, the shared smart-plug-off action runs immediately for each appliance whose plug turns off. That appliance's repeat interval and additional-repeat count control later runs independently of the other appliances in the group. The first action is not counted as a repeat. These alarm parameters are configured with the appliance, not in the group actions form.
 
 | Group | Hooks common to every profile |
 | --- | --- |
 | Climate control | Activity starts, activity ends, smart plug off |
+| Deliveries | Arrival, collection reminder, collected |
 | Laundry and drying | Activity starts, activity ends, maximum runtime, pending unload, emptied, smart plug off |
 | Openings | Activity starts, activity ends |
-| Sun protection | Activity starts, activity ends |
-| Deliveries | Arrival, collection reminder, collected |
 | Refrigeration | Activity starts, activity ends, door-open alarm |
+| Sun protection | Activity starts, activity ends |
 
 Group action templates receive `ham_appliance_name` (the appliance's Home Assistant device name), `ham_area_name` (the assigned area, or `None`), and `ham_source_entity_id` when an entity event triggered the action. Timer-triggered actions have no source entity. For example, use `{{ ham_area_name or ham_appliance_name }}` in a notification message to prefer the area and fall back to the device name.
 

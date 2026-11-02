@@ -237,13 +237,19 @@ def _duration_marker(
 def _identity_schema(
     values: dict[str, Any],
     appliance_groups: tuple[str, ...] = tuple(APPLIANCE_GROUPS),
+    *,
+    language: str = "en",
 ) -> vol.Schema:
+    sorted_groups = sorted(
+        appliance_groups,
+        key=lambda group: get_appliance_group_name(group, language).casefold(),
+    )
     return vol.Schema(
         {
             _required(CONF_NAME, values): selector.TextSelector(),
             _required(CONF_APPLIANCE_GROUP, values): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=list(appliance_groups),
+                    options=sorted_groups,
                     mode=selector.SelectSelectorMode.DROPDOWN,
                     translation_key="appliance_group",
                 )
@@ -817,7 +823,9 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_appliance_class()
         return self.async_show_form(
             step_id="user",
-            data_schema=_identity_schema({}),
+            data_schema=_identity_schema(
+                {}, language=self.hass.config.language if self.hass is not None else "en"
+            ),
             last_step=False,
         )
 

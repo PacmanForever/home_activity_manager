@@ -245,6 +245,24 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertEqual(values[CONF_APPLIANCE_GROUP], "laundry")
         self.assertNotIn(CONF_POWER_ENTITY, values)
 
+        catalan_schema = _identity_schema({}, language="ca")
+        group_selector = next(
+            value
+            for marker, value in catalan_schema.schema.items()
+            if marker.schema == CONF_APPLIANCE_GROUP
+        )
+        self.assertEqual(
+            group_selector.config["options"],
+            [
+                "climate",
+                "deliveries",
+                "sun_protection",
+                "refrigeration",
+                "laundry",
+                "openings",
+            ],
+        )
+
     def test_sensor_selection_fields_prefill_during_edit(self) -> None:
         values = {
             CONF_POWER_ENTITY: "sensor.dishwasher_power",
@@ -1032,6 +1050,36 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             self.assertIn("ham_appliance_name", help_text)
             self.assertIn("ham_area_name", help_text)
             self.assertIn("ham_source_entity_id", help_text)
+            self.assertNotIn("{{", help_text)
+            self.assertNotIn("}}", help_text)
+            action_help = translation["options"]["step"]["group_actions"][
+                "data_description"
+            ]
+            for action_key in (
+                "start_actions",
+                "finish_actions",
+                "max_runtime_actions",
+                "pending_actions",
+                "emptied_actions",
+                "door_open_actions",
+                "compressor_inactive_actions",
+                "plug_off_actions",
+            ):
+                self.assertTrue(action_help[action_key].strip(), (path, action_key))
+
+    def test_last_appliance_removed_abort_is_translated(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        paths = (
+            root / "strings.json",
+            root / "translations" / "en.json",
+            root / "translations" / "es.json",
+            root / "translations" / "ca.json",
+        )
+        for path in paths:
+            translation = json.loads(path.read_text(encoding="utf-8"))
+            self.assertTrue(
+                translation["config"]["abort"]["last_appliance_removed"].strip()
+            )
 
 
 @pytest.mark.asyncio
