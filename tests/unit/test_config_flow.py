@@ -1061,8 +1061,8 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                     for term in ("timer", "temporitzador", "temporizador")
                 )
             )
-            self.assertIn("{{ ham_device_area_name or ham_device_name }}", help_text)
-            self.assertIn("{{ ham_source_entity_id | default(", help_text)
+            self.assertNotIn("{{", help_text)
+            self.assertNotIn("}}", help_text)
             action_help = translation["options"]["step"]["group_actions"][
                 "data_description"
             ]

@@ -1,0 +1,13 @@
+# Repository Instructions
+
+## Home Assistant Translations
+
+- Never include literal Jinja delimiters (`{{` or `}}`) in `strings.json` or `translations/*.json`. Home Assistant may interpret them as translation-format arguments and display `Translation error: MALFORMED_ARGUMENT`.
+- Explain template variables in translation text without embedding a full Jinja expression. Put copyable expressions in the README or other non-translation documentation.
+- Add or keep a regression test that asserts translated help strings do not contain literal Jinja delimiters.
+
+## Releases
+
+- Do not create a release commit, tag, push, or GitHub Release until the complete unit and component test suite passes with the CI coverage threshold.
+- Before release, run `python3 -m pytest -q tests/unit tests/component --cov=custom_components.home_activity_manager --cov-report= --cov-fail-under=95` and stop to fix any failures before committing or publishing.
+- Include regression tests for user-visible translation and config-flow behavior; passing tests must verify the intended behavior, not preserve a broken implementation detail.

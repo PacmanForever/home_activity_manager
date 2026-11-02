@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.9.32 - 2026-11-02
+
+### Fixed
+
+- Prevent malformed-argument translation errors by removing literal Jinja delimiters from translated help text.
+
 ## v0.9.31 - 2026-11-02
 
 ### Changed
