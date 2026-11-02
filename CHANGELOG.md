@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v0.9.28 - 2026-11-02
+
+### Changed
+
+- Use singular Catalan group names "Tancament" and "Lliurament" in selectors and device models.
+- Clarify activity-detection mode labels across supported languages and document the group, class, and mode hierarchy.
+
 ## v0.9.27 - 2026-11-02
 
 ### Changed

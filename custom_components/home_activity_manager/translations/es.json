@@ -175,21 +175,21 @@
       "options": {"thermostat": "Termostato", "dryer": "Secadora", "mailbox": "Buzón", "refrigerator": "Frigorífico", "washer": "Lavadora", "dishwasher": "Lavavajillas", "opening": "Apertura", "sun_protection": "Protección solar"}
     },
     "activity_mode": {
-      "options": {"running_sensor": "1. Sensor binario (encendido = aire en marcha)", "climate": "2. Entidad climate (sigue la actividad HVAC)", "power": "4. Sensor de potencia (sigue los umbrales de inicio y parada)", "smart_plug": "Interruptor inteligente (encendido = dispositivo activo)", "mail_slot": "Sensor de contacto/apertura de trampilla (abrir = llega correo)", "mail_motion": "Movimiento interior (movimiento = llega correo)"}
+      "options": {"running_sensor": "Detección de actividad con sensor de contacto", "climate": "Detección de actividad con entidad climate", "power": "Detección de actividad con sensor de potencia", "smart_plug": "Detección de actividad con interruptor inteligente", "mail_slot": "Detección de actividad con sensor de contacto de la trampilla", "mail_motion": "Detección de actividad con sensor de movimiento interior"}
     },
-    "activity_mode_thermostat": {"options": {"running_sensor": "Sensor de contacto/apertura (on = aire acondicionado activo)", "power": "Sensor de potencia (sigue los umbrales de inicio y parada)", "climate": "Entidad climate (sigue el modo de climatización)"}},
-    "activity_mode_climate": {"options": {"running_sensor": "Sensor de contacto (on = en funcionamiento)", "power": "Sensor de potencia (sigue los umbrales de inicio y parada)", "climate": "Entidad climate (sigue la actividad HVAC)"}},
-    "activity_mode_laundry": {"options": {"power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
-    "activity_mode_openings": {"options": {"running_sensor": "Sensor de contacto (indica el estado abierto/cerrado)"}},
-    "activity_mode_deliveries": {"options": {"mail_slot": "Sensor de contacto de la trampilla", "mail_motion": "Sensor de movimiento interior"}},
-    "activity_mode_refrigeration": {"options": {"smart_plug": "Interruptor inteligente (encendido = dispositivo activo)", "power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
-    "activity_mode_dryer": {"options": {"power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
-    "activity_mode_mailbox": {"options": {"mail_slot": "Sensor de contacto/apertura de la trampilla (detecta el correo)", "mail_motion": "Sensor de movimiento interior (detecta el correo)"}},
-    "activity_mode_refrigerator": {"options": {"smart_plug": "Interruptor inteligente (encendido = frigorífico activo)", "power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
-    "activity_mode_washer": {"options": {"power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
-    "activity_mode_dishwasher": {"options": {"power": "Sensor de potencia (sigue los umbrales de inicio y parada)"}},
-    "activity_mode_opening": {"options": {"running_sensor": "Sensor de contacto (indica estado abierto/cerrado, no movimiento)"}},
-    "activity_mode_sun_protection": {"options": {"running_sensor": "Sensor de contacto (indica abierto/cerrado, no el movimiento del motor)", "cover": "Entidad cover (cualquier estado salvo cerrado = activa)"}},
+    "activity_mode_thermostat": {"options": {"running_sensor": "Detección de actividad con sensor de contacto", "power": "Detección de actividad con sensor de potencia", "climate": "Detección de actividad con entidad climate"}},
+    "activity_mode_climate": {"options": {"running_sensor": "Detección de actividad con sensor de contacto", "power": "Detección de actividad con sensor de potencia", "climate": "Detección de actividad con entidad climate"}},
+    "activity_mode_laundry": {"options": {"power": "Detección de actividad con sensor de potencia"}},
+    "activity_mode_openings": {"options": {"running_sensor": "Detección de actividad con sensor de contacto"}},
+    "activity_mode_deliveries": {"options": {"mail_slot": "Detección de actividad con sensor de contacto de la trampilla", "mail_motion": "Detección de actividad con sensor de movimiento interior"}},
+    "activity_mode_refrigeration": {"options": {"smart_plug": "Detección de actividad con interruptor inteligente", "power": "Detección de actividad con sensor de potencia"}},
+    "activity_mode_dryer": {"options": {"power": "Detección de actividad con sensor de potencia"}},
+    "activity_mode_mailbox": {"options": {"mail_slot": "Detección de actividad con sensor de contacto de la trampilla", "mail_motion": "Detección de actividad con sensor de movimiento interior"}},
+    "activity_mode_refrigerator": {"options": {"smart_plug": "Detección de actividad con interruptor inteligente", "power": "Detección de actividad con sensor de potencia"}},
+    "activity_mode_washer": {"options": {"power": "Detección de actividad con sensor de potencia"}},
+    "activity_mode_dishwasher": {"options": {"power": "Detección de actividad con sensor de potencia"}},
+    "activity_mode_opening": {"options": {"running_sensor": "Detección de actividad con sensor de contacto"}},
+    "activity_mode_sun_protection": {"options": {"running_sensor": "Detección de actividad con sensor de contacto", "cover": "Detección de actividad con entidad cover"}},
     "appliance_type": {
       "options": {
         "laundry": "Dispositivo de lavado y secado",

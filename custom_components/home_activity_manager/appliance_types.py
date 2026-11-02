@@ -582,9 +582,9 @@ APPLIANCE_GROUP_TRANSLATIONS = {
     "ca": {
         "climate": "Climatització",
         "laundry": "Rentat i assecat",
-        "openings": "Tancaments",
+        "openings": "Tancament",
         "sun_protection": "Protecció solar",
-        "deliveries": "Lliuraments",
+        "deliveries": "Lliurament",
         "refrigeration": "Refrigeració",
     },
     "es": {

@@ -68,7 +68,53 @@ The integration works on supported Home Assistant versions; displaying its local
 
 ## Configuration
 
-Appliances are organized into six groups: Climate control (air conditioner and thermostat), Laundry and drying (washer, dryer, and dishwasher), Openings (door and window), Sun protection (blind and awning), Deliveries (mailbox), and Refrigeration (refrigerator and freezer). Each group has one config entry. Add, edit, or remove appliances from that group's options. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Existing per-appliance entries are consolidated automatically during migration, preserving appliance IDs, entity IDs, registry customizations, and runtime state. Setup asks for:
+Appliances are organized in three levels: **group**, **appliance class**, and **activity-detection mode**. The mode labels use the same wording in the setup selector:
+
+```text
+Climate control
+|-- Air conditioner
+|   |-- Activity detection with a contact sensor
+|   `-- Activity detection with a power sensor
+`-- Thermostat
+	`-- Activity detection with a climate entity
+
+Laundry and drying
+|-- Washer
+|   `-- Activity detection with a power sensor
+|-- Dryer
+|   `-- Activity detection with a power sensor
+`-- Dishwasher
+	`-- Activity detection with a power sensor
+
+Openings
+|-- Door
+|   `-- Activity detection with a contact sensor
+`-- Window
+	`-- Activity detection with a contact sensor
+
+Sun protection
+|-- Blind
+|   |-- Activity detection with a contact sensor
+|   `-- Activity detection with a cover entity
+`-- Awning
+	|-- Activity detection with a contact sensor
+	`-- Activity detection with a cover entity
+
+Deliveries
+`-- Mailbox
+	|-- Activity detection with a mail-slot contact sensor
+	`-- Activity detection with an interior motion sensor
+
+Refrigeration
+|-- Refrigerator
+|   |-- Activity detection with a power sensor
+|   `-- Activity detection with a smart switch
+`-- Freezer
+	|-- Activity detection with a power sensor
+	`-- Activity detection with a smart switch
+```
+
+Each group has one config entry. Add, edit, or remove appliances from that group's options. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Existing per-appliance entries are consolidated automatically during migration, preserving appliance IDs, entity IDs, registry customizations, and runtime state. Setup asks for:
 
 Each group entry groups its appliances on the integration page. Only configured appliances are registered as devices; the group itself is not added as an empty device.
 

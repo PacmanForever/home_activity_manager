@@ -169,27 +169,27 @@
   },
   "selector": {
     "appliance_action": {"options": {"edit": "Edita un dispositiu", "remove": "Elimina un dispositiu"}},
-    "appliance_group": {"options": {"climate": "Climatització", "laundry": "Rentat i assecat", "openings": "Tancaments", "sun_protection": "Protecció solar", "deliveries": "Lliuraments", "refrigeration": "Refrigeració"}},
+    "appliance_group": {"options": {"climate": "Climatització", "laundry": "Rentat i assecat", "openings": "Tancament", "sun_protection": "Protecció solar", "deliveries": "Lliurament", "refrigeration": "Refrigeració"}},
     "appliance_class": {"options": {"air_conditioner": "Aire condicionat", "thermostat": "Termòstat", "washer": "Rentadora", "dryer": "Assecadora", "dishwasher": "Rentaplats", "door": "Porta", "window": "Finestra", "blind": "Persiana", "awning": "Tendal", "mailbox": "Bústia", "refrigerator": "Nevera", "freezer": "Congelador", "opening": "Obertura", "sun_protection": "Protecció solar"}},
     "appliance_category": {
       "options": {"thermostat": "Termòstat", "dryer": "Assecadora", "mailbox": "Bústia", "refrigerator": "Nevera", "washer": "Rentadora", "dishwasher": "Rentaplats", "opening": "Obertura", "sun_protection": "Protecció solar"}
     },
     "activity_mode": {
-      "options": {"running_sensor": "1. Sensor binari (on = aire funcionant)", "climate": "2. Entitat clima (segueix l'activitat HVAC)", "power": "4. Sensor de potència (segueix els llindars d’inici i d’aturada)", "smart_plug": "Interruptor intel·ligent (encès = dispositiu actiu)", "mail_slot": "Sensor de contacte/obertura de portella (obrir = arriba correu)", "mail_motion": "Moviment interior (moviment = arriba correu)"}
+      "options": {"running_sensor": "Detecció d’activitat amb sensor de contacte", "climate": "Detecció d’activitat amb entitat clima", "power": "Detecció d’activitat amb sensor de potència", "smart_plug": "Detecció d’activitat amb interruptor intel·ligent", "mail_slot": "Detecció d’activitat amb sensor de contacte de portella", "mail_motion": "Detecció d’activitat amb sensor de moviment interior"}
     },
-    "activity_mode_thermostat": {"options": {"running_sensor": "Sensor de contacte/obertura (on = aire condicionat actiu)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)", "climate": "Entitat climate (segueix el mode de climatització)"}},
-    "activity_mode_climate": {"options": {"running_sensor": "Sensor de contacte (on = en funcionament)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)", "climate": "Entitat climate (segueix l’activitat HVAC)"}},
-    "activity_mode_laundry": {"options": {"power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
-    "activity_mode_openings": {"options": {"running_sensor": "Sensor de contacte (informa de l’estat obert/tancat)"}},
-    "activity_mode_deliveries": {"options": {"mail_slot": "Sensor de contacte de la portella", "mail_motion": "Sensor de moviment interior"}},
-    "activity_mode_refrigeration": {"options": {"smart_plug": "Interruptor intel·ligent (encès = dispositiu actiu)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
-    "activity_mode_dryer": {"options": {"power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
-    "activity_mode_mailbox": {"options": {"mail_slot": "Sensor de contacte/obertura de la portella (detecta el correu)", "mail_motion": "Sensor de moviment interior (detecta el correu)"}},
-    "activity_mode_refrigerator": {"options": {"smart_plug": "Interruptor intel·ligent (encès = nevera activa)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
-    "activity_mode_washer": {"options": {"power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
-    "activity_mode_dishwasher": {"options": {"power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
-    "activity_mode_opening": {"options": {"running_sensor": "Sensor de contacte (informa de l’estat obert/tancat, no del moviment)"}},
-    "activity_mode_sun_protection": {"options": {"running_sensor": "Sensor de contacte (informa obert/tancat, no del moviment del motor)", "cover": "Entitat cover (qualsevol estat excepte tancat = activa)"}},
+    "activity_mode_thermostat": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte", "power": "Detecció d’activitat amb sensor de potència", "climate": "Detecció d’activitat amb entitat clima"}},
+    "activity_mode_climate": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte", "power": "Detecció d’activitat amb sensor de potència", "climate": "Detecció d’activitat amb entitat clima"}},
+    "activity_mode_laundry": {"options": {"power": "Detecció d’activitat amb sensor de potència"}},
+    "activity_mode_openings": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte"}},
+    "activity_mode_deliveries": {"options": {"mail_slot": "Detecció d’activitat amb sensor de contacte de portella", "mail_motion": "Detecció d’activitat amb sensor de moviment interior"}},
+    "activity_mode_refrigeration": {"options": {"smart_plug": "Detecció d’activitat amb interruptor intel·ligent", "power": "Detecció d’activitat amb sensor de potència"}},
+    "activity_mode_dryer": {"options": {"power": "Detecció d’activitat amb sensor de potència"}},
+    "activity_mode_mailbox": {"options": {"mail_slot": "Detecció d’activitat amb sensor de contacte de portella", "mail_motion": "Detecció d’activitat amb sensor de moviment interior"}},
+    "activity_mode_refrigerator": {"options": {"smart_plug": "Detecció d’activitat amb interruptor intel·ligent", "power": "Detecció d’activitat amb sensor de potència"}},
+    "activity_mode_washer": {"options": {"power": "Detecció d’activitat amb sensor de potència"}},
+    "activity_mode_dishwasher": {"options": {"power": "Detecció d’activitat amb sensor de potència"}},
+    "activity_mode_opening": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte"}},
+    "activity_mode_sun_protection": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte", "cover": "Detecció d’activitat amb entitat cover"}},
     "appliance_type": {
       "options": {
         "laundry": "Dispositiu de rentat i assecat",

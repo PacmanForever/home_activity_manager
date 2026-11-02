@@ -175,21 +175,21 @@
       "options": {"thermostat": "Thermostat", "dryer": "Dryer", "mailbox": "Mailbox", "refrigerator": "Refrigerator", "washer": "Washer", "dishwasher": "Dishwasher", "opening": "Opening", "sun_protection": "Sun protection"}
     },
     "activity_mode": {
-      "options": {"running_sensor": "1. Binary sensor (on = air running)", "climate": "2. Climate entity (follows HVAC activity)", "power": "4. Power sensor (follows start and stop thresholds)", "smart_plug": "Smart switch (on = device active)", "mail_slot": "Mail-slot contact/opening sensor (open = mail arrived)", "mail_motion": "Interior motion (motion = mail arrived)"}
+      "options": {"running_sensor": "Activity detection with a contact sensor", "climate": "Activity detection with a climate entity", "power": "Activity detection with a power sensor", "smart_plug": "Activity detection with a smart switch", "mail_slot": "Activity detection with a mail-slot contact sensor", "mail_motion": "Activity detection with an interior motion sensor"}
     },
-    "activity_mode_thermostat": {"options": {"running_sensor": "Contact/opening sensor (on = air conditioner active)", "power": "Power sensor (follows start and stop thresholds)", "climate": "Climate entity (follows climate mode)"}},
-    "activity_mode_climate": {"options": {"running_sensor": "Contact sensor (on = running)", "power": "Power sensor (follows start and stop thresholds)", "climate": "Climate entity (follows HVAC activity)"}},
-    "activity_mode_laundry": {"options": {"power": "Power sensor (follows start and stop thresholds)"}},
-    "activity_mode_openings": {"options": {"running_sensor": "Contact sensor (reports open/closed state)"}},
-    "activity_mode_deliveries": {"options": {"mail_slot": "Mail-slot contact sensor", "mail_motion": "Interior motion sensor"}},
-    "activity_mode_refrigeration": {"options": {"smart_plug": "Smart switch (on = device active)", "power": "Power sensor (follows start and stop thresholds)"}},
-    "activity_mode_dryer": {"options": {"power": "Power sensor (follows start and stop thresholds)"}},
-    "activity_mode_mailbox": {"options": {"mail_slot": "Mail-slot contact/opening sensor (mail detected)", "mail_motion": "Interior motion sensor (mail detected)"}},
-    "activity_mode_refrigerator": {"options": {"smart_plug": "Smart switch (on = refrigerator active)", "power": "Power sensor (follows start and stop thresholds)"}},
-    "activity_mode_washer": {"options": {"power": "Power sensor (follows start and stop thresholds)"}},
-    "activity_mode_dishwasher": {"options": {"power": "Power sensor (follows start and stop thresholds)"}},
-    "activity_mode_opening": {"options": {"running_sensor": "Contact sensor (reports open/closed state, not movement)"}},
-    "activity_mode_sun_protection": {"options": {"running_sensor": "Contact sensor (reports open/closed, not motor motion)", "cover": "Cover entity (not closed = active)"}},
+    "activity_mode_thermostat": {"options": {"running_sensor": "Activity detection with a contact sensor", "power": "Activity detection with a power sensor", "climate": "Activity detection with a climate entity"}},
+    "activity_mode_climate": {"options": {"running_sensor": "Activity detection with a contact sensor", "power": "Activity detection with a power sensor", "climate": "Activity detection with a climate entity"}},
+    "activity_mode_laundry": {"options": {"power": "Activity detection with a power sensor"}},
+    "activity_mode_openings": {"options": {"running_sensor": "Activity detection with a contact sensor"}},
+    "activity_mode_deliveries": {"options": {"mail_slot": "Activity detection with a mail-slot contact sensor", "mail_motion": "Activity detection with an interior motion sensor"}},
+    "activity_mode_refrigeration": {"options": {"smart_plug": "Activity detection with a smart switch", "power": "Activity detection with a power sensor"}},
+    "activity_mode_dryer": {"options": {"power": "Activity detection with a power sensor"}},
+    "activity_mode_mailbox": {"options": {"mail_slot": "Activity detection with a mail-slot contact sensor", "mail_motion": "Activity detection with an interior motion sensor"}},
+    "activity_mode_refrigerator": {"options": {"smart_plug": "Activity detection with a smart switch", "power": "Activity detection with a power sensor"}},
+    "activity_mode_washer": {"options": {"power": "Activity detection with a power sensor"}},
+    "activity_mode_dishwasher": {"options": {"power": "Activity detection with a power sensor"}},
+    "activity_mode_opening": {"options": {"running_sensor": "Activity detection with a contact sensor"}},
+    "activity_mode_sun_protection": {"options": {"running_sensor": "Activity detection with a contact sensor", "cover": "Activity detection with a cover entity"}},
     "appliance_type": {
       "options": {
         "laundry": "Laundry device",
