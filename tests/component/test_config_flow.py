@@ -181,40 +181,12 @@ async def test_add_appliance_through_four_config_flow_steps(
     entry = result["result"]
     options_result = await hass.config_entries.options.async_init(entry.entry_id)
     options_flow_id = options_result["flow_id"]
-    result = await hass.config_entries.options.async_configure(
-        options_flow_id, {"appliance_action": "add"}
+    actions = next(
+        value
+        for marker, value in options_result["data_schema"].schema.items()
+        if marker.schema == "appliance_action"
     )
-    assert result["step_id"] == "appliance_class"
-    result = await hass.config_entries.options.async_configure(
-        options_flow_id, {CONF_APPLIANCE_CLASS: "dishwasher"}
-    )
-    assert result["step_id"] == "activity_mode_laundry"
-    result = await hass.config_entries.options.async_configure(
-        options_flow_id, {"activity_mode": "power"}
-    )
-    assert result["step_id"] == "sensors_laundry"
-    result = await hass.config_entries.options.async_configure(
-        options_flow_id, {"laundry_power_entity": "sensor.second_washer_power"}
-    )
-    assert result["step_id"] == "parameters_laundry"
-    result = await hass.config_entries.options.async_configure(
-        options_flow_id,
-        {
-            "start_power_w": 4,
-            "start_duration_seconds": 15,
-            "finish_power_w": 1,
-            "finish_duration_seconds": 60,
-        },
-    )
-    result = await hass.config_entries.options.async_configure(
-        options_flow_id,
-        {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: [], "max_runtime_actions": []},
-    )
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert len(entry.data["appliances"]) == 2
-    assert entry.data["appliances"][1]["data"][CONF_POWER_ENTITY] == (
-        "sensor.second_washer_power"
-    )
+    assert actions.config["options"] == ["edit", "remove"]
 
 
 @pytest.mark.asyncio

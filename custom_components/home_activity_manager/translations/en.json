@@ -168,7 +168,7 @@
     }
   },
   "selector": {
-    "appliance_action": {"options": {"add": "Add device", "edit": "Edit device", "remove": "Remove device"}},
+    "appliance_action": {"options": {"edit": "Edit device", "remove": "Remove device"}},
     "appliance_group": {"options": {"climate": "Climate control", "laundry": "Laundry and drying", "openings": "Openings", "sun_protection": "Sun protection", "deliveries": "Deliveries", "refrigeration": "Refrigeration"}},
     "appliance_class": {"options": {"air_conditioner": "Air conditioner", "thermostat": "Thermostat", "washer": "Washer", "dryer": "Dryer", "dishwasher": "Dishwasher", "door": "Door", "window": "Window", "blind": "Blind", "awning": "Awning", "mailbox": "Mailbox", "refrigerator": "Refrigerator", "freezer": "Freezer", "opening": "Opening", "sun_protection": "Sun protection"}},
     "appliance_category": {

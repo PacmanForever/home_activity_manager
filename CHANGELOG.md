@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v0.9.25 - 2026-11-02
+
+### Changed
+
+- Show the appliance group, class, and detection method in every device model, localized to Home Assistant's configured language.
+- Keep adding devices in the main setup flow; use the options flow only to edit or remove devices.
+
 ## v0.9.24 - 2026-11-02
 
 ### Added
@@ -11,6 +18,7 @@
 ### Changed
 
 - Add appliances from the main setup flow to an existing group instead of showing a duplicate-group error.
+- Keep the group management menu focused on editing and removing existing appliances.
 - Use consistent device terminology across the supported translations.
 
 ## v0.9.23 - 2026-11-02

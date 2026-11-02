@@ -744,6 +744,52 @@ APPLIANCE_MODEL_NAMES = {
     "sun_protection_cover": "Sun protection (cover)",
 }
 
+APPLIANCE_DETECTION_MODEL_NAMES = {
+    "power": {
+        "en": "Power sensor",
+        "ca": "Sensor de potència",
+        "es": "Sensor de potencia",
+    },
+    "climate": {
+        "en": "Climate entity",
+        "ca": "Entitat climate",
+        "es": "Entidad climate",
+    },
+    "running_sensor": {
+        "en": "Contact/opening sensor",
+        "ca": "Sensor de contacte/obertura",
+        "es": "Sensor de contacto/apertura",
+    },
+    "smart_plug": {
+        "en": "Smart switch",
+        "ca": "Interruptor intel·ligent",
+        "es": "Interruptor inteligente",
+    },
+    "cover": {
+        "en": "Cover entity",
+        "ca": "Entitat cover",
+        "es": "Entidad cover",
+    },
+    "mail_motion": {
+        "en": "Interior motion sensor",
+        "ca": "Sensor de moviment interior",
+        "es": "Sensor de movimiento interior",
+    },
+    "mail_slot": {
+        "en": "Mail-slot contact/opening sensor",
+        "ca": "Sensor de contacte/obertura de portella",
+        "es": "Sensor de contacto/apertura de trampilla",
+    },
+}
+
+APPLIANCE_UNCLASSIFIED_MODEL_NAMES = {
+    "laundry": {
+        "en": "Laundry device",
+        "ca": "Dispositiu de rentat i assecat",
+        "es": "Dispositivo de lavado y secado",
+    }
+}
+
 LEGACY_APPLIANCE_CLASSES = {
     "thermostat_climate": "thermostat",
     "washer": "washer",
@@ -783,23 +829,34 @@ def get_appliance_model(
     language: str = "en",
 ) -> str | None:
     """Return the localized display model name for an appliance profile."""
-    if appliance_type == "air_conditioner_power":
-        power_sensor_names = {
-            "ca": "Sensor de potència",
-            "es": "Sensor de potencia",
-        }
-        power_sensor_name = power_sensor_names.get(
-            language.split("-")[0], "Power sensor"
-        )
-        group_name = get_appliance_group_name("climate", language)
-        class_name = get_appliance_class_name(
-            appliance_class or "air_conditioner", language
-        )
-        return f"{group_name} · {class_name} · {power_sensor_name}"
-    if appliance_class in APPLIANCE_CLASS_NAMES:
-        return APPLIANCE_CLASS_NAMES[appliance_class]
     if appliance_type is None:
         return None
+
+    profile = APPLIANCE_PROFILES.get(appliance_type)
+    appliance_class = appliance_class or get_legacy_appliance_class(appliance_type)
+    group = get_appliance_group_for_profile(appliance_type, appliance_class)
+    if appliance_class is None and appliance_type in APPLIANCE_UNCLASSIFIED_MODEL_NAMES:
+        group = "laundry"
+    if profile is not None and profile.detection_sources and group is not None:
+        detection_names = APPLIANCE_DETECTION_MODEL_NAMES.get(
+            profile.detection_sources[0]
+        )
+        if detection_names is not None:
+            language_code = language.split("-")[0]
+            detection_name = detection_names.get(language_code, detection_names["en"])
+            group_name = get_appliance_group_name(group, language)
+            if appliance_class in APPLIANCE_CLASS_NAMES:
+                class_name = get_appliance_class_name(appliance_class, language)
+            else:
+                class_names = APPLIANCE_UNCLASSIFIED_MODEL_NAMES.get(appliance_type)
+                if class_names is None:
+                    class_name = None
+                else:
+                    class_name = class_names.get(language_code, class_names["en"])
+            if class_name is not None:
+                return f"{group_name} · {class_name} · {detection_name}"
+    if appliance_class in APPLIANCE_CLASS_NAMES:
+        return get_appliance_class_name(appliance_class, language)
     return APPLIANCE_MODEL_NAMES.get(appliance_type)
 
 

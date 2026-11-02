@@ -111,7 +111,23 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertEqual(set(APPLIANCE_MODEL_NAMES), set(APPLIANCE_PROFILES))
         self.assertEqual(
             get_appliance_model("air_conditioner_contact"),
-            "Air conditioner (contact/opening sensor)",
+            "Climate control · Air conditioner · Contact/opening sensor",
+        )
+        self.assertEqual(
+            get_appliance_model("air_conditioner_contact", "air_conditioner", "ca"),
+            "Climatització · Aire condicionat · Sensor de contacte/obertura",
+        )
+        self.assertEqual(
+            get_appliance_model("air_conditioner_contact", "air_conditioner", "es"),
+            "Climatización · Aire acondicionado · Sensor de contacto/apertura",
+        )
+        self.assertEqual(
+            get_appliance_model("opening", "opening", "ca"),
+            "Obertures · Obertura · Sensor de contacte/obertura",
+        )
+        self.assertEqual(
+            get_appliance_model("laundry", language="ca"),
+            "Rentat i assecat · Dispositiu de rentat i assecat · Sensor de potència",
         )
         self.assertEqual(
             get_appliance_model("air_conditioner_power"),
@@ -131,13 +147,32 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         )
         self.assertEqual(
             get_appliance_model("mailbox_slot"),
-            "Mailbox (mail-slot contact/opening sensor)",
+            "Deliveries · Mailbox · Mail-slot contact/opening sensor",
         )
+
+    def test_device_models_include_details_for_all_grouped_profiles(self) -> None:
+        for group, classes in APPLIANCE_GROUPS.items():
+            for appliance_class, modes in classes.items():
+                for appliance_type in modes.values():
+                    for language in ("ca", "en", "es"):
+                        with self.subTest(
+                            group=group,
+                            appliance_class=appliance_class,
+                            appliance_type=appliance_type,
+                            language=language,
+                        ):
+                            model = get_appliance_model(
+                                appliance_type, appliance_class, language
+                            )
+                            self.assertIsNotNone(model)
+                            self.assertEqual(model.count(" · "), 2)
 
     def test_appliance_class_names_follow_configured_language(self) -> None:
         self.assertEqual(get_appliance_class_name("washer", "ca"), "Rentadora")
         self.assertEqual(get_appliance_class_name("door", "es"), "Puerta")
         self.assertEqual(get_appliance_class_name("washer"), "Washer")
+        self.assertTrue(APPLIANCE_PROFILES["washer"].supports_smart_plug)
+        self.assertFalse(APPLIANCE_PROFILES["opening"].supports_smart_plug)
 
     def test_unknown_profile_metadata_returns_none(self) -> None:
         self.assertIsNone(get_appliance_model("unknown_profile"))
@@ -146,6 +181,10 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertIsNone(get_appliance_model(None))
         self.assertIsNone(get_legacy_appliance_class(None))
         self.assertIsNone(get_appliance_group_for_profile(None))
+        self.assertEqual(
+            get_appliance_model("thermostat_climate", "unknown_class"),
+            "Thermostat (climate entity)",
+        )
         self.assertEqual(get_appliance_group_for_profile("laundry", "washer"), "laundry")
 
     def test_identity_schema_requires_name_and_group(self) -> None:

@@ -168,7 +168,7 @@
     }
   },
   "selector": {
-    "appliance_action": {"options": {"add": "Añadir dispositivo", "edit": "Editar dispositivo", "remove": "Eliminar dispositivo"}},
+    "appliance_action": {"options": {"edit": "Editar dispositivo", "remove": "Eliminar dispositivo"}},
     "appliance_group": {"options": {"climate": "Climatización", "laundry": "Lavado y secado", "openings": "Aberturas", "sun_protection": "Protección solar", "deliveries": "Entregas", "refrigeration": "Refrigeración"}},
     "appliance_class": {"options": {"air_conditioner": "Aire acondicionado", "thermostat": "Termostato", "washer": "Lavadora", "dryer": "Secadora", "dishwasher": "Lavavajillas", "door": "Puerta", "window": "Ventana", "blind": "Persiana", "awning": "Toldo", "mailbox": "Buzón", "refrigerator": "Frigorífico", "freezer": "Congelador", "opening": "Apertura", "sun_protection": "Protección solar"}},
     "appliance_category": {

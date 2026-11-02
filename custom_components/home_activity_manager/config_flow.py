@@ -1051,7 +1051,6 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         self._draft: dict[str, Any] = {}
         self._saved: dict[str, Any] = {}
         self._appliance_id: str | None = None
-        self._adding_appliance = False
         self._appliance_action: str | None = None
 
     async def async_step_init(
@@ -1061,9 +1060,6 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         if isinstance(records, list):
             if user_input is not None:
                 self._appliance_action = user_input["appliance_action"]
-                if self._appliance_action == "add":
-                    self._adding_appliance = True
-                    return await self.async_step_appliance_class()
                 return await self.async_step_select_appliance()
 
             return self.async_show_form(
@@ -1072,7 +1068,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     {
                         vol.Required("appliance_action"): selector.SelectSelector(
                             selector.SelectSelectorConfig(
-                                options=["add", "edit", "remove"],
+                                options=["edit", "remove"],
                                 mode=selector.SelectSelectorMode.DROPDOWN,
                                 translation_key="appliance_action",
                             )
@@ -1384,17 +1380,14 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             if isinstance(self.config_entry.data.get("appliances"), list):
                 records = list(self.config_entry.data["appliances"])
                 record = {
-                    "id": self._appliance_id or uuid4().hex,
+                    "id": self._appliance_id,
                     "data": _entry_data(values),
                     "options": _entry_options(values),
                 }
-                if self._adding_appliance:
-                    records.append(record)
-                else:
-                    records = [
-                        record if item.get("id") == self._appliance_id else item
-                        for item in records
-                    ]
+                records = [
+                    record if item.get("id") == self._appliance_id else item
+                    for item in records
+                ]
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
                     data={**self.config_entry.data, "appliances": records},

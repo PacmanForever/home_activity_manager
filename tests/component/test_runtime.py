@@ -1015,7 +1015,10 @@ async def test_category_entry_groups_appliances_without_parent_device(
     ]
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
-    assert [device.model for device in appliance_devices] == ["Washer", "Dishwasher"]
+    assert [device.model for device in appliance_devices] == [
+        "Laundry and drying · Washer · Power sensor",
+        "Laundry and drying · Dishwasher · Power sensor",
+    ]
     assert len(entry.runtime_data) == 2
 
     options_result = await hass.config_entries.options.async_init(entry.entry_id)
