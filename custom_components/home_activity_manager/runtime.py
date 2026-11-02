@@ -10,7 +10,8 @@ from typing import Any, Callable
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, UnitOfEnergy
-from homeassistant.core import Event, HomeAssistant
+from homeassistant.core import Context, Event, HomeAssistant
+from homeassistant.helpers import area_registry as ar, device_registry as dr
 from homeassistant.helpers.event import (
     async_track_point_in_time,
     async_track_state_change_event,
@@ -32,8 +33,14 @@ from .appliance import (
     CycleThresholds,
     CycleTransition,
 )
-from .appliance_types import get_appliance_profile
+from .appliance_types import (
+    APPLIANCE_GROUPS,
+    get_appliance_group_for_profile,
+    get_appliance_profile,
+    get_common_group_action_groups,
+)
 from .const import (
+    ACTION_GROUP_CONFIG_KEYS,
     CONF_ALARM_REPEAT_COUNT,
     CONF_ALARM_REPEAT_INTERVAL_SECONDS,
     CONF_APPLIANCE_TYPE,
@@ -42,6 +49,7 @@ from .const import (
     CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
     CONF_DOOR_ENTITY,
+    CONF_GROUP_ACTIONS,
     CONF_ENERGY_ENTITY,
     CONF_DOOR_OPEN_ACTIONS,
     CONF_DOOR_OPEN_DELAY_SECONDS,
@@ -82,6 +90,7 @@ from .const import (
     DEFAULT_START_POWER_W,
     DOMAIN,
 )
+from .device import _get_device_by_identifier
 
 _LOGGER = logging.getLogger(__name__)
 _STORE_VERSION = 1
@@ -150,6 +159,29 @@ class ApplianceRuntime:
         self.config = config
         self.appliance_id = config.get("_appliance_id", entry.entry_id)
         self.profile = get_appliance_profile(config.get(CONF_APPLIANCE_TYPE, "washer"))
+        appliance_group = entry.data.get("category")
+        if appliance_group not in APPLIANCE_GROUPS:
+            appliance_group = get_appliance_group_for_profile(
+                config.get(CONF_APPLIANCE_TYPE), config.get("appliance_class")
+            )
+        configured_group_actions = entry.options.get(CONF_GROUP_ACTIONS, {})
+        if not isinstance(configured_group_actions, dict):
+            configured_group_actions = {}
+        common_action_groups = (
+            get_common_group_action_groups(appliance_group)
+            if appliance_group in APPLIANCE_GROUPS
+            else ()
+        )
+        self.group_actions = {
+            ACTION_GROUP_CONFIG_KEYS[action_group]: actions
+            for action_group in common_action_groups
+            if isinstance(
+                actions := configured_group_actions.get(
+                    ACTION_GROUP_CONFIG_KEYS[action_group]
+                ),
+                list,
+            )
+        }
         self._configured_inputs = {
             item.config_key: config[item.config_key]
             for item in self.profile.sensor_inputs
@@ -257,29 +289,47 @@ class ApplianceRuntime:
             self.hass.states.get(source_entity_id) if source_entity_id else None
         )
         if "climate" in self.profile.detection_sources:
-            self._apply_climate_state(source_state, now, initialize=True)
+            self._apply_climate_state(
+                source_state, now, initialize=True, source_entity_id=source_entity_id
+            )
         elif "cover" in self.profile.detection_sources:
-            self._apply_cover_state(source_state, now, initialize=True)
+            self._apply_cover_state(
+                source_state, now, initialize=True, source_entity_id=source_entity_id
+            )
         elif "running_sensor" in self.profile.detection_sources:
-            self._apply_running_state(source_state, now, initialize=True)
+            self._apply_running_state(
+                source_state, now, initialize=True, source_entity_id=source_entity_id
+            )
         elif "smart_plug" in self.profile.detection_sources:
-            self._apply_running_state(source_state, now, initialize=True)
+            self._apply_running_state(
+                source_state, now, initialize=True, source_entity_id=source_entity_id
+            )
         elif "mail_motion" in self.profile.detection_sources or "mail_slot" in self.profile.detection_sources:
             self._initialize_mail_sensor(source_state)
         else:
-            self._apply_power_state(source_state, now, initialize_energy=True)
+            self._apply_power_state(
+                source_state,
+                now,
+                initialize_energy=True,
+                source_entity_id=source_entity_id,
+            )
 
         if source_key != CONF_POWER_ENTITY and self.config.get(CONF_POWER_ENTITY):
             self._apply_power_state(
                 self.hass.states.get(self.config[CONF_POWER_ENTITY]),
                 now,
                 initialize_energy=True,
+                source_entity_id=self.config[CONF_POWER_ENTITY],
             )
 
         door_entity = self.config.get(CONF_DOOR_ENTITY)
         if door_entity:
             door_state = self.hass.states.get(door_entity)
-            self._apply_door_state(door_state, now)
+            self._apply_door_state(
+                door_state,
+                now,
+                source_entity_id=door_entity,
+            )
         plug_entity = self.config.get(CONF_PLUG_ENTITY)
         if plug_entity:
             self._update_plug_off_alarm_state(
@@ -310,7 +360,7 @@ class ApplianceRuntime:
         self._listeners.add(listener)
         return lambda: self._listeners.discard(listener)
 
-    def clear_pending_unload(self) -> None:
+    def clear_pending_unload(self, source_entity_id: str | None = None) -> None:
         """Clear the unload state and cancel all scheduled reminders."""
         was_pending = self.pending_unload
         self._pending_generation += 1
@@ -322,9 +372,9 @@ class ApplianceRuntime:
             was_pending
             and ("mail_motion" in self.profile.detection_sources or "mail_slot" in self.profile.detection_sources)
         ):
-            self._run_actions_in_background(CONF_FINISH_ACTIONS)
+            self._queue_actions(CONF_FINISH_ACTIONS, source_entity_id)
         if was_pending and "emptied" in self.profile.action_groups:
-            self._run_actions_in_background(CONF_EMPTIED_ACTIONS)
+            self._queue_actions(CONF_EMPTIED_ACTIONS, source_entity_id)
         self._schedule_save()
         self._schedule_deadline()
         self._notify()
@@ -429,17 +479,17 @@ class ApplianceRuntime:
             "climate" in self.profile.detection_sources
             and entity_id == self.config.get(CONF_CLIMATE_ENTITY)
         ):
-            self._apply_climate_state(new_state, now)
+            self._apply_climate_state(new_state, now, source_entity_id=entity_id)
         elif (
             "cover" in self.profile.detection_sources
             and entity_id == self.config.get(CONF_COVER_ENTITY)
         ):
-            self._apply_cover_state(new_state, now)
+            self._apply_cover_state(new_state, now, source_entity_id=entity_id)
         elif (
             "running_sensor" in self.profile.detection_sources
             and entity_id == self.config.get(CONF_RUNNING_ENTITY)
         ):
-            self._apply_running_state(new_state, now)
+            self._apply_running_state(new_state, now, source_entity_id=entity_id)
         elif (
             "mail_motion" in self.profile.detection_sources
             and entity_id == self.config.get(CONF_MAIL_MOTION_ENTITY)
@@ -447,16 +497,18 @@ class ApplianceRuntime:
             "mail_slot" in self.profile.detection_sources
             and entity_id == self.config.get(CONF_MAIL_SLOT_ENTITY)
         ):
-            self._apply_mail_sensor_state(new_state, now)
+            self._apply_mail_sensor_state(
+                new_state, now, source_entity_id=entity_id
+            )
         elif entity_id == self.config.get(CONF_POWER_ENTITY):
-            self._apply_power_state(new_state, now)
+            self._apply_power_state(new_state, now, source_entity_id=entity_id)
         elif (
             "smart_plug" in self.profile.detection_sources
             and entity_id == self.config.get(CONF_PLUG_ENTITY)
         ):
-            self._apply_running_state(new_state, now)
+            self._apply_running_state(new_state, now, source_entity_id=entity_id)
         elif entity_id == self.config.get(CONF_DOOR_ENTITY):
-            self._apply_door_state(new_state, now)
+            self._apply_door_state(new_state, now, source_entity_id=entity_id)
         elif entity_id == self.config.get(CONF_PLUG_ENTITY):
             self._notify()
         elif entity_id == self.config.get(CONF_ENERGY_ENTITY):
@@ -526,38 +578,54 @@ class ApplianceRuntime:
         )
 
     def _apply_running_state(
-        self, state: Any, now: datetime, initialize: bool = False
+        self,
+        state: Any,
+        now: datetime,
+        initialize: bool = False,
+        source_entity_id: str | None = None,
     ) -> None:
         value = state.state if state is not None else None
-        self._apply_running_value(value, now, initialize)
+        self._apply_running_value(value, now, initialize, source_entity_id)
 
     def _apply_climate_state(
-        self, state: Any, now: datetime, initialize: bool = False
+        self,
+        state: Any,
+        now: datetime,
+        initialize: bool = False,
+        source_entity_id: str | None = None,
     ) -> None:
         value = None
         if state is not None and state.state not in ("unknown", "unavailable"):
             value = "off" if state.state == "off" else "on"
 
-        self._apply_running_value(value, now, initialize)
+        self._apply_running_value(value, now, initialize, source_entity_id)
 
     def _apply_cover_state(
-        self, state: Any, now: datetime, initialize: bool = False
+        self,
+        state: Any,
+        now: datetime,
+        initialize: bool = False,
+        source_entity_id: str | None = None,
     ) -> None:
         value = None
         if state is not None and state.state not in ("unknown", "unavailable"):
             value = "off" if state.state == "closed" else "on"
 
-        self._apply_running_value(value, now, initialize)
+        self._apply_running_value(value, now, initialize, source_entity_id)
 
     def _apply_running_value(
-        self, value: str | None, now: datetime, initialize: bool = False
+        self,
+        value: str | None,
+        now: datetime,
+        initialize: bool = False,
+        source_entity_id: str | None = None,
     ) -> None:
         if initialize or self._restoring_detector_state:
             events = self.detector.reconcile_state(value, now)
             self._restoring_detector_state = False
         else:
             events = self.detector.observe_state(value, now)
-        self._handle_cycle_events(events)
+        self._handle_cycle_events(events, source_entity_id)
         self._schedule_save()
         self._schedule_deadline()
         self._notify()
@@ -570,7 +638,9 @@ class ApplianceRuntime:
                 value == "on" if value in ("on", "off") else None
             )
 
-    def _apply_mail_sensor_state(self, state: Any, now: datetime) -> None:
+    def _apply_mail_sensor_state(
+        self, state: Any, now: datetime, source_entity_id: str | None = None
+    ) -> None:
         value = state.state if state is not None else None
         if "mail_slot" in self.profile.detection_sources:
             self.mail_slot_open = (
@@ -581,12 +651,14 @@ class ApplianceRuntime:
         elif value == "on":
             if self._mail_sensor_ready:
                 self._mail_sensor_ready = False
-                self._handle_mail_arrival(now)
+                self._handle_mail_arrival(now, source_entity_id)
         else:
             self._mail_sensor_ready = False
         self._notify()
 
-    def _handle_mail_arrival(self, now: datetime) -> None:
+    def _handle_mail_arrival(
+        self, now: datetime, source_entity_id: str | None = None
+    ) -> None:
         cycle_already_active = self.pending_unload
         self._pending_generation += 1
         self.pending_unload = True
@@ -594,8 +666,8 @@ class ApplianceRuntime:
         self.next_pending_reminder = None
         self._pending_action_running = False
         if not cycle_already_active:
-            self._run_actions_in_background(CONF_START_ACTIONS)
-        if self.door_open is False and self.config.get(CONF_PENDING_ACTIONS):
+            self._queue_actions(CONF_START_ACTIONS, source_entity_id)
+        if self.door_open is False and self._has_actions(CONF_PENDING_ACTIONS):
             self.next_pending_reminder = now + timedelta(
                 seconds=self._pending_delay_seconds
             )
@@ -604,7 +676,11 @@ class ApplianceRuntime:
         self._notify()
 
     def _apply_power_state(
-        self, state: Any, now: datetime, initialize_energy: bool = False
+        self,
+        state: Any,
+        now: datetime,
+        initialize_energy: bool = False,
+        source_entity_id: str | None = None,
     ) -> None:
         value = state.state if state is not None else None
         unit = (
@@ -639,7 +715,7 @@ class ApplianceRuntime:
             self._restoring_detector_state = watts is None
         else:
             events = self.detector.observe_power(value, unit, now)
-        self._handle_cycle_events(events)
+        self._handle_cycle_events(events, source_entity_id)
         if (
             "compressor_alarm" in self.profile.parameter_groups
             and watts is not None
@@ -651,7 +727,9 @@ class ApplianceRuntime:
         self._schedule_deadline()
         self._notify()
 
-    def _apply_door_state(self, state: Any, now: datetime) -> None:
+    def _apply_door_state(
+        self, state: Any, now: datetime, source_entity_id: str | None = None
+    ) -> None:
         if state is None or state.state not in ("on", "off"):
             self.door_open = None
         else:
@@ -659,11 +737,11 @@ class ApplianceRuntime:
             if "door_alarm" in self.profile.parameter_groups:
                 self._update_alarm_condition("door", self.door_open, now)
             if self.door_open and "pending_unload" in self.profile.parameter_groups:
-                self.clear_pending_unload()
+                self.clear_pending_unload(source_entity_id)
             elif (
                 self.pending_unload
                 and not self.detector.is_running
-                and self.config.get(CONF_PENDING_ACTIONS)
+                and self._has_actions(CONF_PENDING_ACTIONS)
                 and self.next_pending_reminder is None
             ):
                 self.next_pending_reminder = now + timedelta(
@@ -673,7 +751,9 @@ class ApplianceRuntime:
         self._schedule_deadline()
         self._notify()
 
-    def _handle_cycle_events(self, events: list[CycleEvent]) -> None:
+    def _handle_cycle_events(
+        self, events: list[CycleEvent], source_entity_id: str | None = None
+    ) -> None:
         for event in events:
             if event.transition is CycleTransition.STARTED:
                 self.max_runtime_fired = False
@@ -686,14 +766,14 @@ class ApplianceRuntime:
                     self.next_pending_reminder = None
                     self._pending_action_running = False
                 if "cycle_start" in self.profile.action_groups:
-                    self._run_actions_in_background(CONF_START_ACTIONS)
+                    self._queue_actions(CONF_START_ACTIONS, source_entity_id)
             else:
                 if "cycle_finish" in self.profile.action_groups:
-                    self._run_actions_in_background(CONF_FINISH_ACTIONS)
+                    self._queue_actions(CONF_FINISH_ACTIONS, source_entity_id)
                 if (
                     self.pending_unload
                     and self.door_open is False
-                    and self.config.get(CONF_PENDING_ACTIONS)
+                    and self._has_actions(CONF_PENDING_ACTIONS)
                 ):
                     self.next_pending_reminder = event.occurred_at + timedelta(
                         seconds=self._pending_delay_seconds
@@ -802,7 +882,7 @@ class ApplianceRuntime:
             and self.next_pending_reminder is not None
             and now >= self.next_pending_reminder
         ):
-            if not self.config.get(CONF_PENDING_ACTIONS):
+            if not self._has_actions(CONF_PENDING_ACTIONS):
                 self.next_pending_reminder = None
             elif self.door_open is False and not self._pending_action_running:
                 pending_generation = self._pending_generation
@@ -864,17 +944,28 @@ class ApplianceRuntime:
         self.energy_kwh += self._energy_power_w * elapsed_seconds / 3_600_000
         self._energy_updated_at = now
 
-    def _run_actions_in_background(self, key: str) -> None:
+    def _queue_actions(self, key: str, source_entity_id: str | None) -> None:
+        if self.group_actions.get(key) and source_entity_id is not None:
+            self._run_actions_in_background(key, source_entity_id)
+        else:
+            self._run_actions_in_background(key)
+
+    def _run_actions_in_background(
+        self, key: str, source_entity_id: str | None = None
+    ) -> None:
         if self._is_unloading:
             return
         self.entry.async_create_background_task(
             self.hass,
-            self._run_actions_serialized(key),
+            self._run_actions_serialized(key, source_entity_id=source_entity_id),
             name=f"{DOMAIN} {self.appliance_id} {key}",
         )
 
     async def _run_actions_serialized(
-        self, key: str, should_run: Callable[[], bool] | None = None
+        self,
+        key: str,
+        should_run: Callable[[], bool] | None = None,
+        source_entity_id: str | None = None,
     ) -> None:
         if should_run is not None and not should_run():
             return
@@ -882,9 +973,43 @@ class ApplianceRuntime:
         async with lock:
             if should_run is not None and not should_run():
                 return
-            await self._run_actions(key)
+            if self.group_actions.get(key) and source_entity_id is not None:
+                await self._run_actions(key, source_entity_id)
+            else:
+                await self._run_actions(key)
 
-    async def _run_actions(self, key: str) -> None:
+    def _group_action_run_variables(
+        self, source_entity_id: str | None
+    ) -> dict[str, Any]:
+        device = _get_device_by_identifier(
+            dr.async_get(self.hass),
+            (DOMAIN, self.appliance_id),
+            self.entry.entry_id,
+        )
+        appliance_name = (
+            device.name_by_user if device is not None else None
+        ) or (device.name if device is not None else None) or self.config.get(
+            "name", self.appliance_id
+        )
+        area_name = None
+        if device is not None and device.area_id is not None:
+            area = ar.async_get(self.hass).async_get_area(device.area_id)
+            if area is not None:
+                area_name = area.name
+        variables = {
+            "ham_appliance_name": appliance_name,
+            "ham_area_name": area_name,
+        }
+        if source_entity_id is not None:
+            variables["ham_source_entity_id"] = source_entity_id
+        return variables
+
+    def _has_actions(self, key: str) -> bool:
+        return bool(self.group_actions.get(key) or self.config.get(key))
+
+    async def _run_actions(
+        self, key: str, source_entity_id: str | None = None
+    ) -> None:
         actions = self.config.get(key)
         if (
             actions is None
@@ -893,18 +1018,31 @@ class ApplianceRuntime:
         ):
             actions = self.config.get(CONF_MAIL_ARRIVAL_ACTIONS, [])
         if not isinstance(actions, list):
-            return
-        for index, action in enumerate(actions):
+            actions = []
+        group_actions = self.group_actions.get(key, [])
+        for index, (action, is_group_action) in enumerate(
+            [(action, True) for action in group_actions]
+            + [(action, False) for action in actions]
+        ):
             if not isinstance(action, dict):
                 continue
             try:
-                await Script(
+                script = Script(
                     self.hass,
                     [action],
                     f"{DOMAIN} {key} {index + 1}",
                     DOMAIN,
                     logger=_LOGGER,
-                ).async_run()
+                )
+                if is_group_action:
+                    await script.async_run(
+                        run_variables=self._group_action_run_variables(
+                            source_entity_id
+                        ),
+                        context=Context(),
+                    )
+                else:
+                    await script.async_run()
             except Exception:
                 _LOGGER.error("Configured %s action %s failed", key, index + 1)
 
@@ -916,7 +1054,7 @@ class ApplianceRuntime:
             "compressor": CONF_COMPRESSOR_INACTIVE_ACTIONS,
             "plug_off": CONF_PLUG_OFF_ACTIONS,
         }[alarm]
-        active = active and bool(self.config.get(action_key))
+        active = active and self._has_actions(action_key)
         active_key = f"{alarm}_alarm_active"
         count_key = f"{alarm}_alarm_fired_count"
         deadline_key = f"next_{alarm}_alarm"

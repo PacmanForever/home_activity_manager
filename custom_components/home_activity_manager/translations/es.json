@@ -14,12 +14,13 @@
     "step": {
       "user": {
         "title": "Agrupación y nombre del dispositivo",
+        "description": "Elige primero una agrupación, después una clase de aparato y su modalidad de detección de actividad.",
         "data": {
           "name": "Nombre que se mostrará para este dispositivo",
           "appliance_group": "Agrupación de dispositivos"
         }
       },
-      "appliance_class": {"title": "Clase de dispositivo", "data": {"appliance_class": "Clase de dispositivo"}},
+      "appliance_class": {"title": "Clase de dispositivo", "description": "Elige una clase dentro de la agrupación seleccionada.", "data": {"appliance_class": "Clase de dispositivo"}},
       "activity_mode_climate": {"title": "Modo de detección de climatización", "data": {"activity_mode": "Cómo detecta la actividad este dispositivo de climatización"}, "data_description": {"activity_mode": "Elige la fuente de actividad del dispositivo."}},
       "activity_mode_laundry": {"title": "Modo de detección de lavado y secado", "data": {"activity_mode": "Cómo detecta la actividad este dispositivo"}, "data_description": {"activity_mode": "Elige la fuente de actividad de la lavadora, secadora o lavavajillas."}},
       "activity_mode_openings": {"title": "Modo de detección de aperturas", "data": {"activity_mode": "Cómo indica su estado esta apertura"}, "data_description": {"activity_mode": "Elige el sensor que indica los estados abierto y cerrado."}},
@@ -89,6 +90,7 @@
     "step": {
       "init": {
         "title": "Gestionar dispositivos",
+        "description": "Edita o elimina un aparato, o configura acciones compartidas para esta agrupación.",
         "data": {
           "appliance_action": "Acción",
           "name": "Nombre que se mostrará para este dispositivo",
@@ -99,6 +101,12 @@
         "data_description": {"activity_mode": "Solo este sensor determina la actividad del dispositivo."}
       },
       "select_appliance": {"title": "Seleccionar dispositivo", "data": {"appliance_id": "Dispositivo"}},
+      "group_actions": {
+        "title": "Acciones de la agrupación",
+        "description": "Solo se muestran las acciones compatibles con todos los perfiles de la agrupación. Se ejecutan antes que las acciones propias de cada dispositivo. Las plantillas pueden usar ham_appliance_name y ham_area_name; el área puede estar vacía. Ejemplo: {{ ham_area_name or ham_appliance_name }}. ham_source_entity_id solo existe cuando una entidad desencadena la acción.",
+        "data": {"start_actions": "Acciones cuando empieza la actividad (opcional)", "finish_actions": "Acciones cuando termina la actividad (opcional)", "max_runtime_actions": "Acciones si se supera el tiempo máximo (opcional)", "pending_actions": "Acciones mientras está pendiente de vaciar o recoger (opcional)", "emptied_actions": "Acciones cuando se retira o recoge el contenido (opcional)", "door_open_actions": "Acciones mientras está activa la alarma de puerta abierta (opcional)", "compressor_inactive_actions": "Acciones mientras está activa la alarma de compresor inactivo (opcional)", "plug_off_actions": "Acciones mientras el enchufe inteligente está apagado (opcional)"},
+        "data_description": {"start_actions": "Se ejecutan antes que las acciones de inicio propias de cada aparato. Las variables de plantilla identifican el aparato que ha activado esta ejecución.", "finish_actions": "Se ejecutan antes que las acciones de finalización propias de cada aparato. Las variables de plantilla identifican el aparato que ha activado esta ejecución."}
+      },
       "edit_appliance": {"title": "Editar dispositivo", "data": {"name": "Nombre que se mostrará para este dispositivo", "appliance_group": "Agrupación de dispositivos", "appliance_class": "Clase de dispositivo", "activity_mode": "Modalidad de detección de actividad"}},
       "appliance_class": {"title": "Clase de dispositivo", "data": {"appliance_class": "Clase de dispositivo"}},
       "activity_mode_climate": {"title": "Modo de detección de climatización", "data": {"activity_mode": "Cómo detecta la actividad este dispositivo de climatización"}},
@@ -168,7 +176,7 @@
     }
   },
   "selector": {
-    "appliance_action": {"options": {"edit": "Editar dispositivo", "remove": "Eliminar dispositivo"}},
+    "appliance_action": {"options": {"edit": "Editar dispositivo", "remove": "Eliminar dispositivo", "group_actions": "Configurar acciones de la agrupación"}},
     "appliance_group": {"options": {"climate": "Climatización", "laundry": "Lavado y secado", "openings": "Aberturas", "sun_protection": "Protección solar", "deliveries": "Entregas", "refrigeration": "Refrigeración"}},
     "appliance_class": {"options": {"air_conditioner": "Aire acondicionado", "thermostat": "Termostato", "washer": "Lavadora", "dryer": "Secadora", "dishwasher": "Lavavajillas", "door": "Puerta", "window": "Ventana", "blind": "Persiana", "awning": "Toldo", "mailbox": "Buzón", "refrigerator": "Frigorífico", "freezer": "Congelador", "opening": "Apertura", "sun_protection": "Protección solar"}},
     "appliance_category": {

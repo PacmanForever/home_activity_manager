@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v0.9.29 - 2026-11-02
+
+### Added
+
+- Configure shared actions per appliance group, limited to hooks common to every profile, with appliance name, area, and source entity available to templates.
+
+### Changed
+
+- Use current Home Assistant device registry APIs for lookups, migration, and device ownership while retaining compatibility with older supported versions.
+
 ## v0.9.28 - 2026-11-02
 
 ### Changed

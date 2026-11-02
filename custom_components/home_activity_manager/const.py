@@ -14,6 +14,7 @@ CONF_RUNNING_ENTITY = "running_entity"
 CONF_MAIL_MOTION_ENTITY = "mail_motion_entity"
 CONF_MAIL_SLOT_ENTITY = "mail_slot_entity"
 CONF_MAIL_ARRIVAL_ACTIONS = "mail_arrival_actions"
+CONF_GROUP_ACTIONS = "group_actions"
 CONF_DOOR_OPEN_ACTIONS = "door_open_actions"
 CONF_COMPRESSOR_INACTIVE_ACTIONS = "compressor_inactive_actions"
 CONF_PLUG_OFF_ACTIONS = "plug_off_actions"
@@ -38,6 +39,17 @@ CONF_PENDING_ACTIONS = "pending_actions"
 CONF_PENDING_DELAY_SECONDS = "pending_delay_seconds"
 CONF_PENDING_INTERVAL_SECONDS = "pending_interval_seconds"
 CONF_PENDING_REPEATS = "pending_repeats"
+
+ACTION_GROUP_CONFIG_KEYS = {
+	"cycle_start": CONF_START_ACTIONS,
+	"cycle_finish": CONF_FINISH_ACTIONS,
+	"emptied": CONF_EMPTIED_ACTIONS,
+	"max_runtime": CONF_MAX_RUNTIME_ACTIONS,
+	"pending_unload": CONF_PENDING_ACTIONS,
+	"door_open_alarm": CONF_DOOR_OPEN_ACTIONS,
+	"compressor_inactive_alarm": CONF_COMPRESSOR_INACTIVE_ACTIONS,
+	"plug_off_alarm": CONF_PLUG_OFF_ACTIONS,
+}
 
 DEFAULT_START_POWER_W = 4.0
 DEFAULT_START_DURATION_SECONDS = 15

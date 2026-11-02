@@ -19,6 +19,7 @@ from .appliance_types import (
     ApplianceTypeProfile,
     get_appliance_group_for_profile,
     get_appliance_group_name,
+    get_common_group_action_groups,
     get_legacy_appliance_class,
     get_appliance_profile,
 )
@@ -35,6 +36,8 @@ from .const import (
     CONF_DOOR_ENTITY,
     CONF_ENERGY_ENTITY,
     CONF_DOOR_OPEN_ACTIONS,
+    ACTION_GROUP_CONFIG_KEYS,
+    CONF_GROUP_ACTIONS,
     CONF_DOOR_OPEN_DELAY_SECONDS,
     CONF_EMPTIED_ACTIONS,
     CONF_PLUG_OFF_ACTIONS,
@@ -506,17 +509,6 @@ def _threshold_schema(
 def _action_schema(
     values: dict[str, Any], profile: ApplianceTypeProfile
 ) -> vol.Schema:
-    action_keys = {
-        "cycle_start": CONF_START_ACTIONS,
-        "cycle_finish": CONF_FINISH_ACTIONS,
-        "emptied": CONF_EMPTIED_ACTIONS,
-        "max_runtime": CONF_MAX_RUNTIME_ACTIONS,
-        "pending_unload": CONF_PENDING_ACTIONS,
-        "door_open_alarm": CONF_DOOR_OPEN_ACTIONS,
-        "compressor_inactive_alarm": CONF_COMPRESSOR_INACTIVE_ACTIONS,
-        "plug_off_alarm": CONF_PLUG_OFF_ACTIONS,
-        "mail_arrival": CONF_MAIL_ARRIVAL_ACTIONS,
-    }
     schema: dict[Any, Any] = {}
     for group in profile.action_groups:
         if group == "plug_off_alarm" and not values.get(CONF_PLUG_ENTITY):
@@ -525,7 +517,7 @@ def _action_schema(
             continue
         if group == "emptied" and not values.get(CONF_DOOR_ENTITY):
             continue
-        key = action_keys[group]
+        key = ACTION_GROUP_CONFIG_KEYS[group]
         default = values.get(key, [])
         if (
             group == "cycle_start"
@@ -536,6 +528,17 @@ def _action_schema(
         schema[vol.Optional(key, default=default)] = (
             selector.ActionSelector()
         )
+    return vol.Schema(schema)
+
+
+def _group_action_schema(
+    appliance_group: str, values: dict[str, Any]
+) -> vol.Schema:
+    schema: dict[Any, Any] = {}
+    for action_group in get_common_group_action_groups(appliance_group):
+        key = ACTION_GROUP_CONFIG_KEYS[action_group]
+        default = values.get(key, [])
+        schema[vol.Optional(key, default=default)] = selector.ActionSelector()
     return vol.Schema(schema)
 
 
@@ -1060,6 +1063,8 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         if isinstance(records, list):
             if user_input is not None:
                 self._appliance_action = user_input["appliance_action"]
+                if self._appliance_action == "group_actions":
+                    return await self.async_step_group_actions()
                 return await self.async_step_select_appliance()
 
             return self.async_show_form(
@@ -1068,7 +1073,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     {
                         vol.Required("appliance_action"): selector.SelectSelector(
                             selector.SelectSelectorConfig(
-                                options=["edit", "remove"],
+                                options=["edit", "remove", "group_actions"],
                                 mode=selector.SelectSelectorMode.DROPDOWN,
                                 translation_key="appliance_action",
                             )
@@ -1127,6 +1132,33 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             last_step=False,
         )
 
+    async def async_step_group_actions(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        appliance_group = self.config_entry.data["category"]
+        common_groups = get_common_group_action_groups(appliance_group)
+        current_actions = self.config_entry.options.get(CONF_GROUP_ACTIONS, {})
+        if not isinstance(current_actions, dict):
+            current_actions = {}
+        if user_input is not None:
+            group_actions = {
+                ACTION_GROUP_CONFIG_KEYS[action_group]: user_input.get(
+                    ACTION_GROUP_CONFIG_KEYS[action_group], []
+                )
+                for action_group in common_groups
+            }
+            return self.async_create_entry(
+                title="",
+                data={
+                    **self.config_entry.options,
+                    CONF_GROUP_ACTIONS: group_actions,
+                },
+            )
+        return self.async_show_form(
+            step_id="group_actions",
+            data_schema=_group_action_schema(appliance_group, current_actions),
+        )
+
     @staticmethod
     def _category_appliance_schema(records: list[dict[str, Any]]) -> vol.Schema:
         options = []
@@ -1172,10 +1204,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     self.config_entry.entry_id,
                 )
                 if device is not None:
-                    device_registry.async_update_device(
-                        device.id,
-                        remove_config_entry_id=self.config_entry.entry_id,
-                    )
+                    device_registry.async_remove_device(device.id)
                 await Store(self.hass, 1, f"{DOMAIN}_{appliance_id}").async_remove()
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
@@ -1188,7 +1217,9 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                         ],
                     },
                 )
-                return self.async_create_entry(title="", data={})
+                return self.async_create_entry(
+                    title="", data=self.config_entry.options
+                )
 
             record = next(record for record in records if record.get("id") == appliance_id)
             self._appliance_id = appliance_id
@@ -1392,14 +1423,24 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     self.config_entry,
                     data={**self.config_entry.data, "appliances": records},
                 )
-                return self.async_create_entry(title="", data={})
+                return self.async_create_entry(
+                    title="", data=self.config_entry.options
+                )
             self.hass.config_entries.async_update_entry(
                 self.config_entry,
                 data=_entry_data(values),
                 title=values[CONF_NAME],
             )
             return self.async_create_entry(
-                title="", data=_entry_options(values)
+                title="",
+                data={
+                    **(
+                        {CONF_GROUP_ACTIONS: self.config_entry.options[CONF_GROUP_ACTIONS]}
+                        if CONF_GROUP_ACTIONS in self.config_entry.options
+                        else {}
+                    ),
+                    **_entry_options(values),
+                },
             )
         return self.async_show_form(
             step_id=_profile_step_id("actions", values[CONF_APPLIANCE_TYPE]),

@@ -13,43 +13,6 @@
 
 Home Activity Manager brings compatible Home Assistant entities together under a dedicated device, making it easier to monitor household equipment and manage its activity, actions, reminders, and alarms. It is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles cover laundry appliances, thermostats (including air conditioners), refrigerators, mailboxes, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
 
-## Features
-
-- **Washer**
-	- Detect cycles from power thresholds and configurable confirmation times.
-	- Optionally monitor the door and control a smart plug; track pending unloading and reminders.
-- **Dishwasher**
-	- Detect cycles from power thresholds and configurable confirmation times.
-	- Optionally monitor the door and control a smart plug; track pending unloading and reminders.
-- **Dryer**
-	- Detect cycles from power thresholds and configurable confirmation times.
-	- Optionally monitor the door and control a smart plug; track pending unloading and reminders.
-- **Thermostat**
-	- **Climate-entity option:** use an existing climate entity as the activity source. A native climate proxy is added to the managed device; the original entity remains on its existing device and is not changed. The proxy mirrors standard climate state and controls and forwards standard climate actions to the original entity. Vendor-specific services are not proxied. Activity follows climate mode (`off` versus any active mode), including periods when `hvac_action` is idle.
-	- **Contact/opening-sensor option:** detect activity from a binary contact/opening sensor.
-	- **Power option:** detect activity from power readings and configurable thresholds.
-	- The contact/opening sensor is required in contact mode. The contact, power, and climate options are all modes of the thermostat category; only the selected source determines activity. Other auxiliary sensors and smart-plug controls depend on the selected mode.
-- **Refrigerator**
-	- **Power option:** requires a power sensor and door contact. Cycle-start/end actions follow compressor activity; the door-open alarm is configurable. A controllable smart plug is optional and does not trigger an off alarm.
-	- **Smart-switch option:** requires a smart switch and separate door contact. Cycle-start/end actions follow the switch state; optional power and energy sensors do not change activity. The door-open alarm is configurable; the switch does not trigger an off alarm.
-- **Mailbox**
-	- **Interior-motion option:** detect incoming mail with a motion sensor inside the mailbox.
-	- **Mail-slot option:** detect incoming mail with a contact on the letter flap and expose its open/closed state as **Mail slot**.
-	- Both options track the mailbox cycle from detected arrival until collection. Cycle-start actions run on arrival; cycle-end actions run when the main door opens or pending collection is cleared. Reminders remain separate, and both options use a separate main-door contact.
-- **Opening**
-	- Expose the required binary contact's open/closed position; it does not report whether the opening is moving. Contact transitions still track cycle actions and duration. An optional lock is represented by a native lock proxy on the managed device; its standard controls forward to the original lock, which remains unchanged on its existing device.
-- **Sun protection**
-	- **Contact-sensor option:** expose the binary sensor's open/closed position. It does not indicate motor movement, so this mode has no `running` entity; contact transitions still track cycle actions and duration.
-	- **Cover option:** use a cover entity; open, opening, and closing states are active, while closed is inactive. A native cover proxy is added to the managed device and forwards standard cover controls to the original entity without moving or modifying it. Vendor-specific services are not proxied.
-- **Across all profiles**
-	- Configure consistent actions when a cycle starts and ends, plus any profile-specific reminders or alarms; restore cycle, reminder, and alarm state after Home Assistant restarts.
-	- On washer, dishwasher, dryer, and mailbox profiles, configure a separate action for when pending contents are removed or collected; it runs when the main door opens or pending status is cleared.
-	- See running state when a profile can infer motion or activity. Opening and contact-only sun-protection profiles show open/closed position instead; last-cycle duration is available for cycle-based profiles.
-	- Monitor power and energy independently of activity detection for profiles with a selected power sensor. Use a cumulative energy sensor's total or calculate energy from power.
-	- Get a Repairs issue when a configured input is missing or unavailable; the issue clears when the input recovers.
-	- Run configured actions in order. Reminders and alarms wait for the previous run to finish before repeating.
-	- In compatible profiles, configure an immediate smart-plug-off alarm with its own repeat interval and count; it pauses while the plug state is unavailable and rearms when switched on.
-
 ## Installation
 
 ### HACS
@@ -113,6 +76,55 @@ Refrigeration
 	|-- Activity detection with a power sensor
 	`-- Activity detection with a smart switch
 ```
+
+### Climate control
+
+- **Air conditioner:** choose contact-sensor or power-based activity detection. Contact mode requires its binary sensor; power mode uses configurable thresholds and confirmation times.
+- **Thermostat:** use an existing climate entity as the activity source. A native climate proxy is added to the managed device; the original remains on its existing device and is not changed. The proxy mirrors standard climate state and controls and forwards standard climate actions; vendor-specific services are not proxied. Activity follows climate mode (`off` versus any active mode), including periods when `hvac_action` is idle.
+
+### Laundry and drying
+
+Washer, dryer, and dishwasher profiles detect cycles from power thresholds and configurable confirmation times. Each appliance can optionally monitor its door, control a smart plug, track pending unloading, and send reminders.
+
+### Openings
+
+Door and window profiles expose the required contact's open/closed position; they do not report whether the opening is moving. Contact transitions track activity actions and duration. An optional lock is represented by a native lock proxy on the managed device; standard controls forward to the original lock, which remains unchanged on its existing device.
+
+### Sun protection
+
+- **Contact-sensor mode:** exposes open/closed position, not motor movement, so it has no `running` entity. Contact transitions still track actions and duration.
+- **Cover mode:** open, opening, and closing states are active; closed is inactive. A native cover proxy is added to the managed device and forwards standard controls without moving or modifying the original entity. Vendor-specific services are not proxied.
+
+### Deliveries
+
+Mailbox profiles detect arrivals with either an interior motion sensor or a mail-slot contact. Mail-slot mode also exposes the contact's open/closed state as **Mail slot**. Both modes use a separate main-door contact and track the cycle until collection. Start actions run on arrival; finish actions run when the main door opens or pending collection is cleared. Reminders are separate.
+
+### Refrigeration
+
+Refrigerator and freezer profiles offer the same two modes. Power mode requires a power sensor and door contact; start/end actions follow compressor activity. A controllable smart plug is optional and does not trigger an off alarm. Smart-switch mode requires a smart switch and separate door contact; start/end actions follow switch state, while optional power and energy sensors do not change activity. Both modes support the door-open alarm; neither switch mode nor the optional power-mode plug triggers a plug-off alarm.
+
+### Shared behavior
+
+- Cycle, reminder, and alarm state is restored after Home Assistant restarts. Configured actions run in order; reminders and alarms wait for the previous run to finish before repeating.
+- Running state is exposed when a profile can infer activity. Opening and contact-only sun-protection profiles expose position instead; cycle-based profiles expose last-cycle duration.
+- Power and energy can be monitored independently of activity detection where supported. Energy uses a selected cumulative sensor or is calculated from power.
+- A Repairs issue is raised when a configured input is missing or unavailable and clears when the input recovers.
+- Compatible profiles can configure an immediate smart-plug-off alarm with its own repeat interval and count. It pauses while the plug state is unavailable and rearms when switched on.
+
+### Group actions
+
+Configure shared actions from the group's options. Only hooks supported by every activity profile under that group are offered. Each appliance runs the shared action when its own event occurs, before its device-specific actions; a group action is not a single once-per-group event.
+
+| Group | Hooks common to every profile |
+| --- | --- |
+| Climate control | Activity starts, activity ends, smart plug off |
+| Laundry and drying | Activity starts, activity ends, maximum runtime, pending unload, emptied, smart plug off |
+| Openings | Activity starts, activity ends |
+| Sun protection | Activity starts, activity ends |
+| Deliveries | Arrival, collection reminder, collected |
+| Refrigeration | Activity starts, activity ends, door-open alarm |
+
+Group action templates receive `ham_appliance_name` (the appliance's Home Assistant device name), `ham_area_name` (the assigned area, or `None`), and `ham_source_entity_id` when an entity event triggered the action. Timer-triggered actions have no source entity. For example, use `{{ ham_area_name or ham_appliance_name }}` in a notification message to prefer the area and fall back to the device name.
 
 Each group has one config entry. Add, edit, or remove appliances from that group's options. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Existing per-appliance entries are consolidated automatically during migration, preserving appliance IDs, entity IDs, registry customizations, and runtime state. Setup asks for:
 

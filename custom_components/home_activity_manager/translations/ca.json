@@ -14,12 +14,13 @@
     "step": {
       "user": {
         "title": "Agrupació i nom del dispositiu",
+        "description": "Tria primer una agrupació, després una classe d’aparell i la seva modalitat de detecció d’activitat.",
         "data": {
           "name": "Nom que es mostrarà per a aquest dispositiu",
           "appliance_group": "Agrupació de dispositius"
         }
       },
-      "appliance_class": {"title": "Classe de dispositiu", "data": {"appliance_class": "Classe de dispositiu"}},
+      "appliance_class": {"title": "Classe de dispositiu", "description": "Tria una classe dins de l’agrupació seleccionada.", "data": {"appliance_class": "Classe de dispositiu"}},
       "activity_mode_climate": {"title": "Modalitat de detecció de climatització", "data": {"activity_mode": "Com detecta l’activitat aquest dispositiu de climatització"}, "data_description": {"activity_mode": "Tria la font d’activitat de el dispositiu."}},
       "activity_mode_laundry": {"title": "Modalitat de detecció de rentat i assecat", "data": {"activity_mode": "Com detecta l’activitat aquest dispositiu"}, "data_description": {"activity_mode": "Tria la font d’activitat de la rentadora, l’assecadora o el rentaplats."}},
       "activity_mode_openings": {"title": "Modalitat de detecció d’obertures", "data": {"activity_mode": "Com informa de l’estat aquesta obertura"}, "data_description": {"activity_mode": "Tria el sensor que informa dels estats obert i tancat."}},
@@ -89,6 +90,7 @@
     "step": {
       "init": {
         "title": "Gestiona els dispositius",
+        "description": "Edita o elimina un aparell, o configura accions compartides per l’agrupació.",
         "data": {
           "appliance_action": "Acció",
           "name": "Nom que es mostrarà per a aquest dispositiu",
@@ -99,6 +101,12 @@
         "data_description": {"activity_mode": "Només aquest sensor determina l'activitat de l'dispositiu."}
       },
       "select_appliance": {"title": "Selecciona el dispositiu", "data": {"appliance_id": "Dispositiu"}},
+      "group_actions": {
+        "title": "Accions de l’agrupació",
+        "description": "Només es mostren les accions compatibles amb tots els perfils de l’agrupació. S’executen abans que les accions pròpies de cada dispositiu. Les plantilles poden fer servir ham_appliance_name i ham_area_name; l’àrea pot ser buida. Exemple: {{ ham_area_name or ham_appliance_name }}. ham_source_entity_id només existeix quan una entitat desencadena l’acció.",
+        "data": {"start_actions": "Accions quan comença l’activitat (opcional)", "finish_actions": "Accions quan acaba l’activitat (opcional)", "max_runtime_actions": "Accions si se supera el temps màxim (opcional)", "pending_actions": "Accions mentre està pendent de buidar o recollir (opcional)", "emptied_actions": "Accions quan es retira o recull el contingut (opcional)", "door_open_actions": "Accions mentre l’alarma de porta oberta està activa (opcional)", "compressor_inactive_actions": "Accions mentre l’alarma de compressor inactiu està activa (opcional)", "plug_off_actions": "Accions mentre l’endoll intel·ligent està apagat (opcional)"},
+        "data_description": {"start_actions": "S’executen abans de les accions d’inici pròpies de cada aparell. Les variables de plantilla identifiquen l’aparell que ha activat aquesta execució.", "finish_actions": "S’executen abans de les accions de finalització pròpies de cada aparell. Les variables de plantilla identifiquen l’aparell que ha activat aquesta execució."}
+      },
       "edit_appliance": {"title": "Edita el dispositiu", "data": {"name": "Nom que es mostrarà per a aquest dispositiu", "appliance_group": "Agrupació de dispositius", "appliance_class": "Classe de dispositiu", "activity_mode": "Modalitat de detecció d'activitat"}},
       "appliance_class": {"title": "Classe de dispositiu", "data": {"appliance_class": "Classe de dispositiu"}},
       "activity_mode_climate": {"title": "Modalitat de detecció de climatització", "data": {"activity_mode": "Com detecta l’activitat aquest dispositiu de climatització"}},
@@ -168,7 +176,7 @@
     }
   },
   "selector": {
-    "appliance_action": {"options": {"edit": "Edita un dispositiu", "remove": "Elimina un dispositiu"}},
+    "appliance_action": {"options": {"edit": "Edita un dispositiu", "remove": "Elimina un dispositiu", "group_actions": "Configura les accions de l’agrupació"}},
     "appliance_group": {"options": {"climate": "Climatització", "laundry": "Rentat i assecat", "openings": "Tancament", "sun_protection": "Protecció solar", "deliveries": "Lliurament", "refrigeration": "Refrigeració"}},
     "appliance_class": {"options": {"air_conditioner": "Aire condicionat", "thermostat": "Termòstat", "washer": "Rentadora", "dryer": "Assecadora", "dishwasher": "Rentaplats", "door": "Porta", "window": "Finestra", "blind": "Persiana", "awning": "Tendal", "mailbox": "Bústia", "refrigerator": "Nevera", "freezer": "Congelador", "opening": "Obertura", "sun_protection": "Protecció solar"}},
     "appliance_category": {

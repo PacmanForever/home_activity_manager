@@ -32,7 +32,11 @@ from .const import (
 	CONF_RUNNING_ENTITY,
 	DOMAIN,
 )
-from .device import remove_appliance_group_devices
+from .device import (
+	_get_device_by_identifier,
+	move_device_to_config_entry,
+	remove_appliance_group_devices,
+)
 from .runtime import (
 	ApplianceRuntime,
 	ApplianceRuntimeCollection,
@@ -100,12 +104,7 @@ def _async_appliance_device_id(
 ) -> str | None:
 	entry_id = entry.entry_id if isinstance(entry, ConfigEntry) else entry
 	registry = dr.async_get(hass)
-	get_by_identifier = getattr(registry, "async_get_device_by_identifier", None)
-	device = (
-		get_by_identifier((DOMAIN, entry_id), entry_id)
-		if get_by_identifier is not None
-		else registry.async_get_device(identifiers={(DOMAIN, entry_id)})
-	)
+	device = _get_device_by_identifier(registry, (DOMAIN, entry_id), entry_id)
 	return device.id if device is not None else None
 
 
@@ -230,21 +229,19 @@ async def _async_migrate_category_entries(
 
 		device_registry = dr.async_get(hass)
 		for device in tuple(
-			device_registry.devices.get_devices_for_config_entry_id(candidate.entry_id)
+			dr.async_entries_for_config_entry(
+				device_registry, candidate.entry_id
+			)
 		):
 			if any(
 				domain == DOMAIN
 				and identifier.startswith(("category:", "profile:"))
 				for domain, identifier in device.identifiers
 			):
-				device_registry.async_update_device(
-					device.id, remove_config_entry_id=candidate.entry_id
-				)
+				device_registry.async_remove_device(device.id)
 				continue
-			device_registry.async_update_device(
-				device.id,
-				add_config_entry_id=entry.entry_id,
-				remove_config_entry_id=candidate.entry_id,
+			move_device_to_config_entry(
+				device_registry, device.id, candidate.entry_id, entry.entry_id
 			)
 		hass.config_entries.async_update_entry(
 			candidate,
@@ -257,7 +254,7 @@ async def _async_migrate_category_entries(
 	device_registry = dr.async_get(hass)
 	category_identifier = (DOMAIN, f"category:{category}")
 	for device in tuple(
-		device_registry.devices.get_devices_for_config_entry_id(entry.entry_id)
+		dr.async_entries_for_config_entry(device_registry, entry.entry_id)
 	):
 		if any(
 			domain == DOMAIN
@@ -265,9 +262,7 @@ async def _async_migrate_category_entries(
 			and identifier != category_identifier[1]
 			for domain, identifier in device.identifiers
 		):
-			device_registry.async_update_device(
-				device.id, remove_config_entry_id=entry.entry_id
-			)
+			device_registry.async_remove_device(device.id)
 	hass.config_entries.async_update_entry(
 		entry,
 		data=data,
@@ -373,18 +368,19 @@ async def _async_migrate_appliance_groups(
 			)
 		device_registry = dr.async_get(hass)
 		for device in tuple(
-			device_registry.devices.get_devices_for_config_entry_id(candidate.entry_id)
+			dr.async_entries_for_config_entry(
+				device_registry, candidate.entry_id
+			)
 		):
 			if any(
 				domain == DOMAIN
 				and identifier.startswith(("category:", "profile:"))
 				for domain, identifier in device.identifiers
 			):
+				device_registry.async_remove_device(device.id)
 				continue
-			device_registry.async_update_device(
-				device.id,
-				add_config_entry_id=entry.entry_id,
-				remove_config_entry_id=candidate.entry_id,
+			move_device_to_config_entry(
+				device_registry, device.id, candidate.entry_id, entry.entry_id
 			)
 		hass.config_entries.async_update_entry(
 			candidate, data={"_merged_into": entry.entry_id}, version=9

@@ -885,6 +885,26 @@ def get_appliance_group_for_profile(
     return LEGACY_APPLIANCE_GROUPS.get(appliance_type)
 
 
+def get_common_group_action_groups(appliance_group: str) -> tuple[str, ...]:
+    """Return actions supported by every profile below a group."""
+    profiles = [
+        APPLIANCE_PROFILES[profile_name]
+        for classes in APPLIANCE_GROUPS[appliance_group].values()
+        for profile_name in classes.values()
+    ]
+    if not profiles:
+        return ()
+
+    common_actions = set(profiles[0].action_groups)
+    for profile in profiles[1:]:
+        common_actions.intersection_update(profile.action_groups)
+    return tuple(
+        action_group
+        for action_group in profiles[0].action_groups
+        if action_group in common_actions
+    )
+
+
 def get_canonical_appliance_type(appliance_type: str) -> str:
     """Map a legacy profile key to its current shared profile key."""
     if appliance_type in {"washer", "dryer", "dishwasher"}:

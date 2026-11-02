@@ -15,6 +15,7 @@ from custom_components.home_activity_manager.config_flow import (
     _identity_schema,
     _entry_data,
     _entry_options,
+    _group_action_schema,
     _normalize_sensor_values,
     _sensor_form_values,
     _sensor_schema,
@@ -36,6 +37,7 @@ from custom_components.home_activity_manager.appliance_types import (
     get_appliance_class_name,
     get_appliance_group_for_profile,
     get_appliance_model,
+    get_common_group_action_groups,
     get_legacy_appliance_class,
     get_appliance_profile,
 )
@@ -52,6 +54,7 @@ from custom_components.home_activity_manager.const import (
     CONF_DOOR_OPEN_DELAY_SECONDS,
     CONF_EMPTIED_ACTIONS,
     CONF_FINISH_ACTIONS,
+    CONF_GROUP_ACTIONS,
     CONF_MAIL_ARRIVAL_ACTIONS,
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
@@ -94,6 +97,43 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                     self.assertEqual(
                         APPLIANCE_PROFILES[profile_name].detection_sources, (mode,)
                     )
+
+    def test_group_actions_are_the_intersection_of_all_descendant_profiles(self) -> None:
+        self.assertEqual(
+            get_common_group_action_groups("climate"),
+            ("cycle_start", "cycle_finish", "plug_off_alarm"),
+        )
+        self.assertEqual(
+            get_common_group_action_groups("laundry"),
+            (
+                "cycle_start",
+                "cycle_finish",
+                "max_runtime",
+                "pending_unload",
+                "emptied",
+                "plug_off_alarm",
+            ),
+        )
+        self.assertEqual(
+            get_common_group_action_groups("refrigeration"),
+            ("cycle_start", "cycle_finish", "door_open_alarm"),
+        )
+        self.assertEqual(
+            get_common_group_action_groups("deliveries"),
+            ("cycle_start", "cycle_finish", "pending_unload", "emptied"),
+        )
+
+    def test_group_action_schema_only_offers_common_hooks(self) -> None:
+        schema = _group_action_schema("climate", {})
+        fields = {marker.schema for marker in schema.schema}
+
+        self.assertEqual(
+            fields,
+            {CONF_START_ACTIONS, CONF_FINISH_ACTIONS, CONF_PLUG_OFF_ACTIONS},
+        )
+        with self.assertRaises(vol.Invalid):
+            schema({CONF_MAX_RUNTIME_ACTIONS: []})
+        self.assertEqual(CONF_GROUP_ACTIONS, "group_actions")
 
     def test_categories_map_each_profile_to_one_compatible_mode(self) -> None:
         mapped = [
@@ -878,6 +918,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         for translation in translations:
             option_labels = translation["selector"]["appliance_type"]["options"]
             self.assertEqual(set(option_labels), set(APPLIANCE_PROFILES))
+
             for appliance_type, label in option_labels.items():
                 self.assertTrue(label.strip())
                 self.assertNotEqual(label, appliance_type)
@@ -965,6 +1006,32 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 self.assertEqual(set(options), set(modes))
                 self.assertTrue(all(label.strip() for label in options.values()))
             self.assertEqual(len(mode_labels), len(set(mode_labels)))
+
+    def test_group_action_help_explains_common_hooks_and_template_variables(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        paths = (
+            root / "strings.json",
+            root / "translations" / "en.json",
+            root / "translations" / "es.json",
+            root / "translations" / "ca.json",
+        )
+        for path in paths:
+            translation = json.loads(path.read_text(encoding="utf-8"))
+            self.assertIn(
+                "group_actions",
+                translation["selector"]["appliance_action"]["options"],
+            )
+            hierarchy_help = translation["config"]["step"]["user"]["description"]
+            self.assertTrue(
+                any(
+                    term in hierarchy_help.casefold()
+                    for term in ("group", "agrupació", "agrupación")
+                )
+            )
+            help_text = translation["options"]["step"]["group_actions"]["description"]
+            self.assertIn("ham_appliance_name", help_text)
+            self.assertIn("ham_area_name", help_text)
+            self.assertIn("ham_source_entity_id", help_text)
 
 
 @pytest.mark.asyncio

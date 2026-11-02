@@ -6,7 +6,7 @@ Crear una integració local de Home Assistant per centralitzar en un únic dispo
 
 L'usuari no ha de necessitar crear automatitzacions o blueprints externs per detectar l'inici o el final del cicle ni per executar les accions configurades.
 
-Les categories generals inicials són rentadora, rentaplats, assecadora, termòstat, nevera, bústia, obertura i protecció solar. Els aires condicionats pertanyen a la categoria termòstat: aquesta categoria ofereix les modalitats de contacte/obertura, potència i entitat `climate`, cadascuna amb el seu perfil concret. La nevera ofereix potència o interruptor; la bústia, moviment interior o sensor de contacte/obertura de portella. Les entrades auxiliars es declaren explícitament a cada perfil; no totes estan disponibles en totes les modalitats. L'estructura ha de permetre afegir perfils futurs sense repartir condicions específiques per perfil entre els fluxos, el runtime i les plataformes d'entitats.
+Les agrupacions de primer nivell inicials són `climate`, `laundry`, `openings`, `sun_protection`, `deliveries` i `refrigeration`. Cada agrupació conté classes d'aparell i, sota cada classe, les modalitats de detecció amb el seu perfil concret. Per exemple, climatització inclou aire condicionat i termòstat; refrigeració inclou nevera i congelador. Les entrades auxiliars i les accions disponibles es declaren explícitament a cada perfil; no totes estan disponibles en totes les modalitats. L'estructura ha de permetre afegir perfils futurs sense repartir condicions específiques per perfil entre els fluxos, el runtime i les plataformes d'entitats.
 
 ## 2. Identitat del projecte
 
@@ -15,7 +15,7 @@ Les categories generals inicials són rentadora, rentaplats, assecadora, termòs
 - **Tipus**: integració personalitzada de Home Assistant, distribuïble amb HACS
 - **Funcionament**: local; sense API externa ni credencials
 - **Font d'activitat**: una entitat de Home Assistant determinada per la modalitat seleccionada
-- **Categories generals inicials**: `washer`, `dishwasher`, `dryer`, `thermostat`, `refrigerator`, `mailbox`, `opening`, `sun_protection`
+- **Agrupacions inicials**: `climate`, `laundry`, `openings`, `sun_protection`, `deliveries`, `refrigeration`
 - **Idioma font**: anglès
 - **Idiomes de la interfície**: anglès, castellà i català
 
@@ -38,9 +38,54 @@ Eliminar un dispositiu de la integració no ha d'esborrar entitats, helpers, tem
 
 Cada dispositiu ha de tenir una configuració pròpia amb els camps següents.
 
+### Jerarquia d'agrupacions
+
+La jerarquia canònica de configuració és **agrupació de primer nivell → classe d'aparell → modalitat/perfil**. Aquest arbre s'ha de mantenir coherent amb `APPLIANCE_GROUPS` i els perfils registrats, i s'ha de documentar igualment al README. Els selectors del flux mostren aquests nivells en passos successius.
+
+```text
+Climatització (climate)
+|-- Aire condicionat
+|   |-- Sensor de contacte/obertura (air_conditioner_contact)
+|   `-- Sensor de potència (air_conditioner_power)
+`-- Termòstat
+	`-- Entitat climate (thermostat_climate)
+
+Rentat i assecat (laundry)
+|-- Rentadora -- Sensor de potència (laundry)
+|-- Assecadora -- Sensor de potència (laundry)
+`-- Rentaplats -- Sensor de potència (laundry)
+
+Obertures (openings)
+|-- Porta -- Sensor de contacte (opening)
+`-- Finestra -- Sensor de contacte (opening)
+
+Protecció solar (sun_protection)
+|-- Persiana
+|   |-- Sensor de contacte (sun_protection_contact)
+|   `-- Entitat cover (sun_protection_cover)
+`-- Tendal
+	|-- Sensor de contacte (sun_protection_contact)
+	`-- Entitat cover (sun_protection_cover)
+
+Lliuraments (deliveries)
+`-- Bústia
+	|-- Contacte de portella (mailbox_slot)
+	`-- Moviment interior (mailbox_motion)
+
+Refrigeració (refrigeration)
+|-- Nevera
+|   |-- Sensor de potència (refrigerator)
+|   `-- Interruptor intel·ligent (refrigerator_switch)
+`-- Congelador
+	|-- Sensor de potència (refrigerator)
+	`-- Interruptor intel·ligent (refrigerator_switch)
+```
+
+Els noms entre parèntesis són identificadors de perfil, no nivells addicionals. Rentadora, assecadora i rentaplats comparteixen el perfil `laundry`; les modalitats de nevera i congelador comparteixen els perfils de refrigeració indicats.
+
 ### 4.1 Flux de configuració
 
-La creació d'un dispositiu presenta cinc passos. En editar, el tipus i la modalitat existents es mostren fixos juntament amb el nom, i se segueix amb sensors, paràmetres i accions.
+La creació segueix la jerarquia d'agrupació, classe i modalitat definida a «Jerarquia d'agrupacions» i després presenta els passos de sensors, paràmetres i accions. En editar, el tipus i la modalitat existents es mostren fixos juntament amb el nom, i se segueix amb sensors, paràmetres i accions. Les accions compartides del grup es configuren separadament a les opcions de l'entrada agrupada.
 
 1. **Tipus i nom**: seleccionar el tipus general i definir-ne el nom.
 2. **Modalitat d'activitat**: seleccionar la font d'activitat entre les disponibles per al tipus.
@@ -101,7 +146,13 @@ Els tipus s'han de definir en un registre de perfils extensible. Cada perfil dec
 
 ### 4.5 Accions
 
-Cada dispositiu pot tenir llistes d'accions de Home Assistant configurables i editables, compatibles amb les accions estàndard de Home Assistant. L'usuari ha de poder afegir, eliminar i reordenar diverses accions. Les llistes poden quedar buides sense impedir que el dispositiu detecti i mostri els cicles.
+Cada dispositiu pot tenir llistes locals d'accions de Home Assistant configurables i editables, compatibles amb les accions estàndard de Home Assistant. L'usuari ha de poder afegir, eliminar i reordenar diverses accions. Les llistes poden quedar buides sense impedir que el dispositiu detecti i mostri els cicles. A més, cada entrada agrupada pot tenir llistes d'accions compartides pels seus dispositius.
+
+Les accions configurables al nivell d'agrupació són exclusivament la intersecció dels grups d'acció (`action_groups`) de tots els perfils descendents de `APPLIANCE_GROUPS`. Un hook que falti en qualsevol perfil descendent no s'ha de mostrar ni acceptar en desar la configuració global; no és suficient que el hook el suporti només algun dispositiu. Els hooks particulars continuen configurant-se localment a l'appliance. Aquesta regla s'ha d'aplicar al selector i validar-se també al runtime perquè les opcions globals antigues o obsoletes no s'executin.
+
+Quan es produeix un hook per a un appliance, s'executen primer les accions compartides del grup i després les accions locals d'aquell appliance. Les accions compartides s'executen per cada appliance i el seu propi esdeveniment, no una única vegada coordinada per a tot el grup. Una llista local buida no desactiva les accions globals. Les opcions globals s'han de conservar en editar o eliminar un dispositiu membre mentre l'entrada de grup continuï existint.
+
+Les plantilles de les accions compartides reben `ham_appliance_name`, el nom visible del dispositiu gestionat; `ham_area_name`, el nom de l'àrea assignada o `None` si no n'hi ha; i `ham_source_entity_id` quan l'acció deriva d'un canvi d'estat d'una entitat. Els hooks iniciats per temporitzador no tenen `ham_source_entity_id`. Per exemple, `{{ ham_area_name or ham_appliance_name }}` prefereix l'àrea i fa fallback al nom del dispositiu. Aquestes variables s'han de passar a cada execució, diferenciades per appliance.
 
 - **Accions en finalitzar l'activitat**: s'executen quan la font de detecció confirma que l'activitat s'ha aturat. En neveres per potència, això correspon a l'aturada del compressor; en neveres per interruptor, a passar el switch a `off`.
 - **Accions en iniciar l'activitat**: s'executen quan la font de detecció confirma que l'activitat ha començat. En neveres per potència, això correspon a l'inici del compressor; en neveres per interruptor, a passar el switch a `on`. Exemples: enviar una notificació, anunciar un missatge de veu o iniciar un temporitzador.
@@ -111,7 +162,7 @@ Cada dispositiu pot tenir llistes d'accions de Home Assistant configurables i ed
 - **Alarma de porta de nevera**: acció pròpia del tipus nevera, disponible amb contacte configurat; s'executa després del retard de porta oberta i repeteix segons els paràmetres del perfil fins al màxim. Tancar la porta rearma el grup.
 - **Arribada de correu**: acció pròpia dels perfils de bústia, executada en detectar una arribada. Les accions de «pendent de recollir» segueixen el retard, interval i màxim de repeticions configurats, i es cancel·len en obrir-se la porta principal.
 
-Les accions són configuració de cada dispositiu; no s'han de codificar com a scripts fixos ni compartir automàticament entre aparells. La integració les ha d'executar directament en l'ordre configurat quan detecti els canvis de cicle o de porta, sense dependre d'una automatització o blueprint extern. No s'han de solapar dues execucions del mateix grup. Es poden invocar scripts existents si l'usuari els selecciona, però no són obligatoris. Els errors d'una acció s'han de registrar sense interrompre la resta d'accions ni la detecció de cicles, i sense exposar dades sensibles.
+Les accions locals són configuració de cada dispositiu i les globals són configuració explícita de l'agrupació; no s'han de codificar com a scripts fixos ni compartir implícitament. La integració les ha d'executar directament en l'ordre configurat quan detecti els canvis de cicle o de porta, sense dependre d'una automatització o blueprint extern. No s'han de solapar dues execucions del mateix hook per appliance. Es poden invocar scripts existents si l'usuari els selecciona, però no són obligatoris. Els errors d'una acció s'han de registrar sense interrompre la resta d'accions ni la detecció de cicles, i sense exposar dades sensibles.
 
 ## 5. Entitats i associació amb el dispositiu
 
@@ -207,6 +258,10 @@ Les accions són configuració de cada dispositiu; no s'han de codificar com a s
 44. Cada input es representa amb la sortida pròpia del perfil quan n'hi ha; no s'han de crear wrappers visibles per al sensor de pala de l'AC ni per als sensors d'entrada de la bústia. Cada aparell elèctric conserva «En funcionament»; cada bústia conserva «Pendent de recollir» i les sortides «Porta»/«Portella» aplicables.
 45. Les proves comproven que només es creen els wrappers declarats pel perfil i que els wrappers obsolets de l'AC i la bústia s'eliminen del registre. Les sortides derivades segueixen les seves fonts; les lectures `unknown`, `unavailable`, la desaparició i la recuperació no han de finalitzar falsament el cicle ni mostrar valors antics com a actuals.
 46. Rentadora, rentaplats, assecadora i bústia ofereixen una acció opcional quan es buida la càrrega o es recull el correu. S'executa una sola vegada quan l'estat pendent passa a net per l'obertura de la porta o pel botó de buidatge, i no s'executa si no hi havia res pendent.
+47. La jerarquia d'agrupació → classe d'aparell → modalitat/perfil és la mateixa al flux, a `APPLIANCE_GROUPS`, al README i a aquest document; no hi ha arbres contradictoris.
+48. Les opcions d'accions de grup mostren exactament els hooks comuns a tots els perfils descendents. Hooks no comuns no es mostren ni es poden desar; hooks globals obsolets desats prèviament no s'executen.
+49. Per a cada esdeveniment d'un appliance, les accions globals s'executen abans que les accions locals. La mateixa configuració global executada per dos appliances rep variables pròpies de cadascun; `ham_area_name` pot ser `None`, i `ham_source_entity_id` només es passa quan hi ha una entitat d'origen.
+50. La configuració de grup es pot editar sense esborrar-la en editar o retirar un membre. El flux explica visualment, amb ajudes natives localitzades, la jerarquia, la intersecció de hooks, l'ordre i les variables de plantilla en anglès, castellà i català.
 
 ## 9. Qualitat i proves
 

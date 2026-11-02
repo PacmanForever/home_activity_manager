@@ -14,12 +14,13 @@
     "step": {
       "user": {
         "title": "Device group and name",
+        "description": "Choose a group first, then an appliance class and its activity-detection mode.",
         "data": {
           "name": "Name shown for this device",
           "appliance_group": "Device group"
         }
       },
-      "appliance_class": {"title": "Device class", "data": {"appliance_class": "Device class"}},
+      "appliance_class": {"title": "Device class", "description": "Choose a class within the selected group.", "data": {"appliance_class": "Device class"}},
       "activity_mode_climate": {"title": "Climate detection mode", "data": {"activity_mode": "How this climate device detects activity"}, "data_description": {"activity_mode": "Choose the activity source for this climate device."}},
       "activity_mode_laundry": {"title": "Laundry detection mode", "data": {"activity_mode": "How this device detects activity"}, "data_description": {"activity_mode": "Choose the activity source for this washer, dryer, or dishwasher."}},
       "activity_mode_openings": {"title": "Opening detection mode", "data": {"activity_mode": "How this opening reports its state"}, "data_description": {"activity_mode": "Choose the contact sensor that reports open and closed states."}},
@@ -89,6 +90,7 @@
     "step": {
       "init": {
         "title": "Manage devices",
+        "description": "Edit or remove an appliance, or configure actions shared by this group.",
         "data": {
           "appliance_action": "Action",
           "name": "Name shown for this device",
@@ -99,6 +101,12 @@
         "data_description": {"activity_mode": "Only this sensor determines device activity."}
       },
       "select_appliance": {"title": "Select device", "data": {"appliance_id": "Device"}},
+      "group_actions": {
+        "title": "Group actions",
+        "description": "Only actions supported by every appliance profile in this group are available. They run before each device's own actions. Templates can use ham_appliance_name and ham_area_name; the area may be empty. Example: {{ ham_area_name or ham_appliance_name }}. ham_source_entity_id is available only when an entity triggered the action.",
+        "data": {"start_actions": "Actions when activity starts (optional)", "finish_actions": "Actions when activity ends (optional)", "max_runtime_actions": "Actions when maximum runtime is exceeded (optional)", "pending_actions": "Actions while waiting to unload or collect (optional)", "emptied_actions": "Actions when contents are removed or collected (optional)", "door_open_actions": "Actions while the door-open alarm is active (optional)", "compressor_inactive_actions": "Actions while the compressor-inactive alarm is active (optional)", "plug_off_actions": "Actions while the smart plug is off (optional)"},
+        "data_description": {"start_actions": "Runs before each appliance's own start actions. Template variables identify the appliance that triggered this run.", "finish_actions": "Runs before each appliance's own finish actions. Template variables identify the appliance that triggered this run."}
+      },
       "edit_appliance": {"title": "Edit device", "data": {"name": "Name shown for this device", "appliance_group": "Device group", "appliance_class": "Device class", "activity_mode": "Activity detection method"}},
       "appliance_class": {"title": "Device class", "data": {"appliance_class": "Device class"}},
       "activity_mode_climate": {"title": "Climate detection mode", "data": {"activity_mode": "How this climate device detects activity"}},
@@ -168,7 +176,7 @@
     }
   },
   "selector": {
-    "appliance_action": {"options": {"edit": "Edit device", "remove": "Remove device"}},
+    "appliance_action": {"options": {"edit": "Edit device", "remove": "Remove device", "group_actions": "Configure group actions"}},
     "appliance_group": {"options": {"climate": "Climate control", "laundry": "Laundry and drying", "openings": "Openings", "sun_protection": "Sun protection", "deliveries": "Deliveries", "refrigeration": "Refrigeration"}},
     "appliance_class": {"options": {"air_conditioner": "Air conditioner", "thermostat": "Thermostat", "washer": "Washer", "dryer": "Dryer", "dishwasher": "Dishwasher", "door": "Door", "window": "Window", "blind": "Blind", "awning": "Awning", "mailbox": "Mailbox", "refrigerator": "Refrigerator", "freezer": "Freezer", "opening": "Opening", "sun_protection": "Sun protection"}},
     "appliance_category": {

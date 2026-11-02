@@ -57,6 +57,15 @@ from custom_components.home_activity_manager.const import (
 )
 
 
+def _device_config_entry_ids(device):
+    config_entry_id = getattr(device, "config_entry_id", None)
+    return (
+        {config_entry_id}
+        if config_entry_id is not None
+        else device.config_entries
+    )
+
+
 def _group_class_mode_for_profile(profile_name: str) -> tuple[str, str, str]:
     return next(
         (group, appliance_class, mode)
@@ -186,7 +195,7 @@ async def test_add_appliance_through_four_config_flow_steps(
         for marker, value in options_result["data_schema"].schema.items()
         if marker.schema == "appliance_action"
     )
-    assert actions.config["options"] == ["edit", "remove"]
+    assert actions.config["options"] == ["edit", "remove", "group_actions"]
 
 
 @pytest.mark.asyncio
@@ -707,10 +716,6 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
         identifiers={(DOMAIN, "category:dryer")},
         name="Dryer",
     )
-    for entry in entries:
-        device_registry.async_update_device(
-            dryer_parent.id, add_config_entry_id=entry.entry_id
-        )
     original_update_device = device_registry.async_update_device
 
     def reject_category_parent_transfer(device_id, **updates):
@@ -720,13 +725,14 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
             for domain, identifier in device.identifiers
         ):
             assert "add_config_entry_id" not in updates
+            assert "new_config_entry_id" not in updates
         return original_update_device(device_id, **updates)
 
     monkeypatch.setattr(
         device_registry, "async_update_device", reject_category_parent_transfer
     )
     appliance_devices = []
-    for entry in entries:
+    for index, entry in enumerate(entries):
         entity_registry.async_get_or_create(
             "sensor",
             DOMAIN,
@@ -740,11 +746,12 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
                 name=entry.title,
             )
         )
-        device_registry.async_get_or_create(
-            config_entry_id=entry.entry_id,
-            identifiers={(DOMAIN, "category:washer")},
-            name="Washer",
-        )
+        if index == 0:
+            device_registry.async_get_or_create(
+                config_entry_id=entry.entry_id,
+                identifiers={(DOMAIN, "category:washer")},
+                name="Washer",
+            )
         await Store(hass, 1, f"{DOMAIN}_{entry.entry_id}").async_save(
             {"preserved": entry.entry_id}
         )
@@ -775,7 +782,7 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
     assert dryer_entry not in hass.config_entries.async_entries(DOMAIN)
     assert migrated_dryer_parent is None or not (
         {survivor.entry_id, merged.entry_id, dryer_entry.entry_id}
-        & migrated_dryer_parent.config_entries
+        & _device_config_entry_ids(migrated_dryer_parent)
     )
     merged_entity = entity_registry.async_get_entity_id(
         "sensor", DOMAIN, f"{merged.entry_id}_power"
@@ -784,8 +791,9 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
     for device in appliance_devices:
         migrated_device = device_registry.async_get(device.id)
         assert migrated_device is not None
-        assert survivor.entry_id in migrated_device.config_entries
-        assert merged.entry_id not in migrated_device.config_entries
+        config_entry_ids = _device_config_entry_ids(migrated_device)
+        assert survivor.entry_id in config_entry_ids
+        assert merged.entry_id not in config_entry_ids
     assert await Store(hass, 1, f"{DOMAIN}_{merged.entry_id}").async_load() == {
         "preserved": merged.entry_id
     }

@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+import inspect
 from types import SimpleNamespace
 
 import pytest
@@ -11,7 +12,7 @@ from homeassistant.components.lock import LockEntityFeature
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfPower
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers.issue_registry import async_get as async_get_issue_registry
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -33,6 +34,8 @@ from custom_components.home_activity_manager.const import (
     CONF_DOOR_OPEN_DELAY_SECONDS,
     CONF_EMPTIED_ACTIONS,
     CONF_FINISH_ACTIONS,
+    CONF_GROUP_ACTIONS,
+    CONF_GROUP_ACTIONS,
     CONF_MAIL_ARRIVAL_ACTIONS,
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
@@ -85,6 +88,24 @@ from custom_components.home_activity_manager.switch import (
 from custom_components.home_activity_manager.climate import ApplianceClimateProxy
 from custom_components.home_activity_manager.cover import ApplianceCoverProxy
 from custom_components.home_activity_manager.lock import ApplianceLockProxy
+
+
+def _find_device(registry, *, identifiers):
+    get_devices = getattr(registry, "async_get_devices", None)
+    if get_devices is not None:
+        return next(iter(get_devices(identifiers=identifiers)), None)
+    devices = registry.devices
+    device_entries = (
+        devices.values() if hasattr(devices, "values") else devices
+    )
+    return next(
+        (
+            device
+            for device in device_entries
+            if identifiers <= device.identifiers
+        ),
+        None,
+    )
 
 
 @pytest.fixture
@@ -422,7 +443,6 @@ async def test_pending_reminders_use_initial_delay_then_repeat_interval(
     monkeypatch.setattr(dt_util, "utcnow", lambda: current_time[0])
     config.update(
         {
-            CONF_PENDING_ACTIONS: [{"service": "test.noop"}],
             CONF_PENDING_DELAY_SECONDS: 120,
             CONF_PENDING_INTERVAL_SECONDS: 300,
             CONF_PENDING_REPEATS: 1,
@@ -432,7 +452,15 @@ async def test_pending_reminders_use_initial_delay_then_repeat_interval(
         config[CONF_POWER_ENTITY], "5", {ATTR_UNIT_OF_MEASUREMENT: "W"}
     )
     hass.states.async_set(config[CONF_DOOR_ENTITY], "off")
-    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=config,
+        options={
+            CONF_GROUP_ACTIONS: {
+                CONF_PENDING_ACTIONS: [{"service": "test.noop"}]
+            }
+        },
+    )
     entry.add_to_hass(hass)
     runtime = ApplianceRuntime(hass, entry, config)
     reminders: list[str] = []
@@ -584,7 +612,7 @@ async def test_action_failure_does_not_stop_later_actions(
         def __init__(self, hass, sequence, name, domain, **kwargs):
             self.action = sequence[0]["action"]
 
-        async def async_run(self):
+        async def async_run(self, **kwargs):
             executed.append(self.action)
             if self.action == "test.fail":
                 raise RuntimeError("simulated failure")
@@ -594,6 +622,91 @@ async def test_action_failure_does_not_stop_later_actions(
     await runtime._run_actions(CONF_START_ACTIONS)
 
     assert executed == ["test.fail", "test.succeed"]
+
+
+@pytest.mark.asyncio
+async def test_group_actions_run_before_local_with_appliance_context(hass, monkeypatch):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"category": "climate"},
+        options={
+            CONF_GROUP_ACTIONS: {
+                CONF_START_ACTIONS: [{"action": "test.group_start"}],
+                CONF_MAX_RUNTIME_ACTIONS: [{"action": "test.obsolete"}],
+            }
+        },
+    )
+    entry.add_to_hass(hass)
+    area = ar.async_get(hass).async_create("Suite")
+    device_registry = dr.async_get(hass)
+    executed: list[tuple[str, dict | None]] = []
+
+    class FakeScript:
+        def __init__(self, hass, sequence, name, domain, **kwargs):
+            self.action = sequence[0]["action"]
+
+        async def async_run(self, **kwargs):
+            executed.append((self.action, kwargs.get("run_variables")))
+
+    monkeypatch.setattr(runtime_module, "Script", FakeScript)
+
+    for appliance_id, appliance_type, name, area_id, source_entity in (
+        (
+            "ac_one",
+            "air_conditioner_contact",
+            "Aire condicionat estudi",
+            area.id,
+            "binary_sensor.ac_one",
+        ),
+        (
+            "ac_two",
+            "thermostat_climate",
+            "Clima menjador",
+            None,
+            "climate.ac_two",
+        ),
+    ):
+        device = device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, appliance_id)},
+            name=f"Default {appliance_id}",
+        )
+        device_registry.async_update_device(
+            device.id,
+            name_by_user=name,
+            area_id=area_id,
+        )
+        config = {
+            CONF_APPLIANCE_TYPE: appliance_type,
+            "_appliance_id": appliance_id,
+            "name": f"Configured {appliance_id}",
+            CONF_START_ACTIONS: [{"action": "test.local_start"}],
+        }
+        runtime = ApplianceRuntime(hass, entry, config)
+        await runtime._run_actions(
+            CONF_START_ACTIONS, source_entity_id=source_entity
+        )
+
+    assert executed == [
+        (
+            "test.group_start",
+            {
+                "ham_appliance_name": "Aire condicionat estudi",
+                "ham_area_name": "Suite",
+                "ham_source_entity_id": "binary_sensor.ac_one",
+            },
+        ),
+        ("test.local_start", None),
+        (
+            "test.group_start",
+            {
+                "ham_appliance_name": "Clima menjador",
+                "ham_area_name": None,
+                "ham_source_entity_id": "climate.ac_two",
+            },
+        ),
+        ("test.local_start", None),
+    ]
 
 
 @pytest.mark.parametrize("appliance_type", ["refrigerator", "refrigerator_switch"])
@@ -752,6 +865,27 @@ async def test_power_entity_preserves_last_reading_internally_during_outage(
     await runtime.async_unload()
 
 
+def test_invalid_stored_energy_resets_appliance_runtime(hass, config):
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    runtime.energy_kwh = 12
+    runtime._last_valid_power_w = 8
+    runtime.pending_unload = True
+    runtime.pending_reminder_count = 3
+    runtime.max_runtime_fired = True
+    runtime.door_alarm_active = True
+
+    runtime._restore({"energy_kwh": -1})
+
+    assert runtime.energy_kwh == 0
+    assert runtime._last_valid_power_w is None
+    assert not runtime.pending_unload
+    assert runtime.pending_reminder_count == 0
+    assert not runtime.max_runtime_fired
+    assert not runtime.door_alarm_active
+
+
 @pytest.mark.asyncio
 async def test_power_entity_stays_unavailable_after_reload_during_outage(
     hass, config, enable_custom_integrations
@@ -807,11 +941,17 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
         identifiers={(DOMAIN, "profile:washer")},
         name="Washer profile",
     )
+    via_device_parameter = (
+        {"via_device_id": profile_device.id}
+        if "via_device_id"
+        in inspect.signature(device_registry.async_get_or_create).parameters
+        else {"via_device": (DOMAIN, "profile:washer")}
+    )
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
         name="Washer",
-        via_device=(DOMAIN, "profile:washer"),
+        **via_device_parameter,
     )
     category_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -822,7 +962,8 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    appliance_device = device_registry.async_get_device(
+    appliance_device = _find_device(
+        device_registry,
         identifiers={(DOMAIN, entry.entry_id)}
     )
     assert appliance_device is not None
@@ -930,10 +1071,12 @@ async def test_setup_localizes_legacy_category_defaults_without_changing_custom_
     assert entry.data["appliances"][0]["data"]["name"] == localized_class_name
     assert entry.data["appliances"][1]["data"]["name"] == "Laundry room"
     registry = dr.async_get(hass)
-    default_device = registry.async_get_device(
+    default_device = _find_device(
+        registry,
         identifiers={(DOMAIN, "washer_default")}
     )
-    custom_device = registry.async_get_device(
+    custom_device = _find_device(
+        registry,
         identifiers={(DOMAIN, "washer_custom")}
     )
     assert default_device is not None
@@ -1001,25 +1144,48 @@ async def test_category_entry_groups_appliances_without_parent_device(
 
     device_registry = dr.async_get(hass)
     assert entry.title == "Laundry and drying"
-    assert device_registry.async_get_device(
+    assert _find_device(
+        device_registry,
         identifiers={(DOMAIN, "category:laundry")}
     ) is None
-    assert device_registry.async_get_device(
+    assert _find_device(
+        device_registry,
         identifiers={(DOMAIN, "category:thermostat")}
     ) is None
     appliance_devices = [
-        device_registry.async_get_device(
+        _find_device(
+            device_registry,
             identifiers={(DOMAIN, record["id"])}
         )
         for record in appliance_records
     ]
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
+    assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.29" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Laundry and drying · Washer · Power sensor",
         "Laundry and drying · Dishwasher · Power sensor",
     ]
     assert len(entry.runtime_data) == 2
+
+    options_result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        options_result["flow_id"], {"appliance_action": "group_actions"}
+    )
+    assert result["step_id"] == "group_actions"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_START_ACTIONS: [{"action": "test.group_start"}],
+            CONF_FINISH_ACTIONS: [{"action": "test.group_finish"}],
+        },
+    )
+    assert result["type"] == "create_entry"
+    assert entry.options[CONF_GROUP_ACTIONS][CONF_START_ACTIONS] == [
+        {"action": "test.group_start"}
+    ]
+    await hass.async_block_till_done()
 
     options_result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(
@@ -1031,13 +1197,18 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert result["type"] == "create_entry"
     await hass.async_block_till_done()
     assert [record["id"] for record in entry.data["appliances"]] == ["washer_one"]
-    assert device_registry.async_get_device(
+    assert entry.options[CONF_GROUP_ACTIONS][CONF_START_ACTIONS] == [
+        {"action": "test.group_start"}
+    ]
+    assert _find_device(
+        device_registry,
         identifiers={(DOMAIN, "washer_two")}
     ) is None
     assert er.async_get(hass).async_get_entity_id(
         "sensor", DOMAIN, "washer_two_power"
     ) is None
-    assert device_registry.async_get_device(
+    assert _find_device(
+        device_registry,
         identifiers={(DOMAIN, "category:washer")}
     ) is None
 
@@ -1051,7 +1222,8 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert result["type"] == "abort"
     assert result["reason"] == "last_appliance_removed"
     assert entry not in hass.config_entries.async_entries(DOMAIN)
-    assert device_registry.async_get_device(
+    assert _find_device(
+        device_registry,
         identifiers={(DOMAIN, "washer_one")}
     ) is None
 
@@ -1099,14 +1271,17 @@ async def test_thermostat_profiles_are_standalone_devices(
 
     device_registry = dr.async_get(hass)
     assert entry.title == "Climate control"
-    assert device_registry.async_get_device(
+    assert _find_device(
+        device_registry,
         identifiers={(DOMAIN, "category:climate")}
     ) is None
-    assert device_registry.async_get_device(
+    assert _find_device(
+        device_registry,
         identifiers={(DOMAIN, "category:washer")}
     ) is None
     appliance_devices = [
-        device_registry.async_get_device(
+        _find_device(
+            device_registry,
             identifiers={(DOMAIN, record["id"])}
         )
         for record in appliance_records
@@ -2303,7 +2478,6 @@ async def test_refrigerator_door_alarm_repeats_rearms_and_persists(
         CONF_APPLIANCE_TYPE: "refrigerator",
         CONF_POWER_ENTITY: "sensor.fridge_power",
         CONF_DOOR_ENTITY: "binary_sensor.fridge_door",
-        CONF_DOOR_OPEN_ACTIONS: [{"action": "test.door_alarm"}],
         CONF_DOOR_OPEN_DELAY_SECONDS: 2,
         CONF_ALARM_REPEAT_INTERVAL_SECONDS: 3,
         CONF_ALARM_REPEAT_COUNT: 1,
@@ -2313,7 +2487,15 @@ async def test_refrigerator_door_alarm_repeats_rearms_and_persists(
         config[CONF_POWER_ENTITY], "0", {ATTR_UNIT_OF_MEASUREMENT: "W"}
     )
     hass.states.async_set(config[CONF_DOOR_ENTITY], "off")
-    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=config,
+        options={
+            CONF_GROUP_ACTIONS: {
+                CONF_DOOR_OPEN_ACTIONS: [{"action": "test.door_alarm"}]
+            }
+        },
+    )
     entry.add_to_hass(hass)
     runtime = ApplianceRuntime(hass, entry, config)
     actions: list[str] = []
