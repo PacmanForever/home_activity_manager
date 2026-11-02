@@ -691,6 +691,8 @@ async def test_group_actions_run_before_local_with_appliance_context(hass, monke
         (
             "test.group_start",
             {
+                "ham_device_name": "Aire condicionat estudi",
+                "ham_device_area_name": "Suite",
                 "ham_appliance_name": "Aire condicionat estudi",
                 "ham_area_name": "Suite",
                 "ham_source_entity_id": "binary_sensor.ac_one",
@@ -700,6 +702,8 @@ async def test_group_actions_run_before_local_with_appliance_context(hass, monke
         (
             "test.group_start",
             {
+                "ham_device_name": "Clima menjador",
+                "ham_device_area_name": None,
                 "ham_appliance_name": "Clima menjador",
                 "ham_area_name": None,
                 "ham_source_entity_id": "climate.ac_two",
@@ -1162,7 +1166,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.30" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.31" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Laundry and drying · Washer · Power sensor",
         "Laundry and drying · Dishwasher · Power sensor",

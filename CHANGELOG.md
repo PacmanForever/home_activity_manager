@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v0.9.31 - 2026-11-02
+
+### Changed
+
+- Add clearer device-name and device-area template variables while retaining the previous names as aliases.
+- Explain the exact template syntax and clarify that the source entity ID refers to the original input entity.
+
 ## v0.9.30 - 2026-11-02
 
 ### Changed

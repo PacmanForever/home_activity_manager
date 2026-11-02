@@ -1047,11 +1047,22 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 )
             )
             help_text = translation["options"]["step"]["group_actions"]["description"]
+            self.assertIn("ham_device_name", help_text)
+            self.assertIn("ham_device_area_name", help_text)
+            self.assertIn("ham_source_entity_id", help_text)
             self.assertIn("ham_appliance_name", help_text)
             self.assertIn("ham_area_name", help_text)
-            self.assertIn("ham_source_entity_id", help_text)
-            self.assertNotIn("{{", help_text)
-            self.assertNotIn("}}", help_text)
+            self.assertTrue(
+                any(term in help_text.casefold() for term in ("proxy", "wrapper"))
+            )
+            self.assertTrue(
+                any(
+                    term in help_text.casefold()
+                    for term in ("timer", "temporitzador", "temporizador")
+                )
+            )
+            self.assertIn("{{ ham_device_area_name or ham_device_name }}", help_text)
+            self.assertIn("{{ ham_source_entity_id | default(", help_text)
             action_help = translation["options"]["step"]["group_actions"][
                 "data_description"
             ]

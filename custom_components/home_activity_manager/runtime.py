@@ -997,6 +997,8 @@ class ApplianceRuntime:
             if area is not None:
                 area_name = area.name
         variables = {
+            "ham_device_name": appliance_name,
+            "ham_device_area_name": area_name,
             "ham_appliance_name": appliance_name,
             "ham_area_name": area_name,
         }
