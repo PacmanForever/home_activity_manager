@@ -845,7 +845,12 @@ def get_appliance_model(
             language_code = language.split("-")[0]
             detection_name = detection_names.get(language_code, detection_names["en"])
             group_name = get_appliance_group_name(group, language)
-            if appliance_class in APPLIANCE_CLASS_NAMES:
+            if appliance_class == "opening":
+                class_name = {
+                    "ca": "Desconegut",
+                    "es": "Desconocido",
+                }.get(language_code, "Unknown")
+            elif appliance_class in APPLIANCE_CLASS_NAMES:
                 class_name = get_appliance_class_name(appliance_class, language)
             else:
                 class_names = APPLIANCE_UNCLASSIFIED_MODEL_NAMES.get(appliance_type)

@@ -123,7 +123,15 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         )
         self.assertEqual(
             get_appliance_model("opening", "opening", "ca"),
-            "Obertures · Obertura · Sensor de contacte/obertura",
+            "Obertures · Desconegut · Sensor de contacte/obertura",
+        )
+        self.assertEqual(
+            get_appliance_model("opening", "opening", "en"),
+            "Openings · Unknown · Contact/opening sensor",
+        )
+        self.assertEqual(
+            get_appliance_model("opening", "opening", "es"),
+            "Aberturas · Desconocido · Sensor de contacto/apertura",
         )
         self.assertEqual(
             get_appliance_model("laundry", language="ca"),

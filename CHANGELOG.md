@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.9.26 - 2026-11-02
+
+### Changed
+
+- Show legacy generic opening devices as unknown rather than as an opening.
+
 ## v0.9.25 - 2026-11-02
 
 ### Changed
