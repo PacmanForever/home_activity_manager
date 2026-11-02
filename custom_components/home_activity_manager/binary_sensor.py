@@ -65,9 +65,7 @@ class ApplianceBinarySensor(BinarySensorEntity):
         self._attr_unique_id = f"{getattr(runtime, 'appliance_id', entry.entry_id)}_{key}"
         self._attr_translation_key = key
         self._attr_device_class = device_class
-        self._attr_device_info = appliance_device_info(
-            getattr(runtime, "hass", None), entry, runtime.config
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     @property
     def is_on(self) -> bool | None:
@@ -182,9 +180,7 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_input_{input_name}"
         )
         self._attr_translation_key = f"input_{input_name}"
-        self._attr_device_info = appliance_device_info(
-            getattr(runtime, "hass", None), entry, runtime.config
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
         if input_config.device_classes:
             self._attr_device_class = BinarySensorDeviceClass(
                 input_config.device_classes[0]

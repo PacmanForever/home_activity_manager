@@ -59,7 +59,6 @@ from custom_components.home_activity_manager import (
     async_unload_entry,
 )
 from custom_components.home_activity_manager import runtime as runtime_module
-from custom_components.home_activity_manager import device as device_module
 from custom_components.home_activity_manager.appliance import ApplianceCycleDetector
 from custom_components.home_activity_manager.sensor import _format_duration
 from custom_components.home_activity_manager.appliance_types import (
@@ -800,30 +799,34 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     )
     entry = MockConfigEntry(domain=DOMAIN, data=config)
     entry.add_to_hass(hass)
+    device_registry = dr.async_get(hass)
+    profile_device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "profile:washer")},
+        name="Washer profile",
+    )
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name="Washer",
+        via_device=(DOMAIN, "profile:washer"),
+    )
+    category_device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "category:washer")},
+        name="Washer category",
+    )
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    device_registry = dr.async_get(hass)
     appliance_device = device_registry.async_get_device(
         identifiers={(DOMAIN, entry.entry_id)}
     )
-    category_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, "category:washer")}
-    )
     assert appliance_device is not None
-    assert category_device is not None
-    assert appliance_device.via_device_id == category_device.id
-    profile_identifiers = {
-        identifier[1]
-        for device in device_registry.devices.values()
-        for identifier in device.identifiers
-        if identifier[0] == DOMAIN and identifier[1].startswith("category:")
-    }
-    assert profile_identifiers == {"category:washer"}
-    assert device_registry.async_get_device(
-        identifiers={(DOMAIN, "profile:washer")}
-    ) is None
+    assert appliance_device.via_device_id is None
+    assert device_registry.async_get(profile_device.id) is None
+    assert device_registry.async_get(category_device.id) is None
 
     registry = er.async_get(hass)
     entry_entities = [
@@ -870,31 +873,8 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     assert hass.states.get(config[CONF_POWER_ENTITY]) is not None
 
 
-def test_appliance_device_info_uses_registered_parent_id_for_new_api(
-    hass, monkeypatch
-):
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title="Washer",
-        data={"category": "washer"},
-    )
-    entry.add_to_hass(hass)
-    category_device = dr.async_get(hass).async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, "category:washer")},
-        name="Washer",
-    )
-    monkeypatch.setattr(device_module, "_VIA_DEVICE_KEY", "via_device_id")
-
-    info = device_module.appliance_device_info(
-        hass, entry, {CONF_APPLIANCE_TYPE: "washer"}
-    )
-
-    assert info["via_device_id"] == category_device.id
-
-
 @pytest.mark.asyncio
-async def test_appliances_share_category_device_and_can_be_removed_individually(
+async def test_category_entry_groups_appliances_without_parent_device(
     hass, enable_custom_integrations
 ):
     appliance_records = [
@@ -928,10 +908,10 @@ async def test_appliances_share_category_device_and_can_be_removed_individually(
     await hass.async_block_till_done()
 
     device_registry = dr.async_get(hass)
-    category_device = device_registry.async_get_device(
+    assert entry.title == "Washer"
+    assert device_registry.async_get_device(
         identifiers={(DOMAIN, "category:washer")}
-    )
-    assert category_device is not None
+    ) is None
     assert device_registry.async_get_device(
         identifiers={(DOMAIN, "category:thermostat")}
     ) is None
@@ -942,7 +922,7 @@ async def test_appliances_share_category_device_and_can_be_removed_individually(
         for record in appliance_records
     ]
     assert all(device is not None for device in appliance_devices)
-    assert all(device.via_device_id == category_device.id for device in appliance_devices)
+    assert all(device.via_device_id is None for device in appliance_devices)
     assert len(entry.runtime_data) == 2
 
     options_result = await hass.config_entries.options.async_init(entry.entry_id)
@@ -950,7 +930,7 @@ async def test_appliances_share_category_device_and_can_be_removed_individually(
         options_result["flow_id"], {"appliance_action": "remove"}
     )
     result = await hass.config_entries.options.async_configure(
-        options_result["flow_id"], {"appliance_id": "washer_two"}
+        result["flow_id"], {"appliance_id": "washer_two"}
     )
     assert result["type"] == "create_entry"
     await hass.async_block_till_done()
@@ -963,7 +943,7 @@ async def test_appliances_share_category_device_and_can_be_removed_individually(
     ) is None
     assert device_registry.async_get_device(
         identifiers={(DOMAIN, "category:washer")}
-    ) is not None
+    ) is None
 
     await hass.config_entries.async_remove(entry.entry_id)
     assert (
@@ -973,7 +953,7 @@ async def test_appliances_share_category_device_and_can_be_removed_individually(
 
 
 @pytest.mark.asyncio
-async def test_thermostat_profiles_share_category_device(
+async def test_thermostat_profiles_are_standalone_devices(
     hass, enable_custom_integrations
 ):
     profiles = (
@@ -1014,10 +994,10 @@ async def test_thermostat_profiles_share_category_device(
     await hass.async_block_till_done()
 
     device_registry = dr.async_get(hass)
-    category_device = device_registry.async_get_device(
+    assert entry.title == "Thermostat"
+    assert device_registry.async_get_device(
         identifiers={(DOMAIN, "category:thermostat")}
-    )
-    assert category_device is not None
+    ) is None
     assert device_registry.async_get_device(
         identifiers={(DOMAIN, "category:washer")}
     ) is None
@@ -1028,9 +1008,7 @@ async def test_thermostat_profiles_share_category_device(
         for record in appliance_records
     ]
     assert all(device is not None for device in appliance_devices)
-    assert all(
-        device.via_device_id == category_device.id for device in appliance_devices
-    )
+    assert all(device.via_device_id is None for device in appliance_devices)
 
     assert len(entry.runtime_data) == len(profiles)
     await hass.config_entries.async_remove(entry.entry_id)

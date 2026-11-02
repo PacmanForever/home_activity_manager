@@ -45,9 +45,7 @@ class EntityProxyMixin:
         self._attr_name = None
         self._attr_should_poll = False
         self._attr_translation_key = translation_key
-        self._attr_device_info = appliance_device_info(
-            getattr(runtime, "hass", None), entry, runtime.config
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     @property
     def _source_state(self) -> Any:

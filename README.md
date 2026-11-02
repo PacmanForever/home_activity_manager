@@ -70,7 +70,7 @@ The integration works on supported Home Assistant versions; displaying its local
 
 Each general category has one config entry. Add, edit, or remove appliances from that category's options; each appliance keeps its own name, profile, activity mode, sensors, actions, and runtime state. A profile and its activity mode are fixed after setup. Existing per-appliance entries are consolidated automatically during migration, preserving appliance IDs, entity IDs, registry customizations, and runtime state. Setup asks for:
 
-In Home Assistant's device registry, each configured general category has one shared parent device, such as "Thermostat", with its configured appliances as child devices. A category appears when its first appliance is added and disappears when its last appliance is removed. Air conditioners and climate-based thermostats share the Thermostat group.
+Each category entry groups its appliances on the integration page. Only configured appliances are registered as devices; the category itself is not added as an empty device. Air conditioners and climate-based thermostats share the Thermostat group.
 
 1. A device profile, name, and activity mode when that profile offers a choice.
 2. The required activity source and any optional compatible sensors or controls. A refrigerator requires a door contact; a mailbox requires a separate main-door contact; opening can optionally include a lock.

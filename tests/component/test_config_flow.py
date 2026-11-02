@@ -59,6 +59,7 @@ from custom_components.home_activity_manager.const import (
 async def test_add_appliance_through_four_config_flow_steps(
     hass, enable_custom_integrations
 ):
+    hass.config.language = "ca"
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
@@ -134,7 +135,7 @@ async def test_add_appliance_through_four_config_flow_steps(
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Washer"
+    assert result["title"] == "Rentadora"
     assert result["data"]["category"] == "washer"
     appliance = result["data"]["appliances"][0]
     assert appliance["data"][CONF_POWER_ENTITY] == "sensor.washer_power"

@@ -25,9 +25,7 @@ class ClearPendingButton(ButtonEntity):
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_clear_pending"
         )
-        self._attr_device_info = appliance_device_info(
-            getattr(runtime, "hass", None), entry, runtime.config
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     async def async_press(self) -> None:
         """Clear the pending state and cancel its reminders."""
@@ -46,9 +44,7 @@ class ResetEnergyButton(ButtonEntity):
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_energy_reset"
         )
-        self._attr_device_info = appliance_device_info(
-            getattr(runtime, "hass", None), entry, runtime.config
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     async def async_press(self) -> None:
         """Reset only the integration's locally calculated energy total."""

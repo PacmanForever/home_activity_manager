@@ -15,9 +15,9 @@ from homeassistant.helpers.storage import Store
 
 from .appliance_types import (
     APPLIANCE_CATEGORIES,
-    APPLIANCE_CATEGORY_NAMES,
     APPLIANCE_TYPES,
     ApplianceTypeProfile,
+    get_appliance_category_name,
     get_appliance_profile,
 )
 from .const import (
@@ -877,8 +877,9 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                 _clear_pending_settings(self._draft)
             category = self._category
             assert category is not None
+            language = self.hass.config.language if self.hass is not None else "en"
             return self.async_create_entry(
-                title=APPLIANCE_CATEGORY_NAMES[category],
+                title=get_appliance_category_name(category, language),
                 data={
                     "category": category,
                     "appliances": [

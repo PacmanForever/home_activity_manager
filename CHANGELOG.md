@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## v0.9.22 - 2026-11-02
+
+### Changed
+
+- Localize category entry titles using Home Assistant's configured language.
+
+### Fixed
+
+- Keep category grouping in the integration page without creating empty category or profile devices.
+- Remove legacy category and profile parent devices and detach appliance devices during setup and migration.
+- Transfer only appliance devices when consolidating legacy config entries.
+
 ## v0.9.21 - 2026-11-02
 
 ### Fixed

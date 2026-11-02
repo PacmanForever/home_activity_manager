@@ -29,9 +29,7 @@ class AppliancePlugSwitch(SwitchEntity):
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_plug"
         )
-        self._attr_device_info = appliance_device_info(
-            getattr(runtime, "hass", None), entry, runtime.config
-        )
+        self._attr_device_info = appliance_device_info(entry, runtime.config)
 
     @property
     def suggested_object_id(self) -> str:

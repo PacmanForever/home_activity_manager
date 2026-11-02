@@ -536,6 +536,37 @@ APPLIANCE_CATEGORY_NAMES = {
     "dishwasher": "Dishwasher",
 }
 
+APPLIANCE_CATEGORY_TRANSLATIONS = {
+    "ca": {
+        "thermostat": "Termòstat",
+        "dryer": "Assecadora",
+        "mailbox": "Bústia",
+        "opening": "Obertura",
+        "refrigerator": "Nevera",
+        "sun_protection": "Protecció solar",
+        "washer": "Rentadora",
+        "dishwasher": "Rentaplats",
+    },
+    "es": {
+        "thermostat": "Termostato",
+        "dryer": "Secadora",
+        "mailbox": "Buzón",
+        "opening": "Apertura",
+        "refrigerator": "Frigorífico",
+        "sun_protection": "Protección solar",
+        "washer": "Lavadora",
+        "dishwasher": "Lavavajillas",
+    },
+}
+
+
+def get_appliance_category_name(category: str, language: str = "en") -> str:
+    """Return the category name in the configured Home Assistant language."""
+    translations = APPLIANCE_CATEGORY_TRANSLATIONS.get(language.split("-")[0])
+    if translations is None:
+        return APPLIANCE_CATEGORY_NAMES[category]
+    return translations.get(category, APPLIANCE_CATEGORY_NAMES[category])
+
 
 # Keep the selector alphabetized by its Catalan display labels.
 APPLIANCE_TYPES = (
