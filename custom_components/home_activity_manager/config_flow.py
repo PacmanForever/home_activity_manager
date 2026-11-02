@@ -791,6 +791,7 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._draft: dict[str, Any] = {}
         self._category: str | None = None
+        self._existing_entry: ConfigEntry | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -799,13 +800,17 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
             self._draft = dict(user_input)
             self._category = self._draft.pop(CONF_APPLIANCE_GROUP)
             if self.hass is not None:
-                if any(
-                    entry.data.get("category") == self._category
-                    for entry in self.hass.config_entries.async_entries(DOMAIN)
-                ):
-                    return self.async_abort(reason="group_already_configured")
-                await self.async_set_unique_id(self._category)
-                self._abort_if_unique_id_configured()
+                self._existing_entry = next(
+                    (
+                        entry
+                        for entry in self.hass.config_entries.async_entries(DOMAIN)
+                        if entry.data.get("category") == self._category
+                    ),
+                    None,
+                )
+                if self._existing_entry is None:
+                    await self.async_set_unique_id(self._category)
+                    self._abort_if_unique_id_configured()
             return await self.async_step_appliance_class()
         return self.async_show_form(
             step_id="user",
@@ -937,17 +942,30 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
             category = self._category
             assert category is not None
             language = self.hass.config.language if self.hass is not None else "en"
+            appliance = {
+                "id": uuid4().hex,
+                "data": _entry_data(self._draft),
+                "options": _entry_options(self._draft),
+            }
+            if self._existing_entry is not None:
+                entry = self.hass.config_entries.async_get_entry(
+                    self._existing_entry.entry_id
+                )
+                if entry is None:
+                    return self.async_abort(reason="group_no_longer_configured")
+                self.hass.config_entries.async_update_entry(
+                    entry,
+                    data={
+                        **entry.data,
+                        "appliances": [*entry.data.get("appliances", []), appliance],
+                    },
+                )
+                return self.async_abort(reason="appliance_added")
             return self.async_create_entry(
                 title=get_appliance_group_name(category, language),
                 data={
                     "category": category,
-                    "appliances": [
-                        {
-                            "id": uuid4().hex,
-                            "data": _entry_data(self._draft),
-                            "options": _entry_options(self._draft),
-                        }
-                    ],
+                    "appliances": [appliance],
                 },
             )
         return self.async_show_form(

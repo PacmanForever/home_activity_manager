@@ -218,14 +218,36 @@ async def test_add_appliance_through_four_config_flow_steps(
 
 
 @pytest.mark.asyncio
-async def test_setup_aborts_when_appliance_group_already_exists(
+async def test_setup_adds_appliance_to_existing_group(
     hass, enable_custom_integrations
 ):
+    hass.states.async_set(
+        "sensor.existing_washer_power", "0", {"unit_of_measurement": "W"}
+    )
+    hass.states.async_set(
+        "sensor.another_washer_power", "0", {"unit_of_measurement": "W"}
+    )
     existing_entry = MockConfigEntry(
         domain=DOMAIN,
-        data={"category": "laundry", "appliances": []},
+        title="Laundry",
+        data={
+            "category": "laundry",
+            "appliances": [
+                {
+                    "id": "existing-washer",
+                    "data": {
+                        "name": "Existing washer",
+                        CONF_APPLIANCE_TYPE: "laundry",
+                        CONF_APPLIANCE_CLASS: "washer",
+                        CONF_POWER_ENTITY: "sensor.existing_washer_power",
+                    },
+                    "options": {},
+                }
+            ],
+        },
     )
     existing_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(existing_entry.entry_id)
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
@@ -234,9 +256,45 @@ async def test_setup_aborts_when_appliance_group_already_exists(
         result["flow_id"],
         {"name": "Another washer", CONF_APPLIANCE_GROUP: "laundry"},
     )
+    assert result["step_id"] == "appliance_class"
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_APPLIANCE_CLASS: "washer"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {"activity_mode": "power"}
+    )
+    assert result["step_id"] == "sensors_laundry"
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {"laundry_power_entity": "sensor.another_washer_power"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {
+            "start_power_w": 4,
+            "start_duration_seconds": 15,
+            "finish_power_w": 1,
+            "finish_duration_seconds": 60,
+        },
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {
+            CONF_START_ACTIONS: [],
+            CONF_FINISH_ACTIONS: [],
+            "max_runtime_actions": [],
+        },
+    )
 
     assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "group_already_configured"
+    assert result["reason"] == "appliance_added"
+    await hass.async_block_till_done()
+    assert len(existing_entry.data["appliances"]) == 2
+    assert existing_entry.data["appliances"][1]["data"][CONF_POWER_ENTITY] == (
+        "sensor.another_washer_power"
+    )
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+    assert len(existing_entry.runtime_data) == 2
 
 
 @pytest.mark.asyncio
@@ -360,8 +418,7 @@ async def test_thermostat_climate_accepts_parented_entity(
         flow_id,
         {"name": "Thermostat 2", CONF_APPLIANCE_GROUP: "climate"},
     )
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "group_already_configured"
+    assert result["step_id"] == "appliance_class"
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## v0.9.24 - 2026-11-02
+
+### Added
+
+- Show the appliance group, class, and detection method in the air-conditioner device model, localized to Home Assistant's configured language.
+
+### Changed
+
+- Add appliances from the main setup flow to an existing group instead of showing a duplicate-group error.
+- Use consistent device terminology across the supported translations.
+
 ## v0.9.23 - 2026-11-02
 
 ### Added

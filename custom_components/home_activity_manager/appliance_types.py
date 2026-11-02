@@ -778,9 +778,24 @@ LEGACY_APPLIANCE_GROUPS = {
 
 
 def get_appliance_model(
-    appliance_type: str | None, appliance_class: str | None = None
+    appliance_type: str | None,
+    appliance_class: str | None = None,
+    language: str = "en",
 ) -> str | None:
-    """Return the English device model name for an appliance profile."""
+    """Return the localized display model name for an appliance profile."""
+    if appliance_type == "air_conditioner_power":
+        power_sensor_names = {
+            "ca": "Sensor de potència",
+            "es": "Sensor de potencia",
+        }
+        power_sensor_name = power_sensor_names.get(
+            language.split("-")[0], "Power sensor"
+        )
+        group_name = get_appliance_group_name("climate", language)
+        class_name = get_appliance_class_name(
+            appliance_class or "air_conditioner", language
+        )
+        return f"{group_name} · {class_name} · {power_sensor_name}"
     if appliance_class in APPLIANCE_CLASS_NAMES:
         return APPLIANCE_CLASS_NAMES[appliance_class]
     if appliance_type is None:

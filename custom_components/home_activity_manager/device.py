@@ -34,14 +34,19 @@ def remove_appliance_group_devices(hass: HomeAssistant) -> None:
             registry.async_remove_device(device.id)
 
 
-def appliance_device_info(entry: ConfigEntry, config: dict[str, Any]) -> DeviceInfo:
+def appliance_device_info(
+    entry: ConfigEntry,
+    config: dict[str, Any],
+    hass: HomeAssistant | None = None,
+) -> DeviceInfo:
     """Return device info for a standalone configured appliance."""
     appliance_type = config.get(CONF_APPLIANCE_TYPE)
     appliance_class = config.get(CONF_APPLIANCE_CLASS)
     appliance_id = config.get("_appliance_id", entry.entry_id)
+    language = hass.config.language if hass is not None else "en"
     return DeviceInfo(
         identifiers={(DOMAIN, appliance_id)},
         name=config.get("name", entry.title),
-        model=get_appliance_model(appliance_type, appliance_class),
+        model=get_appliance_model(appliance_type, appliance_class, language),
         via_device=None,
     )

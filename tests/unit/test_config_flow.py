@@ -115,7 +115,19 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         )
         self.assertEqual(
             get_appliance_model("air_conditioner_power"),
-            "Air conditioner (power sensor)",
+            "Climate control · Air conditioner · Power sensor",
+        )
+        self.assertEqual(
+            get_appliance_model("air_conditioner_power", "air_conditioner"),
+            "Climate control · Air conditioner · Power sensor",
+        )
+        self.assertEqual(
+            get_appliance_model("air_conditioner_power", "air_conditioner", "ca"),
+            "Climatització · Aire condicionat · Sensor de potència",
+        )
+        self.assertEqual(
+            get_appliance_model("air_conditioner_power", "air_conditioner", "es"),
+            "Climatización · Aire acondicionado · Sensor de potencia",
         )
         self.assertEqual(
             get_appliance_model("mailbox_slot"),
