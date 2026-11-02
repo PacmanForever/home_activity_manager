@@ -81,12 +81,22 @@ def remove_appliance_group_devices(hass: HomeAssistant) -> None:
         if get_devices is not None
         else registry.devices.values()
     )
+    update_device = getattr(registry, "async_update_device", None)
+    update_parameters = (
+        inspect.signature(update_device).parameters
+        if update_device is not None
+        else {}
+    )
     for device in tuple(devices):
         if any(
             domain == DOMAIN
             and identifier.startswith(("category:", "profile:"))
             for domain, identifier in device.identifiers
         ):
+            if "via_device_id" in update_parameters:
+                for child in tuple(devices):
+                    if child.via_device_id == device.id:
+                        update_device(child.id, via_device_id=None)
             registry.async_remove_device(device.id)
 
 
