@@ -14,7 +14,12 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .appliance_types import SensorInput
-from .const import CONF_DOOR_ENTITY, CONF_MAIL_SLOT_ENTITY, DOMAIN
+from .const import (
+    CONF_APPLIANCE_CLASS,
+    CONF_DOOR_ENTITY,
+    CONF_MAIL_SLOT_ENTITY,
+    DOMAIN,
+)
 from .device import appliance_device_info
 from .entity_proxy import _suggested_proxy_object_id
 from .runtime import ApplianceRuntime, entry_runtimes
@@ -24,10 +29,17 @@ _RUNNING_ICONS = {
     "washer": ("mdi:washing-machine", "mdi:washing-machine-off"),
     "dishwasher": ("mdi:dishwasher", "mdi:dishwasher-off"),
     "dryer": ("mdi:tumble-dryer", "mdi:tumble-dryer-off"),
+    "air_conditioner": ("mdi:hvac", "mdi:hvac-off"),
+    "thermostat": ("mdi:hvac", "mdi:hvac-off"),
+    "refrigerator": ("mdi:fridge", "mdi:fridge-off"),
+    "freezer": ("mdi:fridge", "mdi:fridge-off"),
+    "blind": ("mdi:blinds-open", "mdi:blinds"),
+    "awning": ("mdi:awning", "mdi:awning"),
+    "door": ("mdi:door-open", "mdi:door-closed"),
+    "window": ("mdi:window-open", "mdi:window-closed"),
     "thermostat_climate": ("mdi:hvac", "mdi:hvac-off"),
     "air_conditioner_contact": ("mdi:hvac", "mdi:hvac-off"),
     "air_conditioner_power": ("mdi:hvac", "mdi:hvac-off"),
-    "refrigerator": ("mdi:fridge", "mdi:fridge-off"),
     "refrigerator_switch": ("mdi:fridge", "mdi:fridge-off"),
     "sun_protection_contact": ("mdi:blinds-open", "mdi:blinds"),
     "sun_protection_cover": ("mdi:blinds-open", "mdi:blinds"),
@@ -39,6 +51,7 @@ _DOOR_ICONS = {
     "dishwasher": ("mdi:dishwasher-alert", "mdi:dishwasher", "mdi:dishwasher"),
     "dryer": ("mdi:tumble-dryer-alert", "mdi:tumble-dryer", "mdi:tumble-dryer"),
     "refrigerator": ("mdi:fridge-alert", "mdi:fridge", "mdi:fridge-alert-outline"),
+    "freezer": ("mdi:fridge-alert", "mdi:fridge", "mdi:fridge-alert-outline"),
     "refrigerator_switch": ("mdi:fridge-alert", "mdi:fridge", "mdi:fridge-alert-outline"),
     "mailbox_motion": ("mdi:mailbox-open", "mdi:mailbox", "mdi:mailbox-outline"),
     "mailbox_slot": ("mdi:mailbox-open", "mdi:mailbox", "mdi:mailbox-outline"),
@@ -126,13 +139,18 @@ class ApplianceBinarySensor(BinarySensorEntity):
     def icon(self) -> str:
         """Return an icon that identifies the entity and its current state."""
         appliance_type = self._runtime.config.get("appliance_type")
+        appliance_class = self._runtime.config.get(CONF_APPLIANCE_CLASS, appliance_type)
         if self._key == "running":
-            icons = _RUNNING_ICONS.get(appliance_type)
+            icons = _RUNNING_ICONS.get(appliance_class) or _RUNNING_ICONS.get(
+                appliance_type
+            )
             if icons is None:
                 return "mdi:power-cycle"
             return icons[1] if self.is_on is False else icons[0]
         if self._key == "door":
-            icons = _DOOR_ICONS.get(appliance_type)
+            icons = _DOOR_ICONS.get(appliance_class) or _DOOR_ICONS.get(
+                appliance_type
+            )
             if icons is not None:
                 if self.is_on is None:
                     return icons[2]

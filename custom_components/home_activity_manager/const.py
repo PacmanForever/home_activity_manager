@@ -3,6 +3,8 @@
 DOMAIN = "home_activity_manager"
 
 CONF_APPLIANCE_TYPE = "appliance_type"
+CONF_APPLIANCE_GROUP = "appliance_group"
+CONF_APPLIANCE_CLASS = "appliance_class"
 CONF_POWER_ENTITY = "power_entity"
 CONF_ENERGY_ENTITY = "energy_entity"
 CONF_CLIMATE_ENTITY = "climate_entity"

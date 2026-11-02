@@ -20,6 +20,7 @@ from pytest_homeassistant_custom_component.plugins import enable_custom_integrat
 from custom_components.home_activity_manager.const import (
     CONF_ALARM_REPEAT_COUNT,
     CONF_ALARM_REPEAT_INTERVAL_SECONDS,
+    CONF_APPLIANCE_CLASS,
     CONF_APPLIANCE_TYPE,
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
@@ -54,6 +55,7 @@ from custom_components.home_activity_manager.const import (
 )
 from custom_components.home_activity_manager import (
     _async_appliance_device_id,
+    _async_localize_category_defaults,
     _async_reload_entry,
     async_remove_entry,
     async_unload_entry,
@@ -874,6 +876,95 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("language", "localized_group_name", "localized_class_name"),
+    (
+        ("ca", "Rentat i assecat", "Washer"),
+        ("es", "Lavado y secado", "Washer"),
+        ("en", "Laundry and drying", "Washer"),
+    ),
+)
+async def test_setup_localizes_legacy_category_defaults_without_changing_custom_names(
+    hass, enable_custom_integrations, language, localized_group_name, localized_class_name
+):
+    hass.config.language = language
+    for appliance_id in ("washer_default", "washer_custom"):
+        hass.states.async_set(
+            f"sensor.{appliance_id}_power",
+            "0",
+            {ATTR_UNIT_OF_MEASUREMENT: "W"},
+        )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Washer",
+        data={
+            "category": "washer",
+            "appliances": [
+                {
+                    "id": "washer_default",
+                    "data": {
+                        "name": "Washer",
+                        CONF_APPLIANCE_TYPE: "washer",
+                        CONF_POWER_ENTITY: "sensor.washer_default_power",
+                    },
+                    "options": {},
+                },
+                {
+                    "id": "washer_custom",
+                    "data": {
+                        "name": "Laundry room",
+                        CONF_APPLIANCE_TYPE: "washer",
+                        CONF_POWER_ENTITY: "sensor.washer_custom_power",
+                    },
+                    "options": {},
+                },
+            ],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.title == localized_group_name
+    assert entry.data["appliances"][0]["data"]["name"] == localized_class_name
+    assert entry.data["appliances"][1]["data"]["name"] == "Laundry room"
+    registry = dr.async_get(hass)
+    default_device = registry.async_get_device(
+        identifiers={(DOMAIN, "washer_default")}
+    )
+    custom_device = registry.async_get_device(
+        identifiers={(DOMAIN, "washer_custom")}
+    )
+    assert default_device is not None
+    assert custom_device is not None
+    assert default_device.name == localized_class_name
+    assert custom_device.name == "Laundry room"
+
+
+def test_localize_legacy_category_defaults_preserves_custom_appliance_names(hass):
+    hass.config.language = "ca"
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Washer",
+        data={
+            "category": "washer",
+            "appliances": [
+                {"id": "washer_default", "data": {"name": "Washer"}},
+                {"id": "washer_custom", "data": {"name": "Laundry room"}},
+            ],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    _async_localize_category_defaults(hass, entry)
+
+    assert entry.title == "Rentadora"
+    assert entry.data["appliances"][0]["data"]["name"] == "Rentadora"
+    assert entry.data["appliances"][1]["data"]["name"] == "Laundry room"
+
+
+@pytest.mark.asyncio
 async def test_category_entry_groups_appliances_without_parent_device(
     hass, enable_custom_integrations
 ):
@@ -884,12 +975,13 @@ async def test_category_entry_groups_appliances_without_parent_device(
                 CONF_POWER_ENTITY: f"sensor.{appliance_id}_power",
                 "name": name,
                 CONF_APPLIANCE_TYPE: "washer",
+                CONF_APPLIANCE_CLASS: appliance_class,
             },
             "options": {},
         }
-        for appliance_id, name in (
-            ("washer_one", "Washer 1"),
-            ("washer_two", "Washer 2"),
+        for appliance_id, name, appliance_class in (
+            ("washer_one", "Washer 1", "washer"),
+            ("washer_two", "Dishwasher 2", "dishwasher"),
         )
     ]
     for record in appliance_records:
@@ -901,16 +993,16 @@ async def test_category_entry_groups_appliances_without_parent_device(
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Washer",
-        data={"category": "washer", "appliances": appliance_records},
+        data={"category": "laundry", "appliances": appliance_records},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
     device_registry = dr.async_get(hass)
-    assert entry.title == "Washer"
+    assert entry.title == "Laundry and drying"
     assert device_registry.async_get_device(
-        identifiers={(DOMAIN, "category:washer")}
+        identifiers={(DOMAIN, "category:laundry")}
     ) is None
     assert device_registry.async_get_device(
         identifiers={(DOMAIN, "category:thermostat")}
@@ -923,6 +1015,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     ]
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
+    assert [device.model for device in appliance_devices] == ["Washer", "Dishwasher"]
     assert len(entry.runtime_data) == 2
 
     options_result = await hass.config_entries.options.async_init(entry.entry_id)
@@ -945,11 +1038,19 @@ async def test_category_entry_groups_appliances_without_parent_device(
         identifiers={(DOMAIN, "category:washer")}
     ) is None
 
-    await hass.config_entries.async_remove(entry.entry_id)
-    assert (
-        device_registry.async_get_device(identifiers={(DOMAIN, "category:washer")})
-        is None
+    options_result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        options_result["flow_id"], {"appliance_action": "remove"}
     )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"appliance_id": "washer_one"}
+    )
+    assert result["type"] == "abort"
+    assert result["reason"] == "last_appliance_removed"
+    assert entry not in hass.config_entries.async_entries(DOMAIN)
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, "washer_one")}
+    ) is None
 
 
 @pytest.mark.asyncio
@@ -994,9 +1095,9 @@ async def test_thermostat_profiles_are_standalone_devices(
     await hass.async_block_till_done()
 
     device_registry = dr.async_get(hass)
-    assert entry.title == "Thermostat"
+    assert entry.title == "Climate control"
     assert device_registry.async_get_device(
-        identifiers={(DOMAIN, "category:thermostat")}
+        identifiers={(DOMAIN, "category:climate")}
     ) is None
     assert device_registry.async_get_device(
         identifiers={(DOMAIN, "category:washer")}

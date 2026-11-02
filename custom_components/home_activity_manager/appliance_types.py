@@ -1,6 +1,6 @@
 """Capabilities and detection sources for supported appliance types."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .const import (
     CONF_DOOR_ENTITY,
@@ -525,6 +525,130 @@ APPLIANCE_CATEGORIES = {
     "dishwasher": {"power": "dishwasher"},
 }
 
+APPLIANCE_GROUPS = {
+    "climate": {
+        "air_conditioner": {
+            "running_sensor": "air_conditioner_contact",
+            "power": "air_conditioner_power",
+        },
+        "thermostat": {"climate": "thermostat_climate"},
+    },
+    "laundry": {
+        "washer": {"power": "laundry"},
+        "dryer": {"power": "laundry"},
+        "dishwasher": {"power": "laundry"},
+    },
+    "openings": {"door": {"running_sensor": "opening"}, "window": {"running_sensor": "opening"}},
+    "sun_protection": {
+        "blind": {
+            "running_sensor": "sun_protection_contact",
+            "cover": "sun_protection_cover",
+        },
+        "awning": {
+            "running_sensor": "sun_protection_contact",
+            "cover": "sun_protection_cover",
+        },
+    },
+    "deliveries": {
+        "mailbox": {"mail_slot": "mailbox_slot", "mail_motion": "mailbox_motion"}
+    },
+    "refrigeration": {
+        "refrigerator": {
+            "smart_plug": "refrigerator_switch",
+            "power": "refrigerator",
+        },
+        "freezer": {"smart_plug": "refrigerator_switch", "power": "refrigerator"},
+    },
+}
+
+APPLIANCE_PROFILES["laundry"] = replace(
+    APPLIANCE_PROFILES["washer"],
+    sensor_inputs=tuple(
+        replace(item, form_key=item.form_key.replace("washer_", "laundry_"))
+        for item in APPLIANCE_PROFILES["washer"].sensor_inputs
+    ),
+)
+
+APPLIANCE_GROUP_NAMES = {
+    "climate": "Climate control",
+    "laundry": "Laundry and drying",
+    "openings": "Openings",
+    "sun_protection": "Sun protection",
+    "deliveries": "Deliveries",
+    "refrigeration": "Refrigeration",
+}
+
+APPLIANCE_GROUP_TRANSLATIONS = {
+    "ca": {
+        "climate": "Climatització",
+        "laundry": "Rentat i assecat",
+        "openings": "Obertures",
+        "sun_protection": "Protecció solar",
+        "deliveries": "Lliuraments",
+        "refrigeration": "Refrigeració",
+    },
+    "es": {
+        "climate": "Climatización",
+        "laundry": "Lavado y secado",
+        "openings": "Aberturas",
+        "sun_protection": "Protección solar",
+        "deliveries": "Entregas",
+        "refrigeration": "Refrigeración",
+    },
+}
+
+APPLIANCE_CLASS_NAMES = {
+    "air_conditioner": "Air conditioner",
+    "thermostat": "Thermostat",
+    "washer": "Washer",
+    "dryer": "Dryer",
+    "dishwasher": "Dishwasher",
+    "door": "Door",
+    "window": "Window",
+    "blind": "Blind",
+    "awning": "Awning",
+    "mailbox": "Mailbox",
+    "refrigerator": "Refrigerator",
+    "freezer": "Freezer",
+    "opening": "Opening",
+    "sun_protection": "Sun protection",
+}
+
+APPLIANCE_CLASS_TRANSLATIONS = {
+    "ca": {
+        "air_conditioner": "Aire condicionat",
+        "thermostat": "Termòstat",
+        "washer": "Rentadora",
+        "dryer": "Assecadora",
+        "dishwasher": "Rentaplats",
+        "door": "Porta",
+        "window": "Finestra",
+        "blind": "Persiana",
+        "awning": "Tendal",
+        "mailbox": "Bústia",
+        "refrigerator": "Nevera",
+        "freezer": "Congelador",
+        "opening": "Obertura",
+        "sun_protection": "Protecció solar",
+    },
+    "es": {
+        "air_conditioner": "Aire acondicionado",
+        "thermostat": "Termostato",
+        "washer": "Lavadora",
+        "dryer": "Secadora",
+        "dishwasher": "Lavavajillas",
+        "door": "Puerta",
+        "window": "Ventana",
+        "blind": "Persiana",
+        "awning": "Toldo",
+        "mailbox": "Buzón",
+        "refrigerator": "Frigorífico",
+        "freezer": "Congelador",
+        "opening": "Abertura",
+        "sun_protection": "Protección solar",
+    },
+}
+
 APPLIANCE_CATEGORY_NAMES = {
     "thermostat": "Thermostat",
     "dryer": "Dryer",
@@ -568,6 +692,22 @@ def get_appliance_category_name(category: str, language: str = "en") -> str:
     return translations.get(category, APPLIANCE_CATEGORY_NAMES[category])
 
 
+def get_appliance_group_name(group: str, language: str = "en") -> str:
+    """Return the broad appliance group name in the configured language."""
+    translations = APPLIANCE_GROUP_TRANSLATIONS.get(language.split("-")[0])
+    if translations is None:
+        return APPLIANCE_GROUP_NAMES[group]
+    return translations.get(group, APPLIANCE_GROUP_NAMES[group])
+
+
+def get_appliance_class_name(appliance_class: str, language: str = "en") -> str:
+    """Return a user-facing appliance class name in the configured language."""
+    translations = APPLIANCE_CLASS_TRANSLATIONS.get(language.split("-")[0])
+    if translations is None:
+        return APPLIANCE_CLASS_NAMES[appliance_class]
+    return translations.get(appliance_class, APPLIANCE_CLASS_NAMES[appliance_class])
+
+
 # Keep the selector alphabetized by its Catalan display labels.
 APPLIANCE_TYPES = (
     "air_conditioner_contact",
@@ -575,6 +715,7 @@ APPLIANCE_TYPES = (
     "dryer",
     "mailbox_slot",
     "mailbox_motion",
+    "laundry",
     "refrigerator_switch",
     "refrigerator",
     "opening",
@@ -587,6 +728,7 @@ APPLIANCE_TYPES = (
 
 
 APPLIANCE_MODEL_NAMES = {
+    "laundry": "Laundry appliance",
     "thermostat_climate": "Thermostat (climate entity)",
     "washer": "Washer",
     "dishwasher": "Dishwasher",
@@ -602,12 +744,75 @@ APPLIANCE_MODEL_NAMES = {
     "sun_protection_cover": "Sun protection (cover)",
 }
 
+LEGACY_APPLIANCE_CLASSES = {
+    "thermostat_climate": "thermostat",
+    "washer": "washer",
+    "dishwasher": "dishwasher",
+    "dryer": "dryer",
+    "air_conditioner_contact": "air_conditioner",
+    "air_conditioner_power": "air_conditioner",
+    "refrigerator": "refrigerator",
+    "refrigerator_switch": "refrigerator",
+    "mailbox_motion": "mailbox",
+    "mailbox_slot": "mailbox",
+    "opening": "opening",
+    "sun_protection_contact": "sun_protection",
+    "sun_protection_cover": "sun_protection",
+}
 
-def get_appliance_model(appliance_type: str | None) -> str | None:
+LEGACY_APPLIANCE_GROUPS = {
+    "thermostat_climate": "climate",
+    "air_conditioner_contact": "climate",
+    "air_conditioner_power": "climate",
+    "washer": "laundry",
+    "dishwasher": "laundry",
+    "dryer": "laundry",
+    "opening": "openings",
+    "sun_protection_contact": "sun_protection",
+    "sun_protection_cover": "sun_protection",
+    "mailbox_motion": "deliveries",
+    "mailbox_slot": "deliveries",
+    "refrigerator": "refrigeration",
+    "refrigerator_switch": "refrigeration",
+}
+
+
+def get_appliance_model(
+    appliance_type: str | None, appliance_class: str | None = None
+) -> str | None:
     """Return the English device model name for an appliance profile."""
+    if appliance_class in APPLIANCE_CLASS_NAMES:
+        return APPLIANCE_CLASS_NAMES[appliance_class]
     if appliance_type is None:
         return None
     return APPLIANCE_MODEL_NAMES.get(appliance_type)
+
+
+def get_legacy_appliance_class(appliance_type: str | None) -> str | None:
+    """Return the unambiguous appliance class for a legacy profile key."""
+    if appliance_type is None:
+        return None
+    return LEGACY_APPLIANCE_CLASSES.get(appliance_type)
+
+
+def get_appliance_group_for_profile(
+    appliance_type: str | None, appliance_class: str | None = None
+) -> str | None:
+    """Return the current group for a profile and optional class."""
+    if appliance_type is None:
+        return None
+    if appliance_class is not None:
+        for group, classes in APPLIANCE_GROUPS.items():
+            if appliance_type in classes.get(appliance_class, {}).values():
+                return group
+    return LEGACY_APPLIANCE_GROUPS.get(appliance_type)
+
+
+def get_canonical_appliance_type(appliance_type: str) -> str:
+    """Map a legacy profile key to its current shared profile key."""
+    if appliance_type in {"washer", "dryer", "dishwasher"}:
+        return "laundry"
+    return appliance_type
 
 
 def get_appliance_category(appliance_type: str | None) -> str | None:

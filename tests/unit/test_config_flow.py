@@ -27,16 +27,23 @@ from custom_components.home_activity_manager.config_flow import (
     _validate_thresholds,
 )
 from custom_components.home_activity_manager.appliance_types import (
+    APPLIANCE_CLASS_NAMES,
     APPLIANCE_CATEGORIES,
+    APPLIANCE_GROUPS,
     APPLIANCE_MODEL_NAMES,
     APPLIANCE_PROFILES,
     APPLIANCE_TYPES,
+    get_appliance_class_name,
+    get_appliance_group_for_profile,
     get_appliance_model,
+    get_legacy_appliance_class,
     get_appliance_profile,
 )
 from custom_components.home_activity_manager.const import (
     CONF_ALARM_REPEAT_COUNT,
     CONF_ALARM_REPEAT_INTERVAL_SECONDS,
+    CONF_APPLIANCE_CLASS,
+    CONF_APPLIANCE_GROUP,
     CONF_APPLIANCE_TYPE,
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
@@ -68,6 +75,26 @@ from custom_components.home_activity_manager.const import (
 
 
 class ConfigFlowSchemaTests(unittest.TestCase):
+    def test_groups_map_classes_to_compatible_profiles(self) -> None:
+        self.assertEqual(
+            set(APPLIANCE_GROUPS),
+            {"climate", "laundry", "openings", "sun_protection", "deliveries", "refrigeration"},
+        )
+        mapped_classes = {
+            appliance_class
+            for classes in APPLIANCE_GROUPS.values()
+            for appliance_class in classes
+        }
+        self.assertTrue(mapped_classes <= set(APPLIANCE_CLASS_NAMES))
+        self.assertEqual(set(APPLIANCE_CLASS_NAMES) - mapped_classes, {"opening", "sun_protection"})
+        for classes in APPLIANCE_GROUPS.values():
+            for modes in classes.values():
+                for mode, profile_name in modes.items():
+                    self.assertIn(profile_name, APPLIANCE_PROFILES)
+                    self.assertEqual(
+                        APPLIANCE_PROFILES[profile_name].detection_sources, (mode,)
+                    )
+
     def test_categories_map_each_profile_to_one_compatible_mode(self) -> None:
         mapped = [
             profile
@@ -75,7 +102,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             for profile in modes.values()
         ]
         self.assertEqual(len(mapped), len(set(mapped)))
-        self.assertEqual(set(mapped), set(APPLIANCE_PROFILES))
+        self.assertEqual(set(mapped), set(APPLIANCE_PROFILES) - {"laundry"})
         for modes in APPLIANCE_CATEGORIES.values():
             for mode, profile in modes.items():
                 self.assertEqual(APPLIANCE_PROFILES[profile].detection_sources, (mode,))
@@ -95,14 +122,28 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             "Mailbox (mail-slot contact/opening sensor)",
         )
 
-    def test_identity_schema_requires_name_and_type(self) -> None:
+    def test_appliance_class_names_follow_configured_language(self) -> None:
+        self.assertEqual(get_appliance_class_name("washer", "ca"), "Rentadora")
+        self.assertEqual(get_appliance_class_name("door", "es"), "Puerta")
+        self.assertEqual(get_appliance_class_name("washer"), "Washer")
+
+    def test_unknown_profile_metadata_returns_none(self) -> None:
+        self.assertIsNone(get_appliance_model("unknown_profile"))
+        self.assertIsNone(get_legacy_appliance_class("unknown_profile"))
+        self.assertIsNone(get_appliance_group_for_profile("unknown_profile"))
+        self.assertIsNone(get_appliance_model(None))
+        self.assertIsNone(get_legacy_appliance_class(None))
+        self.assertIsNone(get_appliance_group_for_profile(None))
+        self.assertEqual(get_appliance_group_for_profile("laundry", "washer"), "laundry")
+
+    def test_identity_schema_requires_name_and_group(self) -> None:
         schema = _identity_schema({})
         with self.assertRaises(vol.Invalid):
             schema({"name": "Washer"})
 
-        values = schema({"name": "Washer", CONF_APPLIANCE_TYPE: "washer"})
+        values = schema({"name": "Washer", CONF_APPLIANCE_GROUP: "laundry"})
 
-        self.assertEqual(values[CONF_APPLIANCE_TYPE], "washer")
+        self.assertEqual(values[CONF_APPLIANCE_GROUP], "laundry")
         self.assertNotIn(CONF_POWER_ENTITY, values)
 
     def test_sensor_selection_fields_prefill_during_edit(self) -> None:
@@ -868,7 +909,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
 
 
 @pytest.mark.asyncio
-async def test_config_flow_has_five_forward_steps_and_separates_options():
+async def test_config_flow_has_six_forward_steps_and_separates_options():
     flow = ApplianceCycleMonitorConfigFlow()
     shown_steps: list[dict[str, object]] = []
     flow.async_show_form = lambda **result: shown_steps.append(result) or result
@@ -878,20 +919,24 @@ async def test_config_flow_has_five_forward_steps_and_separates_options():
     assert first_result["step_id"] == "user"
     assert first_result["last_step"] is False
 
-    mode_result = await flow.async_step_user(
+    class_result = await flow.async_step_user(
         {
             "name": "Washer",
-            "appliance_type": "washer",
+            CONF_APPLIANCE_GROUP: "laundry",
         }
     )
-    assert mode_result["step_id"] == "activity_mode_washer"
+    assert class_result["step_id"] == "appliance_class"
+    mode_result = await flow.async_step_appliance_class(
+        {CONF_APPLIANCE_CLASS: "washer"}
+    )
+    assert mode_result["step_id"] == "activity_mode_laundry"
     sensors_result = await flow.async_step_activity_mode({"activity_mode": "power"})
-    assert sensors_result["step_id"] == "sensors_washer"
+    assert sensors_result["step_id"] == "sensors_laundry"
 
     parameters_result = await flow.async_step_sensors(
-        {"washer_power_entity": "sensor.washer_power"}
+        {"laundry_power_entity": "sensor.washer_power"}
     )
-    assert parameters_result["step_id"] == "parameters_washer"
+    assert parameters_result["step_id"] == "parameters_laundry"
     assert parameters_result["last_step"] is False
 
     actions_result = await flow.async_step_parameters(
@@ -902,7 +947,7 @@ async def test_config_flow_has_five_forward_steps_and_separates_options():
             "finish_duration_seconds": 60,
         }
     )
-    assert actions_result["step_id"] == "actions_washer"
+    assert actions_result["step_id"] == "actions_laundry"
 
     created = await flow.async_step_actions(
         {
@@ -911,18 +956,21 @@ async def test_config_flow_has_five_forward_steps_and_separates_options():
             "max_runtime_actions": [],
         }
     )
-    assert created["title"] == "Washer"
-    assert created["data"]["category"] == "washer"
+    assert created["title"] == "Laundry and drying"
+    assert created["data"]["category"] == "laundry"
     appliance = created["data"]["appliances"][0]
     assert appliance["data"]["power_entity"] == "sensor.washer_power"
+    assert appliance["data"][CONF_APPLIANCE_TYPE] == "laundry"
+    assert appliance["data"][CONF_APPLIANCE_CLASS] == "washer"
     assert "start_power_w" not in appliance["data"]
     assert appliance["options"]["start_power_w"] == 4
     assert [result["step_id"] for result in shown_steps] == [
         "user",
-        "activity_mode_washer",
-        "sensors_washer",
-        "parameters_washer",
-        "actions_washer",
+        "appliance_class",
+        "activity_mode_laundry",
+        "sensors_laundry",
+        "parameters_laundry",
+        "actions_laundry",
     ]
 
 
@@ -935,13 +983,14 @@ async def test_pending_settings_are_validated_on_parameters_step():
     await flow.async_step_user(
         {
             "name": "Washer",
-            "appliance_type": "washer",
+            CONF_APPLIANCE_GROUP: "laundry",
         }
     )
+    await flow.async_step_appliance_class({CONF_APPLIANCE_CLASS: "washer"})
     await flow.async_step_activity_mode({"activity_mode": "power"})
     await flow.async_step_sensors(
         {
-            "washer_power_entity": "sensor.washer_power",
+            "laundry_power_entity": "sensor.washer_power",
             "door_entity": "binary_sensor.washer_door",
         }
     )
@@ -956,7 +1005,7 @@ async def test_pending_settings_are_validated_on_parameters_step():
             CONF_PENDING_REPEATS: 2,
         }
     )
-    assert result["step_id"] == "parameters_washer"
+    assert result["step_id"] == "parameters_laundry"
     assert result["errors"] == {"base": "invalid_thresholds"}
 
     result = await flow.async_step_parameters(
@@ -971,7 +1020,7 @@ async def test_pending_settings_are_validated_on_parameters_step():
         }
     )
 
-    assert result["step_id"] == "parameters_washer"
+    assert result["step_id"] == "parameters_laundry"
     assert result["errors"] == {"base": "invalid_pending_settings"}
 
     result = await flow.async_step_parameters(
@@ -985,7 +1034,7 @@ async def test_pending_settings_are_validated_on_parameters_step():
             CONF_PENDING_REPEATS: 2,
         }
     )
-    assert result["step_id"] == "actions_washer"
+    assert result["step_id"] == "actions_laundry"
     assert CONF_PENDING_DELAY_SECONDS not in result["data_schema"].schema
 
     created = await flow.async_step_actions(
@@ -1148,6 +1197,7 @@ async def test_options_flow_clears_omitted_air_conditioner_sensors(monkeypatch):
         "power_entity": None,
         "plug_entity": None,
         "energy_entity": None,
+        CONF_APPLIANCE_CLASS: "thermostat",
     }
     assert "power_entity" not in result["data"]
     assert "plug_entity" not in result["data"]

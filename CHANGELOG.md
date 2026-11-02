@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## v0.9.23 - 2026-11-02
+
+### Added
+
+- Organize appliances into six groups with distinct appliance classes, localized labels, and class-aware device metadata.
+- Prevent creating more than one config entry for the same appliance group.
+
+### Changed
+
+- Share the laundry activity profile across washers, dryers, and dishwashers while retaining each appliance's class and editable name.
+- Migrate existing entries to the group and class taxonomy while preserving appliance and entity identifiers, registry customizations, and runtime state.
+- Remove a group entry automatically when its last appliance is deleted.
+
 ## v0.9.22 - 2026-11-02
 
 ### Changed

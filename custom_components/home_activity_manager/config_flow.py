@@ -15,12 +15,16 @@ from homeassistant.helpers.storage import Store
 
 from .appliance_types import (
     APPLIANCE_CATEGORIES,
-    APPLIANCE_TYPES,
+    APPLIANCE_GROUPS,
     ApplianceTypeProfile,
-    get_appliance_category_name,
+    get_appliance_group_for_profile,
+    get_appliance_group_name,
+    get_legacy_appliance_class,
     get_appliance_profile,
 )
 from .const import (
+    CONF_APPLIANCE_CLASS,
+    CONF_APPLIANCE_GROUP,
     CONF_APPLIANCE_TYPE,
     CONF_ALARM_REPEAT_COUNT,
     CONF_ALARM_REPEAT_INTERVAL_SECONDS,
@@ -76,6 +80,7 @@ CONF_NAME = "name"
 _ENTRY_DATA_KEYS = {
     CONF_NAME,
     CONF_APPLIANCE_TYPE,
+    CONF_APPLIANCE_CLASS,
     CONF_POWER_ENTITY,
     CONF_ENERGY_ENTITY,
     CONF_CLIMATE_ENTITY,
@@ -228,57 +233,75 @@ def _duration_marker(
 
 def _identity_schema(
     values: dict[str, Any],
-    appliance_types: tuple[str, ...] = APPLIANCE_TYPES,
-    translation_key: str = CONF_APPLIANCE_TYPE,
+    appliance_groups: tuple[str, ...] = tuple(APPLIANCE_GROUPS),
 ) -> vol.Schema:
     return vol.Schema(
         {
-        _required(CONF_NAME, values): selector.TextSelector(),
-        _required(CONF_APPLIANCE_TYPE, values): (
-            _LockedSelectSelector(
+            _required(CONF_NAME, values): selector.TextSelector(),
+            _required(CONF_APPLIANCE_GROUP, values): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=list(appliance_types),
+                    options=list(appliance_groups),
                     mode=selector.SelectSelectorMode.DROPDOWN,
-                    translation_key=translation_key,
+                    translation_key="appliance_group",
                 )
-            )
-            if len(appliance_types) == 1
-            else selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=list(appliance_types),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    translation_key=translation_key,
-                )
-            )
-        ),
+            ),
         }
     )
 
 
-def _activity_mode_schema(category: str) -> vol.Schema:
+def _appliance_class_schema(
+    group: str, values: dict[str, Any] | None = None
+) -> vol.Schema:
+    values = values or {}
+    return vol.Schema(
+        {
+            _required(CONF_APPLIANCE_CLASS, values): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(APPLIANCE_GROUPS[group]),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key="appliance_class",
+                )
+            )
+        }
+    )
+
+
+def _activity_mode_schema(group: str, appliance_class: str) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required("activity_mode"): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=list(APPLIANCE_CATEGORIES[category]),
+                    options=list(APPLIANCE_GROUPS[group][appliance_class]),
                     mode=selector.SelectSelectorMode.DROPDOWN,
-                    translation_key=f"activity_mode_{category}",
+                    translation_key=f"activity_mode_{group}",
                 )
             )
         }
     )
 
 
-def _options_identity_schema(values: dict[str, Any]) -> vol.Schema:
-    category, mode = _profile_identity(values[CONF_APPLIANCE_TYPE])
+def _options_identity_schema(values: dict[str, Any], group: str) -> vol.Schema:
+    appliance_class = values.get(CONF_APPLIANCE_CLASS) or get_legacy_appliance_class(
+        values[CONF_APPLIANCE_TYPE]
+    )
+    assert appliance_class is not None
+    _, mode = _profile_identity(values[CONF_APPLIANCE_TYPE], appliance_class)
     return vol.Schema(
         {
             _required(CONF_NAME, values): selector.TextSelector(),
-            vol.Required(CONF_APPLIANCE_TYPE, default=category): _LockedSelectSelector(
+            vol.Required(CONF_APPLIANCE_GROUP, default=group): _LockedSelectSelector(
                 selector.SelectSelectorConfig(
-                    options=[category],
+                    options=[group],
                     mode=selector.SelectSelectorMode.DROPDOWN,
-                    translation_key="appliance_category",
+                    translation_key="appliance_group",
+                    read_only=True,
+                )
+            ),
+            vol.Required(CONF_APPLIANCE_CLASS, default=appliance_class): _LockedSelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[appliance_class],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key="appliance_class",
                     read_only=True,
                 )
             ),
@@ -294,12 +317,24 @@ def _options_identity_schema(values: dict[str, Any]) -> vol.Schema:
     )
 
 
-def _profile_identity(profile_name: str) -> tuple[str, str]:
-    return next(
+def _profile_identity(
+    profile_name: str, appliance_class: str | None = None
+) -> tuple[str, str]:
+    if appliance_class is not None:
+        for group, classes in APPLIANCE_GROUPS.items():
+            modes = classes.get(appliance_class, {})
+            for mode, name in modes.items():
+                if name == profile_name:
+                    return group, mode
+    category, mode = next(
         (category, mode)
         for category, modes in APPLIANCE_CATEGORIES.items()
         for mode, name in modes.items()
         if name == profile_name
+    )
+    return (
+        get_appliance_group_for_profile(profile_name, appliance_class) or category,
+        mode,
     )
 
 
@@ -751,7 +786,7 @@ def _entry_options(values: dict[str, Any]) -> dict[str, Any]:
 class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle initial setup of an appliance category."""
 
-    VERSION = 8
+    VERSION = 9
 
     def __init__(self) -> None:
         self._draft: dict[str, Any] = {}
@@ -762,13 +797,36 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> dict[str, Any]:
         if user_input is not None:
             self._draft = dict(user_input)
-            self._category = self._draft[CONF_APPLIANCE_TYPE]
-            return await self.async_step_activity_mode()
+            self._category = self._draft.pop(CONF_APPLIANCE_GROUP)
+            if self.hass is not None:
+                if any(
+                    entry.data.get("category") == self._category
+                    for entry in self.hass.config_entries.async_entries(DOMAIN)
+                ):
+                    return self.async_abort(reason="group_already_configured")
+                await self.async_set_unique_id(self._category)
+                self._abort_if_unique_id_configured()
+            return await self.async_step_appliance_class()
         return self.async_show_form(
             step_id="user",
-            data_schema=_identity_schema(
-                {}, tuple(APPLIANCE_CATEGORIES), "appliance_category"
-            ),
+            data_schema=_identity_schema({}),
+            last_step=False,
+        )
+
+    async def async_step_appliance_class(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        assert self._category is not None
+        classes = APPLIANCE_GROUPS[self._category]
+        if len(classes) == 1:
+            self._draft[CONF_APPLIANCE_CLASS] = next(iter(classes))
+            return await self.async_step_activity_mode()
+        if user_input is not None:
+            self._draft.update(user_input)
+            return await self.async_step_activity_mode()
+        return self.async_show_form(
+            step_id="appliance_class",
+            data_schema=_appliance_class_schema(self._category, self._draft),
             last_step=False,
         )
 
@@ -776,14 +834,15 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         assert self._category is not None
+        appliance_class = self._draft[CONF_APPLIANCE_CLASS]
         if user_input is not None:
-            self._draft[CONF_APPLIANCE_TYPE] = APPLIANCE_CATEGORIES[self._category][
-                user_input["activity_mode"]
-            ]
+            self._draft[CONF_APPLIANCE_TYPE] = APPLIANCE_GROUPS[self._category][
+                appliance_class
+            ][user_input["activity_mode"]]
             return await self.async_step_sensors()
         return self.async_show_form(
             step_id=f"activity_mode_{self._category}",
-            data_schema=_activity_mode_schema(self._category),
+            data_schema=_activity_mode_schema(self._category, appliance_class),
             last_step=False,
         )
 
@@ -879,7 +938,7 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
             assert category is not None
             language = self.hass.config.language if self.hass is not None else "en"
             return self.async_create_entry(
-                title=get_appliance_category_name(category, language),
+                title=get_appliance_group_name(category, language),
                 data={
                     "category": category,
                     "appliances": [
@@ -906,9 +965,22 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_activity_mode_dishwasher = async_step_activity_mode
     async_step_activity_mode_opening = async_step_activity_mode
     async_step_activity_mode_sun_protection = async_step_activity_mode
+    async_step_activity_mode_climate = async_step_activity_mode
+    async_step_activity_mode_laundry = async_step_activity_mode
+    async_step_activity_mode_openings = async_step_activity_mode
+    async_step_activity_mode_deliveries = async_step_activity_mode
+    async_step_activity_mode_refrigeration = async_step_activity_mode
     async_step_sensors_thermostat_climate = async_step_sensors
     async_step_parameters_thermostat_climate = async_step_parameters
     async_step_actions_thermostat_climate = async_step_actions
+    async_step_activity_mode_climate = async_step_activity_mode
+    async_step_activity_mode_laundry = async_step_activity_mode
+    async_step_activity_mode_openings = async_step_activity_mode
+    async_step_activity_mode_deliveries = async_step_activity_mode
+    async_step_activity_mode_refrigeration = async_step_activity_mode
+    async_step_sensors_laundry = async_step_sensors
+    async_step_parameters_laundry = async_step_parameters
+    async_step_actions_laundry = async_step_actions
     async_step_sensors_air_conditioner_contact = async_step_sensors
     async_step_parameters_air_conditioner_contact = async_step_parameters
     async_step_actions_air_conditioner_contact = async_step_actions
@@ -945,6 +1017,9 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_sensors_sun_protection_cover = async_step_sensors
     async_step_parameters_sun_protection_cover = async_step_parameters
     async_step_actions_sun_protection_cover = async_step_actions
+    async_step_sensors_laundry = async_step_sensors
+    async_step_parameters_laundry = async_step_parameters
+    async_step_actions_laundry = async_step_actions
 
     @staticmethod
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
@@ -970,9 +1045,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                 self._appliance_action = user_input["appliance_action"]
                 if self._appliance_action == "add":
                     self._adding_appliance = True
-                    category = self.config_entry.data["category"]
-                    self._draft = {CONF_APPLIANCE_TYPE: category}
-                    return await self.async_step_activity_mode()
+                    return await self.async_step_appliance_class()
                 return await self.async_step_select_appliance()
 
             return self.async_show_form(
@@ -994,26 +1067,49 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         if not self._saved:
             self._saved = {**self.config_entry.data, **self.config_entry.options}
             self._saved.setdefault(CONF_NAME, self.config_entry.title)
+            self._saved.setdefault(
+                CONF_APPLIANCE_CLASS,
+                get_legacy_appliance_class(self._saved[CONF_APPLIANCE_TYPE]),
+            )
         if user_input is not None:
-            category, mode = _profile_identity(self._saved[CONF_APPLIANCE_TYPE])
+            category, mode = _profile_identity(
+                self._saved[CONF_APPLIANCE_TYPE], self._saved[CONF_APPLIANCE_CLASS]
+            )
             if (
-                user_input.get(CONF_APPLIANCE_TYPE, category) != category
+                user_input.get(CONF_APPLIANCE_GROUP, category) != category
+                or user_input.get(
+                    CONF_APPLIANCE_CLASS, self._saved[CONF_APPLIANCE_CLASS]
+                )
+                != self._saved[CONF_APPLIANCE_CLASS]
                 or user_input.get("activity_mode", mode) != mode
             ):
                 return self.async_show_form(
                     step_id="init",
-                    data_schema=_options_identity_schema(self._saved),
+                    data_schema=_options_identity_schema(
+                        self._saved,
+                        self.config_entry.data.get("category", category),
+                    ),
                     errors={"base": "appliance_type_immutable"},
                     last_step=False,
                 )
             self._draft = {
                 CONF_NAME: user_input[CONF_NAME],
                 CONF_APPLIANCE_TYPE: self._saved[CONF_APPLIANCE_TYPE],
+                CONF_APPLIANCE_CLASS: self._saved[CONF_APPLIANCE_CLASS],
             }
             return await self.async_step_sensors()
         return self.async_show_form(
             step_id="init",
-            data_schema=_options_identity_schema(self._saved),
+            data_schema=_options_identity_schema(
+                self._saved,
+                self.config_entry.data.get(
+                    "category",
+                    _profile_identity(
+                        self._saved[CONF_APPLIANCE_TYPE],
+                        self._saved.get(CONF_APPLIANCE_CLASS),
+                    )[0],
+                ),
+            ),
             last_step=False,
         )
 
@@ -1044,11 +1140,10 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             appliance_id = user_input["appliance_id"]
             if self._appliance_action == "remove":
                 if len(records) <= 1:
-                    return self.async_show_form(
-                        step_id="select_appliance",
-                        data_schema=self._category_appliance_schema(records),
-                        errors={"base": "cannot_remove_last_appliance"},
+                    await self.hass.config_entries.async_remove(
+                        self.config_entry.entry_id
                     )
+                    return self.async_abort(reason="last_appliance_removed")
                 registry = er.async_get(self.hass)
                 for entity in tuple(registry.entities.values()):
                     if (
@@ -1090,6 +1185,10 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             self._saved.setdefault(
                 CONF_NAME, record.get("data", {}).get(CONF_NAME, "")
             )
+            self._saved.setdefault(
+                CONF_APPLIANCE_CLASS,
+                get_legacy_appliance_class(self._saved[CONF_APPLIANCE_TYPE]),
+            )
             return await self.async_step_edit_appliance()
         return self.async_show_form(
             step_id="select_appliance",
@@ -1100,14 +1199,32 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         category = self.config_entry.data["category"]
+        appliance_class = self._draft[CONF_APPLIANCE_CLASS]
         if user_input is not None:
-            self._draft[CONF_APPLIANCE_TYPE] = APPLIANCE_CATEGORIES[category][
-                user_input["activity_mode"]
-            ]
+            self._draft[CONF_APPLIANCE_TYPE] = APPLIANCE_GROUPS[category][
+                appliance_class
+            ][user_input["activity_mode"]]
             return await self.async_step_sensors()
         return self.async_show_form(
             step_id=f"activity_mode_{category}",
-            data_schema=_activity_mode_schema(category),
+            data_schema=_activity_mode_schema(category, appliance_class),
+            last_step=False,
+        )
+
+    async def async_step_appliance_class(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        category = self.config_entry.data["category"]
+        classes = APPLIANCE_GROUPS[category]
+        if len(classes) == 1:
+            self._draft[CONF_APPLIANCE_CLASS] = next(iter(classes))
+            return await self.async_step_activity_mode()
+        if user_input is not None:
+            self._draft.update(user_input)
+            return await self.async_step_activity_mode()
+        return self.async_show_form(
+            step_id="appliance_class",
+            data_schema=_appliance_class_schema(category, self._draft),
             last_step=False,
         )
 
@@ -1115,25 +1232,37 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         if user_input is not None:
-            category, mode = _profile_identity(self._saved[CONF_APPLIANCE_TYPE])
+            category, mode = _profile_identity(
+                self._saved[CONF_APPLIANCE_TYPE],
+                self._saved[CONF_APPLIANCE_CLASS],
+            )
             if (
-                user_input.get(CONF_APPLIANCE_TYPE, category) != category
+                user_input.get(CONF_APPLIANCE_GROUP, category) != category
+                or user_input.get(
+                    CONF_APPLIANCE_CLASS, self._saved[CONF_APPLIANCE_CLASS]
+                )
+                != self._saved[CONF_APPLIANCE_CLASS]
                 or user_input.get("activity_mode", mode) != mode
             ):
                 return self.async_show_form(
                     step_id="edit_appliance",
-                    data_schema=_options_identity_schema(self._saved),
+                    data_schema=_options_identity_schema(
+                        self._saved, self.config_entry.data["category"]
+                    ),
                     errors={"base": "appliance_type_immutable"},
                     last_step=False,
                 )
             self._draft = {
                 CONF_NAME: user_input[CONF_NAME],
                 CONF_APPLIANCE_TYPE: self._saved[CONF_APPLIANCE_TYPE],
+                CONF_APPLIANCE_CLASS: self._saved[CONF_APPLIANCE_CLASS],
             }
             return await self.async_step_sensors()
         return self.async_show_form(
             step_id="edit_appliance",
-            data_schema=_options_identity_schema(self._saved),
+            data_schema=_options_identity_schema(
+                self._saved, self.config_entry.data["category"]
+            ),
             last_step=False,
         )
 
@@ -1300,6 +1429,14 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_sensors_refrigerator_switch = async_step_sensors
     async_step_parameters_refrigerator_switch = async_step_parameters
     async_step_actions_refrigerator_switch = async_step_actions
+    async_step_activity_mode_climate = async_step_activity_mode
+    async_step_activity_mode_laundry = async_step_activity_mode
+    async_step_activity_mode_openings = async_step_activity_mode
+    async_step_activity_mode_deliveries = async_step_activity_mode
+    async_step_activity_mode_refrigeration = async_step_activity_mode
+    async_step_sensors_laundry = async_step_sensors
+    async_step_parameters_laundry = async_step_parameters
+    async_step_actions_laundry = async_step_actions
     async_step_sensors_mailbox_motion = async_step_sensors
     async_step_parameters_mailbox_motion = async_step_parameters
     async_step_actions_mailbox_motion = async_step_actions

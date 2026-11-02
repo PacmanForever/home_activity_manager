@@ -68,15 +68,15 @@ The integration works on supported Home Assistant versions; displaying its local
 
 ## Configuration
 
-Each general category has one config entry. Add, edit, or remove appliances from that category's options; each appliance keeps its own name, profile, activity mode, sensors, actions, and runtime state. A profile and its activity mode are fixed after setup. Existing per-appliance entries are consolidated automatically during migration, preserving appliance IDs, entity IDs, registry customizations, and runtime state. Setup asks for:
+Appliances are organized into six groups: Climate control (air conditioner and thermostat), Laundry and drying (washer, dryer, and dishwasher), Openings (door and window), Sun protection (blind and awning), Deliveries (mailbox), and Refrigeration (refrigerator and freezer). Each group has one config entry. Add, edit, or remove appliances from that group's options. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Existing per-appliance entries are consolidated automatically during migration, preserving appliance IDs, entity IDs, registry customizations, and runtime state. Setup asks for:
 
-Each category entry groups its appliances on the integration page. Only configured appliances are registered as devices; the category itself is not added as an empty device. Air conditioners and climate-based thermostats share the Thermostat group.
+Each group entry groups its appliances on the integration page. Only configured appliances are registered as devices; the group itself is not added as an empty device.
 
-1. A device profile, name, and activity mode when that profile offers a choice.
+1. A group, appliance class, editable name, and activity mode when that profile offers a choice.
 2. The required activity source and any optional compatible sensors or controls. A refrigerator requires a door contact; a mailbox requires a separate main-door contact; opening can optionally include a lock.
 3. The profile's parameters and actions, when available. Empty parameter forms are skipped.
 
-Editing shows the fixed profile and mode alongside the name, followed by that profile's sensors, parameters, and actions. The activity source can be replaced with a compatible entity. A running cycle retains its start time after replacement unless the new source confirms it has stopped. An unavailable source does not cause a transition.
+Editing shows the fixed group, class, and mode alongside the name, followed by that profile's sensors, parameters, and actions. The activity source can be replaced with a compatible entity. A running cycle retains its start time after replacement unless the new source confirms it has stopped. An unavailable source does not cause a transition.
 
 Each device-type-and-mode profile uses its own sensor, parameter and action fields. Cycle-start and cycle-end actions use the same labels across profiles; optional fields are marked explicitly in the selected profile's form.
 

@@ -6,14 +6,26 @@
     }
   },
   "config": {
+    "abort": {
+      "group_already_configured": "Aquesta agrupació d’aparells ja està configurada. Afegeix-hi aparells des de la seva entrada existent."
+    },
     "step": {
       "user": {
-        "title": "Categoria i nom de l’electrodomèstic",
+        "title": "Agrupació i nom de l’electrodomèstic",
         "data": {
           "name": "Nom que es mostrarà per a aquest electrodomèstic",
-          "appliance_type": "Tipus d’electrodomèstic"
+          "appliance_group": "Agrupació d’aparells"
         }
       },
+      "appliance_class": {"title": "Classe d’aparell", "data": {"appliance_class": "Classe d’aparell"}},
+      "activity_mode_climate": {"title": "Modalitat de detecció de climatització", "data": {"activity_mode": "Com detecta l’activitat aquest aparell de climatització"}, "data_description": {"activity_mode": "Tria la font d’activitat de l’aparell."}},
+      "activity_mode_laundry": {"title": "Modalitat de detecció de rentat i assecat", "data": {"activity_mode": "Com detecta l’activitat aquest aparell"}, "data_description": {"activity_mode": "Tria la font d’activitat de la rentadora, l’assecadora o el rentaplats."}},
+      "activity_mode_openings": {"title": "Modalitat de detecció d’obertures", "data": {"activity_mode": "Com informa de l’estat aquesta obertura"}, "data_description": {"activity_mode": "Tria el sensor que informa dels estats obert i tancat."}},
+      "activity_mode_deliveries": {"title": "Modalitat de detecció de lliuraments", "data": {"activity_mode": "Com detecta l’arribada de correu aquesta bústia"}, "data_description": {"activity_mode": "Tria el sensor d’arribada de correu."}},
+      "activity_mode_refrigeration": {"title": "Modalitat de detecció de refrigeració", "data": {"activity_mode": "Com detecta l’activitat aquest aparell"}, "data_description": {"activity_mode": "Tria la font d’activitat de la nevera o el congelador."}},
+      "sensors_laundry": {"title": "Sensors de rentat i assecat", "data": {"laundry_power_entity": "Sensor de potència en watts (obligatori)", "laundry_door_entity": "Sensor de porta de l’aparell (opcional)", "laundry_plug_entity": "Endoll intel·ligent (opcional)", "laundry_energy_entity": "Sensor d’energia acumulada (opcional)"}},
+      "parameters_laundry": {"title": "Paràmetres del cicle de rentat i assecat", "data": {"start_power_w": "Llindar de potència d’inici (W)", "start_duration_seconds": "Temps de confirmació d’inici", "finish_power_w": "Llindar de potència de finalització (W)", "finish_duration_seconds": "Temps de confirmació de finalització", "max_runtime_seconds": "Temps màxim del cicle (opcional)", "pending_delay_seconds": "Retard abans del primer avís de buidatge", "pending_interval_seconds": "Interval entre avisos de buidatge", "pending_repeats": "Avisos de buidatge addicionals", "plug_off_repeat_interval_seconds": "Interval entre avisos de l’endoll", "plug_off_repeat_count": "Avisos addicionals de l’endoll"}},
+      "actions_laundry": {"title": "Accions de rentat i assecat", "data": {"start_actions": "Accions quan comença el cicle (opcional)", "finish_actions": "Accions quan acaba el cicle (opcional)", "max_runtime_actions": "Accions si se supera el temps màxim (opcional)", "pending_actions": "Accions mentre està pendent de buidar (opcional)", "emptied_actions": "Accions quan es buida l’aparell (opcional)", "plug_off_actions": "Accions mentre l’endoll està apagat (opcional)"}, "data_description": {"emptied_actions": "S’executen quan s’obren les portes o es prem el botó de buidatge."}},
       "activity_mode_thermostat": {"title": "Modalitat de detecció del termòstat", "data": {"activity_mode": "Com detecta l’activitat aquest termòstat"}, "data_description": {"activity_mode": "Tria la font d’activitat d’aquest termòstat."}},
       "activity_mode_dryer": {"title": "Modalitat de detecció de l’assecadora", "data": {"activity_mode": "Com detecta l’activitat aquesta assecadora"}, "data_description": {"activity_mode": "Tria la modalitat de detecció pròpia de l’assecadora."}},
       "activity_mode_mailbox": {"title": "Modalitat de detecció de la bústia", "data": {"activity_mode": "Com detecta l’arribada de correu aquesta bústia"}, "data_description": {"activity_mode": "Tria el sensor d’arribada propi d’aquesta bústia."}},
@@ -78,13 +90,23 @@
         "data": {
           "appliance_action": "Acció",
           "name": "Nom que es mostrarà per a aquest electrodomèstic",
-          "appliance_type": "Tipus d’electrodomèstic",
+          "appliance_group": "Agrupació d’aparells",
+          "appliance_class": "Classe d’aparell",
           "activity_mode": "Modalitat de detecció d'activitat"
         },
         "data_description": {"activity_mode": "Només aquest sensor determina l'activitat de l'aparell."}
       },
       "select_appliance": {"title": "Selecciona l’aparell", "data": {"appliance_id": "Aparell"}},
-      "edit_appliance": {"title": "Edita l’aparell", "data": {"name": "Nom que es mostrarà per a aquest electrodomèstic", "appliance_type": "Categoria de l’aparell", "activity_mode": "Modalitat de detecció d'activitat"}},
+      "edit_appliance": {"title": "Edita l’aparell", "data": {"name": "Nom que es mostrarà per a aquest electrodomèstic", "appliance_group": "Agrupació d’aparells", "appliance_class": "Classe d’aparell", "activity_mode": "Modalitat de detecció d'activitat"}},
+      "appliance_class": {"title": "Classe d’aparell", "data": {"appliance_class": "Classe d’aparell"}},
+      "activity_mode_climate": {"title": "Modalitat de detecció de climatització", "data": {"activity_mode": "Com detecta l’activitat aquest aparell de climatització"}},
+      "activity_mode_laundry": {"title": "Modalitat de detecció de rentat i assecat", "data": {"activity_mode": "Com detecta l’activitat aquest aparell"}},
+      "activity_mode_openings": {"title": "Modalitat de detecció d’obertures", "data": {"activity_mode": "Com informa de l’estat aquesta obertura"}},
+      "activity_mode_deliveries": {"title": "Modalitat de detecció de lliuraments", "data": {"activity_mode": "Com detecta el correu aquesta bústia"}},
+      "activity_mode_refrigeration": {"title": "Modalitat de detecció de refrigeració", "data": {"activity_mode": "Com detecta l’activitat aquest aparell"}},
+      "sensors_laundry": {"title": "Sensors de rentat i assecat", "data": {"laundry_power_entity": "Sensor de potència en watts (obligatori)", "laundry_door_entity": "Sensor de porta de l’aparell (opcional)", "laundry_plug_entity": "Endoll intel·ligent (opcional)", "laundry_energy_entity": "Sensor d’energia acumulada (opcional)"}},
+      "parameters_laundry": {"title": "Paràmetres del cicle de rentat i assecat", "data": {"start_power_w": "Llindar de potència d’inici (W)", "start_duration_seconds": "Temps de confirmació d’inici", "finish_power_w": "Llindar de potència de finalització (W)", "finish_duration_seconds": "Temps de confirmació de finalització", "max_runtime_seconds": "Temps màxim del cicle (opcional)", "pending_delay_seconds": "Retard abans del primer avís de buidatge", "pending_interval_seconds": "Interval entre avisos de buidatge", "pending_repeats": "Avisos de buidatge addicionals", "plug_off_repeat_interval_seconds": "Interval entre avisos de l’endoll", "plug_off_repeat_count": "Avisos addicionals de l’endoll"}},
+      "actions_laundry": {"title": "Accions de rentat i assecat", "data": {"start_actions": "Accions quan comença el cicle (opcional)", "finish_actions": "Accions quan acaba el cicle (opcional)", "max_runtime_actions": "Accions si se supera el temps màxim (opcional)", "pending_actions": "Accions mentre està pendent de buidar (opcional)", "emptied_actions": "Accions quan es buida l’aparell (opcional)", "plug_off_actions": "Accions mentre l’endoll està apagat (opcional)"}, "data_description": {"emptied_actions": "S’executen quan s’obren les portes o es prem el botó de buidatge."}},
       "activity_mode_thermostat": {"title": "Modalitat de detecció del termòstat", "data": {"activity_mode": "Com detecta l’activitat aquest termòstat"}},
       "activity_mode_dryer": {"title": "Modalitat de detecció de l’assecadora", "data": {"activity_mode": "Com detecta l’activitat aquesta assecadora"}},
       "activity_mode_mailbox": {"title": "Modalitat de detecció de la bústia", "data": {"activity_mode": "Com detecta l’arribada de correu aquesta bústia"}},
@@ -139,13 +161,14 @@
       "invalid_alarm_settings": "Els retards i l’interval han de ser enters positius. Les repeticions addicionals han de ser un enter no negatiu.",
       "invalid_plug_off_alarm_settings": "L’interval de repetició amb l’endoll apagat ha de ser un enter positiu i les alarmes addicionals, un enter no negatiu.",
       "appliance_type_immutable": "No es poden canviar el tipus d’aparell ni la modalitat d'activitat després de configurar-lo. Afegeix un aparell nou per canviar-los.",
-      "cannot_remove_last_appliance": "Elimina l’entrada de la categoria per suprimir-ne l’últim aparell.",
       "mailbox_sensors_must_be_distinct": "El sensor d’arribada de correu i el sensor de la porta principal han de ser entitats diferents.",
       "climate_entity_requires_no_device": "Tria una entitat climate existent o la que ja estigui assignada a aquest aparell."
     }
   },
   "selector": {
     "appliance_action": {"options": {"add": "Afegeix un aparell", "edit": "Edita un aparell", "remove": "Elimina un aparell"}},
+    "appliance_group": {"options": {"climate": "Climatització", "laundry": "Rentat i assecat", "openings": "Obertures", "sun_protection": "Protecció solar", "deliveries": "Lliuraments", "refrigeration": "Refrigeració"}},
+    "appliance_class": {"options": {"air_conditioner": "Aire condicionat", "thermostat": "Termòstat", "washer": "Rentadora", "dryer": "Assecadora", "dishwasher": "Rentaplats", "door": "Porta", "window": "Finestra", "blind": "Persiana", "awning": "Tendal", "mailbox": "Bústia", "refrigerator": "Nevera", "freezer": "Congelador", "opening": "Obertura", "sun_protection": "Protecció solar"}},
     "appliance_category": {
       "options": {"thermostat": "Termòstat", "dryer": "Assecadora", "mailbox": "Bústia", "refrigerator": "Nevera", "washer": "Rentadora", "dishwasher": "Rentaplats", "opening": "Obertura", "sun_protection": "Protecció solar"}
     },
@@ -153,6 +176,11 @@
       "options": {"running_sensor": "1. Sensor binari (on = aire funcionant)", "climate": "2. Entitat clima (segueix l'activitat HVAC)", "power": "4. Sensor de potència (segueix els llindars d’inici i d’aturada)", "smart_plug": "Interruptor intel·ligent (encès = aparell actiu)", "mail_slot": "Sensor de contacte/obertura de portella (obrir = arriba correu)", "mail_motion": "Moviment interior (moviment = arriba correu)"}
     },
     "activity_mode_thermostat": {"options": {"running_sensor": "Sensor de contacte/obertura (on = aire condicionat actiu)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)", "climate": "Entitat climate (segueix el mode de climatització)"}},
+    "activity_mode_climate": {"options": {"running_sensor": "Sensor de contacte (on = en funcionament)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)", "climate": "Entitat climate (segueix l’activitat HVAC)"}},
+    "activity_mode_laundry": {"options": {"power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
+    "activity_mode_openings": {"options": {"running_sensor": "Sensor de contacte (informa de l’estat obert/tancat)"}},
+    "activity_mode_deliveries": {"options": {"mail_slot": "Sensor de contacte de la portella", "mail_motion": "Sensor de moviment interior"}},
+    "activity_mode_refrigeration": {"options": {"smart_plug": "Interruptor intel·ligent (encès = aparell actiu)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
     "activity_mode_dryer": {"options": {"power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
     "activity_mode_mailbox": {"options": {"mail_slot": "Sensor de contacte/obertura de la portella (detecta el correu)", "mail_motion": "Sensor de moviment interior (detecta el correu)"}},
     "activity_mode_refrigerator": {"options": {"smart_plug": "Interruptor intel·ligent (encès = nevera activa)", "power": "Sensor de potència (segueix els llindars d’inici i d’aturada)"}},
@@ -162,6 +190,7 @@
     "activity_mode_sun_protection": {"options": {"running_sensor": "Sensor de contacte (informa obert/tancat, no del moviment del motor)", "cover": "Entitat cover (qualsevol estat excepte tancat = activa)"}},
     "appliance_type": {
       "options": {
+        "laundry": "Electrodomèstic de rentat i assecat",
         "washer": "Rentadora",
         "dishwasher": "Rentaplats",
         "dryer": "Assecadora",
