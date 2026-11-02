@@ -169,7 +169,7 @@
   },
   "selector": {
     "appliance_action": {"options": {"edit": "Edita un dispositiu", "remove": "Elimina un dispositiu"}},
-    "appliance_group": {"options": {"climate": "Climatització", "laundry": "Rentat i assecat", "openings": "Obertures", "sun_protection": "Protecció solar", "deliveries": "Lliuraments", "refrigeration": "Refrigeració"}},
+    "appliance_group": {"options": {"climate": "Climatització", "laundry": "Rentat i assecat", "openings": "Tancaments", "sun_protection": "Protecció solar", "deliveries": "Lliuraments", "refrigeration": "Refrigeració"}},
     "appliance_class": {"options": {"air_conditioner": "Aire condicionat", "thermostat": "Termòstat", "washer": "Rentadora", "dryer": "Assecadora", "dishwasher": "Rentaplats", "door": "Porta", "window": "Finestra", "blind": "Persiana", "awning": "Tendal", "mailbox": "Bústia", "refrigerator": "Nevera", "freezer": "Congelador", "opening": "Obertura", "sun_protection": "Protecció solar"}},
     "appliance_category": {
       "options": {"thermostat": "Termòstat", "dryer": "Assecadora", "mailbox": "Bústia", "refrigerator": "Nevera", "washer": "Rentadora", "dishwasher": "Rentaplats", "opening": "Obertura", "sun_protection": "Protecció solar"}

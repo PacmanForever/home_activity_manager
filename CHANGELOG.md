@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.9.27 - 2026-11-02
+
+### Changed
+
+- Use the Catalan group name "Tancaments" consistently in selectors and device models.
+
 ## v0.9.26 - 2026-11-02
 
 ### Changed

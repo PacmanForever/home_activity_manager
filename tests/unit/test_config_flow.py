@@ -123,7 +123,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         )
         self.assertEqual(
             get_appliance_model("opening", "opening", "ca"),
-            "Obertures · Desconegut · Sensor de contacte/obertura",
+            "Tancaments · Desconegut · Sensor de contacte/obertura",
         )
         self.assertEqual(
             get_appliance_model("opening", "opening", "en"),
