@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.37 - 2026-11-03
+
+### Changed
+
+- Use a shared state label for Access and solar-protection covers, and distinguish pending mailbox occupancy from the mail-slot state.
+- Clarify that opening duration measures time open, not motor runtime.
+
 ## v0.9.36 - 2026-11-03
 
 ### Added

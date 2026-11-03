@@ -109,7 +109,7 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 
 ### Deliveries
 
-Mailbox profiles detect arrivals with either an interior motion sensor or a mail-slot contact. Mail-slot mode also exposes the contact's open/closed state as **Mail slot**. Both modes use a separate main-door contact and track the cycle until collection. Start actions run on arrival; finish actions run when the main door opens or pending collection is cleared. Reminders are separate.
+Mailbox profiles detect arrivals with either an interior motion sensor or a mail-slot contact. Mail-slot mode also exposes the contact's open/closed state as **Mail slot**. Pending mail is shown as **Occupied** until collection; this is separate from the flap and main-door positions. Both modes use a separate main-door contact and track the cycle until collection. Start actions run on arrival; finish actions run when the main door opens or pending collection is cleared. Reminders are separate.
 
 ### Laundry and drying
 
@@ -117,7 +117,7 @@ Washer, dryer, and dishwasher profiles detect cycles from power thresholds and c
 
 ### Openings
 
-Windows use a required contact sensor, and conventional doors use contact detection with an optional associated shutter. **Access** is for openings whose primary role is to let people or vehicles enter or leave a space, such as a garage, shop, or warehouse. This is a functional distinction, not a statement about size or motorization. Access can use a required contact sensor or a cover entity as its primary detector; it does not have a second associated cover. A lock is optional in either mode and reports its own state; it does not determine whether the access is open or closed. For a primary cover, `open` starts activity and `closed` ends it; actions run only after the entity settles at one of those states, not while it is `opening` or `closing`. A configured cover or lock with no device is reused directly on the managed device; one already assigned to a device keeps that association and is represented by a native proxy. An associated shutter on a contact-mode door also exposes its open/closed state.
+Windows use a required contact sensor, and conventional doors use contact detection with an optional associated shutter. **Access** is for openings whose primary role is to let people or vehicles enter or leave a space, such as a garage, shop, or warehouse. This is a functional distinction, not a statement about size or motorization. Access can use a required contact sensor or a cover entity as its primary detector; it does not have a second associated cover. Its **State** binary sensor means open/closed, not motor movement. A lock is optional in either mode and reports its own state; it does not determine whether the access is open or closed. For a primary cover, `open` starts the duration interval and `closed` ends it; actions run only after the entity settles at one of those states, not while it is `opening` or `closing`. The duration is time open, not time the motor runs. A configured cover or lock with no device is reused directly on the managed device; one already assigned to a device keeps that association and is represented by a native proxy. An associated shutter on a contact-mode door also exposes its open/closed state.
 
 ### Refrigeration
 

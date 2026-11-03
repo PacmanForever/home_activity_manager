@@ -18,6 +18,7 @@ from .const import (
     CONF_APPLIANCE_CLASS,
     CONF_DOOR_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
+    CONF_RUNNING_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
     CONF_SHUTTER_COVER_ENTITY,
     DOMAIN,
@@ -79,6 +80,18 @@ class ApplianceBinarySensor(BinarySensorEntity):
         self._value_fn = value_fn
         self._attr_unique_id = f"{getattr(runtime, 'appliance_id', entry.entry_id)}_{key}"
         self._attr_translation_key = key
+        appliance_type = runtime.config.get("appliance_type")
+        appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)
+        detection_sources = getattr(
+            getattr(runtime, "profile", None), "detection_sources", ()
+        )
+        if key == "running" and "cover" in detection_sources:
+            self._attr_translation_key = "state"
+        elif key == "pending_unload" and (
+            appliance_class == "mailbox"
+            or appliance_type in {"mailbox_motion", "mailbox_slot"}
+        ):
+            self._attr_translation_key = "occupied"
         self._attr_device_class = device_class
         self._attr_device_info = appliance_device_info(
             entry, runtime.config, getattr(runtime, "hass", None)
@@ -217,7 +230,12 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_input_{input_name}"
         )
-        self._attr_translation_key = f"input_{input_name}"
+        self._attr_translation_key = (
+            "state"
+            if input_config.config_key == CONF_RUNNING_ENTITY
+            and runtime.config.get(CONF_APPLIANCE_CLASS) == "access"
+            else f"input_{input_name}"
+        )
         self._attr_device_info = appliance_device_info(
             entry, runtime.config, getattr(runtime, "hass", None)
         )
@@ -289,13 +307,18 @@ async def async_setup_entry(
         entity_prefixes.add(f"{appliance_id}_")
         runtime_entities = []
         if "running" in runtime.profile.output_entities:
+            running_device_class = (
+                BinarySensorDeviceClass.OPENING
+                if "cover" in runtime.profile.detection_sources
+                else BinarySensorDeviceClass.RUNNING
+            )
             runtime_entities.append(
                 ApplianceBinarySensor(
                     runtime,
                     entry,
                     "running",
                     lambda runtime=runtime: runtime.detector.is_running,
-                    BinarySensorDeviceClass.RUNNING,
+                    running_device_class,
                 )
             )
         if (
@@ -315,12 +338,18 @@ async def async_setup_entry(
             "pending_unload" in runtime.profile.output_entities
             and runtime.config.get(CONF_DOOR_ENTITY)
         ):
+            appliance_type = runtime.config.get("appliance_type")
+            appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)
             runtime_entities.append(
                 ApplianceBinarySensor(
                     runtime,
                     entry,
                     "pending_unload",
                     lambda runtime=runtime: runtime.pending_unload,
+                    BinarySensorDeviceClass.OCCUPANCY
+                    if appliance_class == "mailbox"
+                    or appliance_type in {"mailbox_motion", "mailbox_slot"}
+                    else None,
                 )
             )
         if (

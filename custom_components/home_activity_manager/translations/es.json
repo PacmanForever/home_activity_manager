@@ -251,6 +251,8 @@
     },
     "binary_sensor": {
       "running": {"name": "En funcionamiento"},
+      "state": {"name": "Estado"},
+      "occupied": {"name": "Ocupada"},
       "input_running": {"name": "Estado del contacto abierto/cerrado"},
       "input_mail_motion": {"name": "Sensor de movimiento"},
       "input_door": {"name": "Sensor de contacto/apertura de la puerta principal"},

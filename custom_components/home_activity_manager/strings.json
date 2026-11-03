@@ -251,6 +251,8 @@
     },
     "binary_sensor": {
       "running": {"name": "Running"},
+      "state": {"name": "State"},
+      "occupied": {"name": "Occupied"},
       "input_running": {"name": "Open/closed contact state"},
       "input_mail_motion": {"name": "Motion sensor"},
       "input_door": {"name": "Main-door contact/opening sensor"},

@@ -1101,6 +1101,18 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertEqual(key_shape(translations[1]), expected)
         self.assertEqual(key_shape(translations[2]), expected)
         self.assertEqual(key_shape(translations[3]), expected)
+        expected_status_names = (
+            ("State", "Occupied"),
+            ("State", "Occupied"),
+            ("Estado", "Ocupada"),
+            ("Estat", "Ocupada"),
+        )
+        for translation, expected_names in zip(translations, expected_status_names):
+            binary_sensor_names = translation["entity"]["binary_sensor"]
+            for key, expected_name in zip(
+                ("state", "occupied"), expected_names
+            ):
+                self.assertEqual(binary_sensor_names[key]["name"], expected_name)
         expected_input_names = (
             ("Motion sensor", "Main-door contact/opening sensor", "Mail-slot contact/opening sensor"),
             ("Motion sensor", "Main-door contact/opening sensor", "Mail-slot contact/opening sensor"),

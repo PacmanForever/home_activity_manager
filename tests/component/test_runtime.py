@@ -6,6 +6,7 @@ import inspect
 from types import SimpleNamespace
 
 import pytest
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.climate import ClimateEntityFeature, HVACMode
 from homeassistant.components.cover import CoverEntityFeature
 from homeassistant.components.lock import LockEntityFeature
@@ -1172,7 +1173,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.36" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.37" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Laundry and drying · Washer · Power sensor",
         "Laundry and drying · Dishwasher · Power sensor",
@@ -1834,6 +1835,80 @@ async def test_opening_contact_tracks_position_without_running_output(
 
 
 @pytest.mark.asyncio
+async def test_access_contact_wrapper_is_labeled_as_open_closed_state(
+    hass, enable_custom_integrations
+):
+    config = {
+        CONF_APPLIANCE_TYPE: "access_contact",
+        CONF_APPLIANCE_CLASS: "access",
+        CONF_RUNNING_ENTITY: "binary_sensor.garage_contact",
+        "name": "Garage access",
+    }
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    registry = er.async_get(hass)
+    state_entity_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_input_running"
+    )
+    assert state_entity_id is not None
+    assert registry.async_get(state_entity_id).translation_key == "state"
+    assert hass.states.get(state_entity_id).attributes["device_class"] == "opening"
+    assert hass.states.get(state_entity_id).state == "off"
+
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
+    await hass.async_block_till_done()
+    assert hass.states.get(state_entity_id).state == "on"
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_access_cover_state_tracks_open_interval_not_motor_motion(
+    hass, monkeypatch, enable_custom_integrations
+):
+    current_time = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: current_time[0])
+    config = {
+        CONF_APPLIANCE_TYPE: "opening_cover",
+        CONF_APPLIANCE_CLASS: "access",
+        CONF_COVER_ENTITY: "cover.garage_access",
+        "name": "Garage access",
+    }
+    hass.states.async_set(config[CONF_COVER_ENTITY], "closed")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    registry = er.async_get(hass)
+    state_entity_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_running"
+    )
+    assert state_entity_id is not None
+    assert registry.async_get(state_entity_id).translation_key == "state"
+    assert hass.states.get(state_entity_id).attributes["device_class"] == "opening"
+    assert hass.states.get(state_entity_id).state == "off"
+
+    hass.states.async_set(config[CONF_COVER_ENTITY], "opening")
+    await hass.async_block_till_done()
+    assert hass.states.get(state_entity_id).state == "off"
+    hass.states.async_set(config[CONF_COVER_ENTITY], "open")
+    await hass.async_block_till_done()
+    assert hass.states.get(state_entity_id).state == "on"
+    current_time[0] += timedelta(seconds=42)
+    hass.states.async_set(config[CONF_COVER_ENTITY], "closing")
+    await hass.async_block_till_done()
+    assert hass.states.get(state_entity_id).state == "on"
+    hass.states.async_set(config[CONF_COVER_ENTITY], "closed")
+    await hass.async_block_till_done()
+
+    assert hass.states.get(state_entity_id).state == "off"
+    assert entry.runtime_data.detector.last_cycle_duration == timedelta(seconds=42)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
 async def test_opening_lock_and_shutter_actions_follow_stable_transitions(
     hass, monkeypatch
 ):
@@ -2284,8 +2359,15 @@ async def test_mailbox_slot_exposes_flap_open_and_closed_state(
     mail_slot_entity_id = registry.async_get_entity_id(
         "binary_sensor", DOMAIN, f"{entry.entry_id}_mail_slot"
     )
+    occupied_entity_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_pending_unload"
+    )
 
     assert mail_slot_entity_id is not None
+    assert occupied_entity_id is not None
+    assert registry.async_get(occupied_entity_id).translation_key == "occupied"
+    assert hass.states.get(occupied_entity_id).attributes["device_class"] == "occupancy"
+    assert hass.states.get(occupied_entity_id).state == "off"
     assert hass.states.get(mail_slot_entity_id).state == "off"
     assert hass.states.get(mail_slot_entity_id).attributes["device_class"] == "door"
     assert hass.states.get(mail_slot_entity_id).attributes["icon"] == "mdi:mailbox-up"
@@ -2299,11 +2381,13 @@ async def test_mailbox_slot_exposes_flap_open_and_closed_state(
     await hass.async_block_till_done()
     assert hass.states.get(mail_slot_entity_id).state == "on"
     assert hass.states.get(mail_slot_entity_id).attributes["icon"] == "mdi:mailbox-open-up"
+    assert hass.states.get(occupied_entity_id).state == "on"
     assert entry.runtime_data.door_open is False
 
     hass.states.async_set(config[CONF_MAIL_SLOT_ENTITY], "off")
     await hass.async_block_till_done()
     assert hass.states.get(mail_slot_entity_id).state == "off"
+    assert hass.states.get(occupied_entity_id).state == "on"
     hass.states.async_set(config[CONF_MAIL_SLOT_ENTITY], "unavailable")
     await hass.async_block_till_done()
     assert hass.states.get(mail_slot_entity_id).attributes["icon"] == "mdi:mailbox-outline"
@@ -2312,6 +2396,7 @@ async def test_mailbox_slot_exposes_flap_open_and_closed_state(
     hass.states.async_set(config[CONF_DOOR_ENTITY], "on")
     await hass.async_block_till_done()
     assert hass.states.get(door_entity_id).attributes["icon"] == "mdi:mailbox-open"
+    assert hass.states.get(occupied_entity_id).state == "off"
     hass.states.async_set(config[CONF_DOOR_ENTITY], "off")
     await hass.async_block_till_done()
     assert entry.runtime_data.door_open is False
@@ -2368,10 +2453,16 @@ def test_sun_protection_cover_running_sensor_availability(hass, cover_state):
         profile=APPLIANCE_PROFILES["sun_protection_cover"],
     )
     sensor = ApplianceBinarySensor(
-        runtime, MockConfigEntry(domain=DOMAIN), "running", lambda: False
+        runtime,
+        MockConfigEntry(domain=DOMAIN),
+        "running",
+        lambda: False,
+        BinarySensorDeviceClass.OPENING,
     )
     sensor.hass = hass
 
+    assert sensor._attr_translation_key == "state"
+    assert sensor._attr_device_class == BinarySensorDeviceClass.OPENING
     assert sensor.available
 
 
