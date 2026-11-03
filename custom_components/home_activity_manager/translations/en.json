@@ -9,8 +9,7 @@
     "abort": {
       "group_already_configured": "This device group is already configured.",
       "appliance_added": "Device added to the existing group.",
-      "group_no_longer_configured": "The device group was removed before the device could be added.",
-      "last_appliance_removed": "The last device was removed, so the device group was deleted."
+      "group_no_longer_configured": "The device group was removed before the device could be added."
     },
     "step": {
       "user": {
@@ -39,7 +38,7 @@
       "activity_mode_opening": {"title": "Opening detection mode", "data": {"activity_mode": "How this opening reports its state"}, "data_description": {"activity_mode": "Choose the contact sensor that reports open and closed states."}},
       "activity_mode_access": {"title": "Access detection mode", "data": {"activity_mode": "How this access reports its state"}, "data_description": {"activity_mode": "Choose the primary contact sensor or cover entity."}},
       "activity_mode_sun_protection": {"title": "Sun-protection detection mode", "data": {"activity_mode": "How this sun protection reports its state"}, "data_description": {"activity_mode": "Contact sensors report open/closed position, not whether the motor is moving. Cover entities provide their current cover state."}},
-      "sensors_opening": {"title": "Opening sensors", "data": {"opening_sensor": "Opening contact sensor (required)", "opening_lock_entity": "Lock (optional)", "opening_shutter_contact_entity": "Associated shutter contact sensor (optional)", "opening_shutter_cover_entity": "Associated shutter cover (optional)"}},
+      "sensors_opening": {"title": "Opening sensors", "data": {"opening_sensor": "Opening contact sensor (required)", "opening_lock_entity": "Lock (optional)", "opening_shutter_contact_entity": "Associated shutter contact sensor (optional)", "opening_shutter_cover_entity": "Associated shutter cover (optional)", "clear_associated_shutter": "Remove associated shutter"}},
       "sensors_access_contact": {"title": "Access contact sensors", "data": {"access_contact_sensor": "Access contact sensor (required)", "access_lock_entity": "Lock (optional)"}},
       "parameters_access_contact": {"title": "Access parameters", "data": {}},
       "actions_access_contact": {"title": "Access actions", "data": {"start_actions": "Actions when the access opens (optional)", "finish_actions": "Actions when the access closes (optional)", "lock_locked_actions": "Actions when the lock locks (optional)", "lock_unlocked_actions": "Actions when the lock unlocks (optional)"}},
@@ -97,6 +96,9 @@
     }
   },
   "options": {
+    "abort": {
+      "last_appliance_removed": "The last device was removed, so the device group was deleted."
+    },
     "step": {
       "init": {
         "title": "Manage devices",
@@ -136,7 +138,7 @@
       "activity_mode_opening": {"title": "Opening detection mode", "data": {"activity_mode": "How this opening reports its state"}},
       "activity_mode_access": {"title": "Access detection mode", "data": {"activity_mode": "How this access reports its state"}},
       "activity_mode_sun_protection": {"title": "Sun-protection detection mode", "data": {"activity_mode": "How this sun protection reports its state"}},
-      "sensors_opening": {"title": "Opening sensors", "data": {"opening_sensor": "Opening contact sensor (required)", "opening_lock_entity": "Lock (optional)", "opening_shutter_contact_entity": "Associated shutter contact sensor (optional)", "opening_shutter_cover_entity": "Associated shutter cover (optional)"}},
+      "sensors_opening": {"title": "Opening sensors", "data": {"opening_sensor": "Opening contact sensor (required)", "opening_lock_entity": "Lock (optional)", "opening_shutter_contact_entity": "Associated shutter contact sensor (optional)", "opening_shutter_cover_entity": "Associated shutter cover (optional)", "clear_associated_shutter": "Remove associated shutter"}},
       "sensors_access_contact": {"title": "Access contact sensors", "data": {"access_contact_sensor": "Access contact sensor (required)", "access_lock_entity": "Lock (optional)"}},
       "parameters_access_contact": {"title": "Access parameters", "data": {}},
       "actions_access_contact": {"title": "Access actions", "data": {"start_actions": "Actions when the access opens (optional)", "finish_actions": "Actions when the access closes (optional)", "lock_locked_actions": "Actions when the lock locks (optional)", "lock_unlocked_actions": "Actions when the lock unlocks (optional)"}},
@@ -252,8 +254,13 @@
     "binary_sensor": {
       "running": {"name": "Running"},
       "state": {"name": "State"},
+      "door_state": {"name": "Door state"},
+      "window_state": {"name": "Window state"},
+      "access_state": {"name": "Access state"},
+      "awning_state": {"name": "Awning state"},
+      "shutter_state": {"name": "Shutter state"},
       "occupied": {"name": "Occupied"},
-      "input_running": {"name": "Open/closed contact state"},
+      "input_running": {"name": "State"},
       "input_mail_motion": {"name": "Motion sensor"},
       "input_door": {"name": "Main-door contact/opening sensor"},
       "input_mail_slot": {"name": "Mail-slot contact/opening sensor"},

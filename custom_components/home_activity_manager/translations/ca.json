@@ -9,8 +9,7 @@
     "abort": {
       "group_already_configured": "Aquesta agrupació de dispositius ja està configurada.",
       "appliance_added": "S’ha afegit el dispositiu a l’agrupació existent.",
-      "group_no_longer_configured": "L’agrupació s’ha eliminat abans de poder afegir-hi el dispositiu.",
-      "last_appliance_removed": "S’ha eliminat l’últim dispositiu i, per tant, l’agrupació."
+      "group_no_longer_configured": "L’agrupació s’ha eliminat abans de poder afegir-hi el dispositiu."
     },
     "step": {
       "user": {
@@ -39,7 +38,7 @@
       "activity_mode_opening": {"title": "Modalitat de detecció de l’obertura", "data": {"activity_mode": "Com informa del seu estat aquesta obertura"}, "data_description": {"activity_mode": "Tria el sensor de contacte que informa dels estats obert i tancat."}},
       "activity_mode_access": {"title": "Modalitat de detecció de l’accés", "data": {"activity_mode": "Com informa del seu estat aquest accés"}, "data_description": {"activity_mode": "Tria el sensor de contacte o l’entitat cover principal."}},
       "activity_mode_sun_protection": {"title": "Modalitat de detecció de la protecció solar", "data": {"activity_mode": "Com informa del seu estat aquesta protecció solar"}, "data_description": {"activity_mode": "El contacte informa de la posició obert/tancat, no del moviment del motor. L’entitat cover informa del seu estat."}},
-      "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)", "opening_shutter_contact_entity": "Sensor de contacte de la persiana associada (opcional)", "opening_shutter_cover_entity": "Cover de la persiana associada (opcional)"}},
+      "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)", "opening_shutter_contact_entity": "Sensor de contacte de la persiana associada (opcional)", "opening_shutter_cover_entity": "Cover de la persiana associada (opcional)", "clear_associated_shutter": "Esborra la persiana associada"}},
       "sensors_access_contact": {"title": "Sensors de contacte de l’accés", "data": {"access_contact_sensor": "Sensor de contacte de l’accés (obligatori)", "access_lock_entity": "Pany (opcional)"}},
       "parameters_access_contact": {"title": "Paràmetres de l’accés", "data": {}},
       "actions_access_contact": {"title": "Accions de l’accés", "data": {"start_actions": "Accions quan s’obre l’accés (opcional)", "finish_actions": "Accions quan es tanca l’accés (opcional)", "lock_locked_actions": "Accions quan es bloqueja el pany (opcional)", "lock_unlocked_actions": "Accions quan es desbloqueja el pany (opcional)"}},
@@ -97,6 +96,9 @@
     }
   },
   "options": {
+    "abort": {
+      "last_appliance_removed": "S’ha eliminat l’últim dispositiu i, per tant, l’agrupació."
+    },
     "step": {
       "init": {
         "title": "Gestiona els dispositius",
@@ -136,7 +138,7 @@
       "activity_mode_opening": {"title": "Modalitat de detecció de l’obertura", "data": {"activity_mode": "Com informa del seu estat aquesta obertura"}},
       "activity_mode_access": {"title": "Modalitat de detecció de l’accés", "data": {"activity_mode": "Com informa del seu estat aquest accés"}},
       "activity_mode_sun_protection": {"title": "Modalitat de detecció de la protecció solar", "data": {"activity_mode": "Com informa del seu estat aquesta protecció solar"}},
-      "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)", "opening_shutter_contact_entity": "Sensor de contacte de la persiana associada (opcional)", "opening_shutter_cover_entity": "Cover de la persiana associada (opcional)"}},
+      "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)", "opening_shutter_contact_entity": "Sensor de contacte de la persiana associada (opcional)", "opening_shutter_cover_entity": "Cover de la persiana associada (opcional)", "clear_associated_shutter": "Esborra la persiana associada"}},
       "sensors_access_contact": {"title": "Sensors de contacte de l’accés", "data": {"access_contact_sensor": "Sensor de contacte de l’accés (obligatori)", "access_lock_entity": "Pany (opcional)"}},
       "parameters_access_contact": {"title": "Paràmetres de l’accés", "data": {}},
       "actions_access_contact": {"title": "Accions de l’accés", "data": {"start_actions": "Accions quan s’obre l’accés (opcional)", "finish_actions": "Accions quan es tanca l’accés (opcional)", "lock_locked_actions": "Accions quan es bloqueja el pany (opcional)", "lock_unlocked_actions": "Accions quan es desbloqueja el pany (opcional)"}},
@@ -252,8 +254,13 @@
     "binary_sensor": {
       "running": {"name": "En funcionament"},
       "state": {"name": "Estat"},
+      "door_state": {"name": "Estat de la porta"},
+      "window_state": {"name": "Estat de la finestra"},
+      "access_state": {"name": "Estat de l’accés"},
+      "awning_state": {"name": "Estat del tendal"},
+      "shutter_state": {"name": "Estat de la persiana"},
       "occupied": {"name": "Ocupada"},
-      "input_running": {"name": "Estat del contacte obert/tancat"},
+      "input_running": {"name": "Estat"},
       "input_mail_motion": {"name": "Sensor de moviment"},
       "input_door": {"name": "Sensor de contacte/obertura de la porta principal"},
       "input_mail_slot": {"name": "Sensor de contacte/obertura de la portella"},

@@ -40,6 +40,7 @@ _RUNNING_ICONS = {
     "awning": ("mdi:awning", "mdi:awning"),
     "door": ("mdi:door-open", "mdi:door-closed"),
     "window": ("mdi:window-open", "mdi:window-closed"),
+    "access": ("mdi:parking", "mdi:parking"),
     "thermostat_climate": ("mdi:hvac", "mdi:hvac-off"),
     "air_conditioner_contact": ("mdi:hvac", "mdi:hvac-off"),
     "air_conditioner_power": ("mdi:hvac", "mdi:hvac-off"),
@@ -48,6 +49,16 @@ _RUNNING_ICONS = {
     "sun_protection_cover": ("mdi:blinds-open", "mdi:blinds"),
     "opening": ("mdi:door-open", "mdi:door-closed"),
 }
+_STATE_TRANSLATION_KEYS = {
+    "door": "door_state",
+    "window": "window_state",
+    "access": "access_state",
+    "awning": "awning_state",
+}
+
+
+def _state_translation_key(appliance_class: str | None) -> str:
+    return _STATE_TRANSLATION_KEYS.get(appliance_class, "state")
 
 _DOOR_ICONS = {
     "washer": ("mdi:washing-machine-alert", "mdi:washing-machine", "mdi:washing-machine"),
@@ -86,7 +97,9 @@ class ApplianceBinarySensor(BinarySensorEntity):
             getattr(runtime, "profile", None), "detection_sources", ()
         )
         if key == "running" and "cover" in detection_sources:
-            self._attr_translation_key = "state"
+            self._attr_translation_key = _state_translation_key(appliance_class)
+        elif key == "shutter":
+            self._attr_translation_key = "shutter_state"
         elif key == "pending_unload" and (
             appliance_class == "mailbox"
             or appliance_type in {"mailbox_motion", "mailbox_slot"}
@@ -230,12 +243,12 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_input_{input_name}"
         )
-        self._attr_translation_key = (
-            "state"
-            if input_config.config_key == CONF_RUNNING_ENTITY
-            and runtime.config.get(CONF_APPLIANCE_CLASS) == "access"
-            else f"input_{input_name}"
-        )
+        if input_config.config_key == CONF_RUNNING_ENTITY:
+            self._attr_translation_key = _state_translation_key(
+                runtime.config.get(CONF_APPLIANCE_CLASS)
+            )
+        else:
+            self._attr_translation_key = f"input_{input_name}"
         self._attr_device_info = appliance_device_info(
             entry, runtime.config, getattr(runtime, "hass", None)
         )
@@ -271,6 +284,15 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
     def icon(self) -> str | None:
         """Show a state-specific icon for contact and opening inputs."""
         if self._input_name == "running":
+            appliance_type = self._runtime.config.get("appliance_type")
+            appliance_class = self._runtime.config.get(
+                CONF_APPLIANCE_CLASS, appliance_type
+            )
+            icons = _RUNNING_ICONS.get(appliance_class) or _RUNNING_ICONS.get(
+                appliance_type
+            )
+            if icons is not None:
+                return icons[1] if self.is_on is False else icons[0]
             return "mdi:door-sliding-open" if self.is_on else "mdi:door-sliding"
         if self._input_name == "door":
             if self.is_on is None:

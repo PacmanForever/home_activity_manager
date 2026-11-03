@@ -59,7 +59,10 @@ Obertures (openings)
 |-- Porta
 |   |-- Sensor de contacte (opening)
 |   `-- Entitat cover (opening_cover)
-`-- Finestra -- Sensor de contacte (opening)
+|-- Finestra -- Sensor de contacte (opening)
+`-- Accés
+	|-- Sensor de contacte (access_contact)
+	`-- Entitat cover principal (opening_cover)
 
 Protecció solar (sun_protection)
 
@@ -81,7 +84,7 @@ Refrigeració (refrigeration)
 	`-- Interruptor intel·ligent (refrigerator_switch)
 ```
 
-Els noms entre parèntesis són identificadors de perfil, no nivells addicionals. Rentadora, assecadora i rentaplats comparteixen el perfil `laundry`; les modalitats de nevera i congelador comparteixen els perfils de refrigeració indicats. Porta i finestra comparteixen el perfil de contacte; només la porta ofereix `opening_cover`, on el cover seleccionat representa la mateixa porta. La persiana associada és una capacitat opcional del perfil de porta per contacte, no una classe de protecció solar. Blind deixa d'estar disponible en les noves configuracions de protecció solar, però les entrades legacy amb classe `blind` han de continuar sent editables.
+Els noms entre parèntesis són identificadors de perfil, no nivells addicionals. Rentadora, assecadora i rentaplats comparteixen el perfil `laundry`; les modalitats de nevera i congelador comparteixen els perfils de refrigeració indicats. Porta i finestra comparteixen el perfil de contacte `opening`; només la porta convencional ofereix també `opening_cover`, on el cover representa la mateixa porta. La classe Access ofereix el contacte `access_contact` o un cover principal `opening_cover`, amb pany opcional i sense una segona persiana associada. La persiana associada és una capacitat opcional del perfil de porta per contacte, no una classe de protecció solar. Blind deixa d'estar disponible en les noves configuracions de protecció solar, però les entrades legacy amb classe `blind` han de continuar sent editables.
 
 ### 4.1 Flux de configuració
 
@@ -108,7 +111,8 @@ Aquest flux és el lloc central per configurar tot el comportament propi de l'el
 - **Switch de nevera**: al perfil `refrigerator`, selector opcional d'un endoll intel·ligent controlable que no altera la detecció per potència. Al perfil `refrigerator_switch`, el switch és obligatori, controla l'alimentació i és també la font binària d'activitat (`on` inicia i `off` finalitza el període).
 - **Arribada de correu**: `mailbox_motion` requereix un sensor binari de moviment interior i `mailbox_slot` un sensor binari a la portella d'entrada. Una transició `off`→`on` després d'haver observat `off` indica una arribada; l'estat inicial `on` no ha de generar una arribada falsa.
 - **Porta principal de la bústia**: selector obligatori dels dos perfils de bústia. L'obertura neteja «pendent de recollir» i cancel·la els recordatoris.
-- **Porta**: per contacte, requereix un contacte d'obertura i pot incloure un pany opcional i cap o una persiana associada. La persiana associada selecciona exactament una font (contacte o entitat `cover`), mai totes dues; el contacte de la persiana ha de ser diferent del contacte de la porta. En mode `cover`, l'entitat és la porta mateixa i no es mostra una segona font de persiana.
+- **Porta**: per contacte, requereix un contacte d'obertura i pot incloure un pany opcional i cap o una persiana associada. La persiana associada selecciona exactament una font (contacte o entitat `cover`), mai totes dues; el contacte de la persiana ha de ser diferent del contacte de la porta. En editar, un control explícit permet esborrar l'associació de persiana i desar ambdues fonts a `None`. En mode `cover`, l'entitat és la porta mateixa i no es mostra una segona font de persiana.
+- **Accés**: requereix un contacte (`access_contact`) o un cover principal (`opening_cover`); el pany és opcional en tots dos modes. Amb cover, només els estats estables `open` i `closed` defineixen l'estat i el període obert; `opening` i `closing` no acaben ni inicien l'interval. No s'afegeix una segona persiana associada.
 - **Pany i persiana associada**: els hooks de pany bloquejat/desbloquejat i persiana oberta/tancada només s'executen en canvis d'estat estables de la font configurada. Un cover que es mou no es considera encara obert o tancat.
 - **Obertura de porta per a bugaderia**: selector opcional per a rentadora, rentaplats i assecadora; activa estat de porta i «pendent de buidar».
 - **Switch intel·ligent de l'endoll**: selector opcional en aparells endollats. La integració n'exposa el control; només determina l'activitat si és la font seleccionada.
@@ -180,9 +184,11 @@ Les accions locals són configuració de cada dispositiu i les globals són conf
 - **Durada de l'últim període actiu**: sensor de sortida amb la durada del període d'activitat més recent detectat.
 - **Temps restant estimat**: només es crea per perfils de cicle que en poden oferir una estimació útil. No es crea per AC ni nevera.
 - **Estat (funcionament)**: cada aparell elèctric té una entitat binària pròpia que indica si hi ha activitat segons l'estratègia declarada pel perfil, separada dels wrappers d'entrada i amb identificador estable.
+- **Estat (obert/tancat)**: les entitats binàries de porta, finestra, Access i tendal han d'identificar la classe: «Estat de la porta», «Estat de la finestra», «Estat de l'accés» i «Estat del tendal», respectivament. Una persiana associada s'ha d'anomenar «Estat de la persiana», separada de l'estat principal. Aquests noms han d'estar traduïts a tots els idiomes de la interfície. `on` significa obert i `off` tancat. En una coberta, `opening` i `closing` conserven l'últim estat estable. La durada d'Access amb cover és el temps que l'obertura roman oberta, no el temps de funcionament del motor.
 - **Porta**: si el perfil usa un contacte de porta, entitat binària de sortida que en reflecteix l'estat.
 - **Portella de bústia**: només per a `mailbox_slot`, entitat binària de sortida que reflecteix si el contacte de la portella d'arribada és obert o tancat. És diferent de l'entitat Porta, que representa l'obertura de la porta principal per recollir el correu.
 - **Pendent de buidar/recollir**: per als perfils de bugaderia amb sensor de porta i per als perfils de bústia; mai per AC o nevera.
+- **Ocupació de la bústia**: «Ocupada» indica que hi ha correu pendent de recollir; és independent de l'estat obert/tancat de la portella i de la porta principal.
 - **Neteja manual de l'estat pendent**: quan un dispositiu té un estat «pendent de buidar», la integració ha de crear-hi també un botó propi per posar-lo manualment a `off`, independentment dels sensors. Aquesta acció de recuperació ha de funcionar encara que el sensor associat falli o no estigui disponible, i ha de cancel·lar els recordatoris pendents i reiniciar-ne el recompte.
 - **Endoll**: si el perfil admet un switch intel·ligent i se n'ha seleccionat un, entitat de switch associada que en reflecteix l'estat i permet activar-lo o desactivar-lo. Al perfil `refrigerator`, és opcional i no substitueix la detecció per potència; al perfil `refrigerator_switch`, és obligatori i també és la font de detecció d'activitat.
 - **Entitats d'alarma**: les alarmes de nevera es representen amb els grups d'acció i els sensors d'estat declarats pel perfil; no es creen entitats de bugaderia per reaprofitar-les.
@@ -351,7 +357,8 @@ La creació segueix cinc passos:
 | Aire condicionat | Sensor de contacte/obertura, potència o `climate` | Una sola font d'activitat; el contacte/obertura només existeix en el perfil de contacte. Potència, energia i interruptor es declaren segons cada perfil. La `climate` original conserva associació i controls, sense wrapper. |
 | Nevera | Potència o interruptor | Accions d'inici/final d'activitat en totes dues modalitats; contacte i alarma de porta; potència i energia auxiliars són compatibles amb la modalitat d'interruptor. No hi ha alarmes de compressor inactiu o endoll apagat. |
 | Bústia | Moviment interior o sensor de contacte/obertura de portella | La modalitat detecta una arribada com a esdeveniment, no un estat de funcionament continu. Cal mantenir la porta principal separada, el pendent de recollir, les accions i els recordatoris. |
-| Tendall o persiana, futurs | Pendent d'investigació | Cal decidir si es detecta moviment, posició o estat obert/tancat, i com es controla l'aparell, inclosa una possible entitat `cover`. Una posició oberta no implica que el motor estigui funcionant. |
+| Access | Contacte o cover principal | Estat obert/tancat, durada de l'interval obert i pany opcional; una coberta en moviment no canvia l'últim estat estable. |
+| Protecció solar (tendal) | Contacte o cover | Estat/posició obert/tancat i durada; no s'ha de presentar com a funcionament del motor. |
 
 Els detectors i les sortides no són intercanviables: cal conservar la semàntica de cada modalitat. La compatibilitat de dispositius futurs requerirà definir-ne els estats, esdeveniments i controls; també caldrà estudiar si un dispositiu que només agrupa entitats necessita una modalitat d'activitat obligatòria.
 

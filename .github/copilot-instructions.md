@@ -6,6 +6,11 @@
 - Explain template variables in translation text without embedding a full Jinja expression. Put copyable expressions in the README or other non-translation documentation.
 - Add or keep a regression test that asserts translated help strings do not contain literal Jinja delimiters.
 
+## Documentation
+
+- At the end of every change, always review both `README.md` and `REQUIREMENTS_TEMPLATE.md` for consistency with the implementation.
+- Update either document whenever behavior, configuration, supported profiles, or project requirements change. Do not leave stale or contradictory descriptions; if a document needs no edit, confirm that it was reviewed in the completion summary.
+
 ## Releases
 
 - Do not create a release commit, tag, push, or GitHub Release until the complete unit and component test suite passes with the CI coverage threshold.

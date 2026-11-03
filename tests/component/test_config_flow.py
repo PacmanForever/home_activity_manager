@@ -1266,6 +1266,13 @@ async def test_every_profile_supports_config_entry_crud(
     second_sensor_form, second_sensor_storage = sensor_values(
         f"{appliance_type}_second"
     )
+    if appliance_type == "opening":
+        assert "clear_associated_shutter" in {
+            marker.schema for marker in result["data_schema"].schema
+        }
+        second_sensor_form["clear_associated_shutter"] = True
+        action_values.pop(CONF_SHUTTER_OPEN_ACTIONS, None)
+        action_values.pop(CONF_SHUTTER_CLOSE_ACTIONS, None)
     result = await hass.config_entries.options.async_configure(
         options_flow_id, second_sensor_form
     )
@@ -1287,7 +1294,10 @@ async def test_every_profile_supports_config_entry_crud(
         CONF_APPLIANCE_CLASS: _group_class_mode_for_profile(appliance_type)[1],
         **second_sensor_storage,
         **(
-            {CONF_SHUTTER_COVER_ENTITY: None}
+            {
+                CONF_SHUTTER_CONTACT_ENTITY: None,
+                CONF_SHUTTER_COVER_ENTITY: None,
+            }
             if appliance_type == "opening"
             else {}
         ),

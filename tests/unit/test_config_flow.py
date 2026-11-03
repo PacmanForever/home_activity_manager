@@ -1119,6 +1119,25 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             ("Sensor de movimiento", "Sensor de contacto/apertura de la puerta principal", "Sensor de contacto/apertura de la trampilla"),
             ("Sensor de moviment", "Sensor de contacte/obertura de la porta principal", "Sensor de contacte/obertura de la portella"),
         )
+        expected_running_names = ("State", "State", "Estado", "Estat")
+        for translation, expected_name in zip(translations, expected_running_names):
+            self.assertEqual(
+                translation["entity"]["binary_sensor"]["input_running"]["name"],
+                expected_name,
+            )
+        expected_entity_state_names = (
+            ("Door state", "Window state", "Access state", "Awning state", "Shutter state"),
+            ("Door state", "Window state", "Access state", "Awning state", "Shutter state"),
+            ("Estado de la puerta", "Estado de la ventana", "Estado del acceso", "Estado del toldo", "Estado de la persiana"),
+            ("Estat de la porta", "Estat de la finestra", "Estat de l’accés", "Estat del tendal", "Estat de la persiana"),
+        )
+        for translation, expected_names in zip(translations, expected_entity_state_names):
+            binary_sensor_names = translation["entity"]["binary_sensor"]
+            for key, expected_name in zip(
+                ("door_state", "window_state", "access_state", "awning_state", "shutter_state"),
+                expected_names,
+            ):
+                self.assertEqual(binary_sensor_names[key]["name"], expected_name)
         for translation, expected_names in zip(translations, expected_input_names):
             binary_sensor_names = translation["entity"]["binary_sensor"]
             for key, expected_name in zip(
@@ -1291,7 +1310,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             self.assertIn(term, readme)
         self.assertIn("default('timer', true)", readme)
 
-    def test_last_appliance_removed_abort_is_translated(self) -> None:
+    def test_last_appliance_removed_abort_uses_options_translation(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
         paths = (
             root / "strings.json",
@@ -1302,8 +1321,9 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         for path in paths:
             translation = json.loads(path.read_text(encoding="utf-8"))
             self.assertTrue(
-                translation["config"]["abort"]["last_appliance_removed"].strip()
+                translation["options"]["abort"]["last_appliance_removed"].strip()
             )
+            self.assertNotIn("last_appliance_removed", translation["config"]["abort"])
 
 
 @pytest.mark.asyncio
@@ -1567,7 +1587,7 @@ async def test_options_flow_clears_omitted_air_conditioner_sensors(monkeypatch):
     )
     monkeypatch.setattr(
         "custom_components.home_activity_manager.config_flow._sensor_schema",
-        lambda *_args: vol.Schema({}),
+        lambda *_args, **_kwargs: vol.Schema({}),
     )
     flow = ApplianceCycleMonitorOptionsFlow()
     flow.hass = SimpleNamespace(

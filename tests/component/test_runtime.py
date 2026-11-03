@@ -1173,7 +1173,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.37" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.38" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Laundry and drying · Washer · Power sensor",
         "Laundry and drying · Dishwasher · Power sensor",
@@ -1854,7 +1854,7 @@ async def test_access_contact_wrapper_is_labeled_as_open_closed_state(
         "binary_sensor", DOMAIN, f"{entry.entry_id}_input_running"
     )
     assert state_entity_id is not None
-    assert registry.async_get(state_entity_id).translation_key == "state"
+    assert registry.async_get(state_entity_id).translation_key == "access_state"
     assert hass.states.get(state_entity_id).attributes["device_class"] == "opening"
     assert hass.states.get(state_entity_id).state == "off"
 
@@ -1886,7 +1886,7 @@ async def test_access_cover_state_tracks_open_interval_not_motor_motion(
         "binary_sensor", DOMAIN, f"{entry.entry_id}_running"
     )
     assert state_entity_id is not None
-    assert registry.async_get(state_entity_id).translation_key == "state"
+    assert registry.async_get(state_entity_id).translation_key == "access_state"
     assert hass.states.get(state_entity_id).attributes["device_class"] == "opening"
     assert hass.states.get(state_entity_id).state == "off"
 
@@ -2448,6 +2448,7 @@ def test_sun_protection_cover_running_sensor_availability(hass, cover_state):
     runtime = SimpleNamespace(
         config={
             CONF_APPLIANCE_TYPE: "sun_protection_cover",
+            CONF_APPLIANCE_CLASS: "awning",
             CONF_COVER_ENTITY: cover_entity_id,
         },
         profile=APPLIANCE_PROFILES["sun_protection_cover"],
@@ -2461,7 +2462,7 @@ def test_sun_protection_cover_running_sensor_availability(hass, cover_state):
     )
     sensor.hass = hass
 
-    assert sensor._attr_translation_key == "state"
+    assert sensor._attr_translation_key == "awning_state"
     assert sensor._attr_device_class == BinarySensorDeviceClass.OPENING
     assert sensor.available
 
@@ -3292,7 +3293,7 @@ def test_input_and_runtime_binary_sensor_states_and_attributes(hass):
 
     assert input_sensor.available is False
     assert input_sensor.is_on is None
-    assert input_sensor.icon == "mdi:door-sliding"
+    assert input_sensor.icon == "mdi:blinds-open"
     assert input_sensor.extra_state_attributes == {"source_entity": entity_id}
 
     hass.states.async_set(entity_id, "unknown")
@@ -3303,10 +3304,10 @@ def test_input_and_runtime_binary_sensor_states_and_attributes(hass):
     hass.states.async_set(entity_id, "off")
     assert input_sensor.available is True
     assert input_sensor.is_on is False
-    assert input_sensor.icon == "mdi:door-sliding"
+    assert input_sensor.icon == "mdi:blinds"
     hass.states.async_set(entity_id, "on")
     assert input_sensor.is_on is True
-    assert input_sensor.icon == "mdi:door-sliding-open"
+    assert input_sensor.icon == "mdi:blinds-open"
 
     running_value = [None]
     running_sensor = ApplianceBinarySensor(
@@ -3330,6 +3331,73 @@ def test_input_and_runtime_binary_sensor_states_and_attributes(hass):
     hass.states.async_set(entity_id, "unavailable")
     assert door_sensor.available is False
     assert door_sensor.icon == "mdi:door"
+
+
+@pytest.mark.parametrize(
+    (
+        "appliance_class",
+        "appliance_type",
+        "open_icon",
+        "closed_icon",
+        "translation_key",
+    ),
+    (
+        ("door", "opening", "mdi:door-open", "mdi:door-closed", "door_state"),
+        (
+            "window",
+            "opening",
+            "mdi:window-open",
+            "mdi:window-closed",
+            "window_state",
+        ),
+        ("access", "access_contact", "mdi:parking", "mdi:parking", "access_state"),
+        (
+            "awning",
+            "sun_protection_contact",
+            "mdi:awning",
+            "mdi:awning",
+            "awning_state",
+        ),
+    ),
+)
+def test_opening_contact_icons_follow_appliance_class(
+    hass, appliance_class, appliance_type, open_icon, closed_icon, translation_key
+):
+    entity_id = "binary_sensor.opening_contact"
+    hass.states.async_set(entity_id, "off")
+    runtime = SimpleNamespace(
+        hass=hass,
+        config={
+            CONF_APPLIANCE_CLASS: appliance_class,
+            CONF_APPLIANCE_TYPE: appliance_type,
+            CONF_RUNNING_ENTITY: entity_id,
+        },
+        profile=APPLIANCE_PROFILES[appliance_type],
+    )
+    sensor = ApplianceInputBinarySensor(
+        runtime,
+        MockConfigEntry(domain=DOMAIN),
+        runtime.profile.sensor_inputs[0],
+    )
+    sensor.hass = hass
+
+    assert sensor._attr_translation_key == translation_key
+    assert sensor.icon == closed_icon
+    hass.states.async_set(entity_id, "on")
+    assert sensor.icon == open_icon
+
+
+def test_associated_shutter_binary_sensor_has_distinct_state_translation():
+    runtime = SimpleNamespace(config={CONF_APPLIANCE_TYPE: "opening"})
+    sensor = ApplianceBinarySensor(
+        runtime,
+        MockConfigEntry(domain=DOMAIN),
+        "shutter",
+        lambda: False,
+        BinarySensorDeviceClass.OPENING,
+    )
+
+    assert sensor._attr_translation_key == "shutter_state"
 
 
 @pytest.mark.asyncio

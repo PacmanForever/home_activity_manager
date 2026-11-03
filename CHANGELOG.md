@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.38 - 2026-11-03
+
+### Changed
+
+- Give opening-state entities class-qualified names and distinguish the associated shutter state in all supported languages.
+- Allow removing a saved associated shutter while editing a door.
+
+### Fixed
+
+- Show the translated options-flow message when removing the final device in a group.
+
 ## v0.9.37 - 2026-11-03
 
 ### Changed
