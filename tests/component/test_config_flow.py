@@ -237,6 +237,49 @@ async def test_add_access_with_primary_cover_mode(hass, enable_custom_integratio
 
 
 @pytest.mark.asyncio
+async def test_initial_opening_flow_clears_deselected_shutter_source(
+    hass, enable_custom_integrations
+):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    flow_id = result["flow_id"]
+    result = await _select_profile_for_setup(
+        hass, flow_id, "Kitchen window", "opening"
+    )
+    assert result["step_id"] == "sensors_opening"
+    selections = {
+        "opening_sensor": "binary_sensor.kitchen_window",
+        "opening_shutter_contact_entity": "binary_sensor.kitchen_shutter_contact",
+        "opening_shutter_cover_entity": "cover.kitchen_shutter",
+    }
+
+    result = await hass.config_entries.flow.async_configure(flow_id, selections)
+    assert result["step_id"] == "sensors_opening"
+    assert result["errors"]["base"] == "invalid_shutter_sources"
+    assert "clear_associated_shutter" not in {
+        marker.schema for marker in result["data_schema"].schema
+    }
+
+    corrected_selections = dict(selections)
+    corrected_selections.pop("opening_shutter_cover_entity")
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, corrected_selections
+    )
+    assert result["step_id"] == "actions_opening"
+    action_values = {
+        marker.schema: [] for marker in result["data_schema"].schema
+    }
+    result = await hass.config_entries.flow.async_configure(flow_id, action_values)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    appliance = result["data"]["appliances"][0]["data"]
+    assert appliance[CONF_SHUTTER_CONTACT_ENTITY] == selections[
+        "opening_shutter_contact_entity"
+    ]
+    assert appliance[CONF_SHUTTER_COVER_ENTITY] is None
+
+
+@pytest.mark.asyncio
 async def test_add_access_with_contact_and_optional_lock(hass, enable_custom_integrations):
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -1267,10 +1310,11 @@ async def test_every_profile_supports_config_entry_crud(
         f"{appliance_type}_second"
     )
     if appliance_type == "opening":
-        assert "clear_associated_shutter" in {
+        assert "clear_associated_shutter" not in {
             marker.schema for marker in result["data_schema"].schema
         }
-        second_sensor_form["clear_associated_shutter"] = True
+        second_sensor_form.pop("opening_shutter_contact_entity")
+        second_sensor_storage[CONF_SHUTTER_CONTACT_ENTITY] = None
         action_values.pop(CONF_SHUTTER_OPEN_ACTIONS, None)
         action_values.pop(CONF_SHUTTER_CLOSE_ACTIONS, None)
     result = await hass.config_entries.options.async_configure(
@@ -1296,7 +1340,6 @@ async def test_every_profile_supports_config_entry_crud(
         **(
             {
                 CONF_SHUTTER_CONTACT_ENTITY: None,
-                CONF_SHUTTER_COVER_ENTITY: None,
             }
             if appliance_type == "opening"
             else {}

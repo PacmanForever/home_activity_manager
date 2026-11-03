@@ -471,7 +471,11 @@ APPLIANCE_PROFILES = {
             "shutter_open",
             "shutter_close",
         ),
-        output_entities=("last_cycle_duration", "shutter"),
+        output_entities=(
+            "last_cycle_duration",
+            "shutter",
+            "shutter_last_cycle_duration",
+        ),
         supports_pending_unload=False,
         estimates_remaining=False,
         supports_max_runtime=False,

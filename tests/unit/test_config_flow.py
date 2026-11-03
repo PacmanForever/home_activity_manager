@@ -416,7 +416,18 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                     for sensor_input in profile.sensor_inputs
                     if sensor_input.required
                 }
+                existing_values = {
+                    sensor_input.config_key: "sensor.previous"
+                    for sensor_input in profile.sensor_inputs
+                    if not sensor_input.required
+                }
                 normalized = _normalize_sensor_values(
+                    form_values,
+                    profile,
+                    clear_missing_optional=True,
+                    existing_values=existing_values,
+                )
+                untouched = _normalize_sensor_values(
                     form_values, profile, clear_missing_optional=True
                 )
                 entry_data = _entry_data(
@@ -428,6 +439,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                         continue
                     self.assertIsNone(normalized[sensor_input.config_key])
                     self.assertIsNone(entry_data[sensor_input.config_key])
+                    self.assertNotIn(sensor_input.config_key, untouched)
 
     def test_opening_shutter_sources_are_optional_but_mutually_exclusive(self) -> None:
         profile = get_appliance_profile("opening")
@@ -1138,6 +1150,54 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 expected_names,
             ):
                 self.assertEqual(binary_sensor_names[key]["name"], expected_name)
+        expected_duration_names = (
+            (
+                "Last cycle duration",
+                "Door open duration",
+                "Window open duration",
+                "Access open duration",
+                "Awning open duration",
+                "Shutter open duration",
+            ),
+            (
+                "Last cycle duration",
+                "Door open duration",
+                "Window open duration",
+                "Access open duration",
+                "Awning open duration",
+                "Shutter open duration",
+            ),
+            (
+                "Duración del último ciclo",
+                "Duración de apertura de la puerta",
+                "Duración de apertura de la ventana",
+                "Duración de apertura del acceso",
+                "Duración de apertura del toldo",
+                "Duración de apertura de la persiana",
+            ),
+            (
+                "Durada de l’últim cicle",
+                "Durada d’obertura de la porta",
+                "Durada d’obertura de la finestra",
+                "Durada d’obertura de l’accés",
+                "Durada d’obertura del tendal",
+                "Durada d’obertura de la persiana",
+            ),
+        )
+        for translation, expected_names in zip(translations, expected_duration_names):
+            sensor_names = translation["entity"]["sensor"]
+            for key, expected_name in zip(
+                (
+                    "last_cycle_duration",
+                    "door_open_duration",
+                    "window_open_duration",
+                    "access_open_duration",
+                    "awning_open_duration",
+                    "shutter_open_duration",
+                ),
+                expected_names,
+            ):
+                self.assertEqual(sensor_names[key]["name"], expected_name)
         for translation, expected_names in zip(translations, expected_input_names):
             binary_sensor_names = translation["entity"]["binary_sensor"]
             for key, expected_name in zip(

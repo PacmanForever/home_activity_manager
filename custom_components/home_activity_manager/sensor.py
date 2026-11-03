@@ -17,9 +17,23 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_ENERGY_ENTITY, CONF_POWER_ENTITY, DOMAIN
+from .const import (
+    CONF_APPLIANCE_CLASS,
+    CONF_ENERGY_ENTITY,
+    CONF_POWER_ENTITY,
+    CONF_SHUTTER_CONTACT_ENTITY,
+    CONF_SHUTTER_COVER_ENTITY,
+    DOMAIN,
+)
 from .device import appliance_device_info
 from .runtime import ApplianceRuntime, entry_runtimes
+
+_DURATION_TRANSLATION_KEYS = {
+    "door": "door_open_duration",
+    "window": "window_open_duration",
+    "access": "access_open_duration",
+    "awning": "awning_open_duration",
+}
 
 
 def _format_duration(seconds: float | None) -> str | None:
@@ -52,10 +66,18 @@ class ApplianceSensor(SensorEntity):
         self._value_fn = value_fn
         self._attr_unique_id = f"{getattr(runtime, 'appliance_id', entry.entry_id)}_{key}"
         self._attr_translation_key = key
+        appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)
+        if key == "last_cycle_duration":
+            self._attr_translation_key = _DURATION_TRANSLATION_KEYS.get(
+                appliance_class, key
+            )
+        elif key == "shutter_last_cycle_duration":
+            self._attr_translation_key = "shutter_open_duration"
         self._attr_icon = {
             "power": "mdi:flash",
             "total_energy": "mdi:lightning-bolt",
             "last_cycle_duration": "mdi:timer-check-outline",
+            "shutter_last_cycle_duration": "mdi:timer-check-outline",
             "estimated_remaining": "mdi:timer-sand",
         }[key]
         self._attr_native_unit_of_measurement = unit
@@ -153,6 +175,19 @@ async def async_setup_entry(
                 None,
                 None,
             ),
+            "shutter_last_cycle_duration": ApplianceSensor(
+                runtime,
+                entry,
+                "shutter_last_cycle_duration",
+                lambda runtime=runtime: _format_duration(
+                    runtime.shutter_detector.last_cycle_duration.total_seconds()
+                    if runtime.shutter_detector.last_cycle_duration is not None
+                    else None
+                ),
+                None,
+                None,
+                None,
+            ),
             "estimated_remaining": ApplianceSensor(
                 runtime,
                 entry,
@@ -170,6 +205,16 @@ async def async_setup_entry(
         }
         expected_keys = set()
         for key in sensors:
+            if key == "shutter_last_cycle_duration":
+                if (
+                    "shutter" in runtime.profile.output_entities
+                    and (
+                        runtime.config.get(CONF_SHUTTER_CONTACT_ENTITY)
+                        or runtime.config.get(CONF_SHUTTER_COVER_ENTITY)
+                    )
+                ):
+                    expected_keys.add(key)
+                continue
             config_key = input_outputs.get(key)
             if (
                 config_key is not None

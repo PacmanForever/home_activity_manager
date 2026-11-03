@@ -223,6 +223,7 @@ class ApplianceRuntime:
         self.mail_slot_open: bool | None = None
         self.lock_state: str | None = None
         self.shutter_open: bool | None = None
+        self.shutter_detector = BinaryActivityDetector()
         self.energy_kwh = 0.0
         self.door_open: bool | None = None
         self.pending_unload = False
@@ -284,6 +285,7 @@ class ApplianceRuntime:
                 entity_id, self.hass.states.get(entity_id)
             )
 
+        now = dt_util.utcnow()
         lock_entity = self.config.get(CONF_LOCK_ENTITY)
         if lock_entity:
             self._apply_lock_state(
@@ -295,6 +297,7 @@ class ApplianceRuntime:
             self._apply_shutter_state(
                 self.hass.states.get(shutter_contact),
                 shutter_contact,
+                now,
                 is_cover=False,
                 initialize=True,
             )
@@ -302,6 +305,7 @@ class ApplianceRuntime:
             self._apply_shutter_state(
                 self.hass.states.get(shutter_cover),
                 shutter_cover,
+                now,
                 is_cover=True,
                 initialize=True,
             )
@@ -311,7 +315,6 @@ class ApplianceRuntime:
                 self.hass.states.get(energy_entity)
             )
 
-        now = dt_util.utcnow()
         source_entity_id = self.config.get(source_key)
         source_state = (
             self.hass.states.get(source_entity_id) if source_entity_id else None
@@ -539,10 +542,10 @@ class ApplianceRuntime:
             self._apply_lock_state(new_state, entity_id)
             self._notify()
         elif entity_id == self.config.get(CONF_SHUTTER_CONTACT_ENTITY):
-            self._apply_shutter_state(new_state, entity_id, is_cover=False)
+            self._apply_shutter_state(new_state, entity_id, now, is_cover=False)
             self._notify()
         elif entity_id == self.config.get(CONF_SHUTTER_COVER_ENTITY):
-            self._apply_shutter_state(new_state, entity_id, is_cover=True)
+            self._apply_shutter_state(new_state, entity_id, now, is_cover=True)
             self._notify()
         elif entity_id == self.config.get(CONF_DOOR_ENTITY):
             self._apply_door_state(new_state, now, source_entity_id=entity_id)
@@ -680,6 +683,7 @@ class ApplianceRuntime:
         self,
         state: Any,
         source_entity_id: str,
+        now: datetime,
         *,
         is_cover: bool,
         initialize: bool = False,
@@ -687,6 +691,7 @@ class ApplianceRuntime:
         value = state.state if state is not None else None
         if value in (None, "unknown", "unavailable"):
             self.shutter_open = None
+            self.shutter_detector.observe_state(None, now)
             return
         if is_cover:
             if value not in ("open", "closed"):
@@ -700,6 +705,15 @@ class ApplianceRuntime:
 
         previous = self.shutter_open
         self.shutter_open = is_open
+        detector_events = (
+            self.shutter_detector.reconcile_state(
+                "on" if is_open else "off", now
+            )
+            if initialize
+            else self.shutter_detector.observe_state("on" if is_open else "off", now)
+        )
+        if detector_events:
+            self._schedule_save()
         if initialize or previous is None or previous == is_open:
             return
         action_group = "shutter_open" if is_open else "shutter_close"
@@ -1313,6 +1327,11 @@ class ApplianceRuntime:
             ),
             "power_entity": self.config.get(CONF_POWER_ENTITY),
             "last_valid_power_w": self._last_valid_power_w,
+            "shutter_entity": (
+                self.config.get(CONF_SHUTTER_CONTACT_ENTITY)
+                or self.config.get(CONF_SHUTTER_COVER_ENTITY)
+            ),
+            "shutter_detector": self.shutter_detector.export_state(),
             "energy_kwh": self.energy_kwh,
             "energy_entity": self.config.get(CONF_ENERGY_ENTITY),
             "external_energy_reset_baseline_kwh": (
@@ -1380,6 +1399,14 @@ class ApplianceRuntime:
                 if not math.isfinite(last_valid_power) or last_valid_power < 0:
                     raise ValueError("Invalid stored power reading")
                 self._last_valid_power_w = last_valid_power
+            current_shutter_entity = (
+                self.config.get(CONF_SHUTTER_CONTACT_ENTITY)
+                or self.config.get(CONF_SHUTTER_COVER_ENTITY)
+            )
+            if stored.get("shutter_entity") == current_shutter_entity:
+                shutter_detector_state = stored.get("shutter_detector")
+                if isinstance(shutter_detector_state, dict):
+                    self.shutter_detector.restore_state(shutter_detector_state)
             energy = float(stored.get("energy_kwh", 0))
             if not math.isfinite(energy) or energy < 0:
                 raise ValueError("Invalid stored energy")

@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.39 - 2026-11-03
+
+### Added
+
+- Add an independent, persistent open-duration sensor for an associated shutter.
+- Use class-specific duration names and state icons for openings, shutters, and awnings.
+
+### Changed
+
+- Clear optional entity selections directly in setup and edit forms without an extra removal option.
+
 ## v0.9.38 - 2026-11-03
 
 ### Changed

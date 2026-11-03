@@ -1780,7 +1780,6 @@ async def test_sun_protection_contact_tracks_position_without_running_output(
     assert registry.async_get_entity_id(
         "binary_sensor", DOMAIN, f"{entry.entry_id}_running"
     ) is None
-
     hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
     await hass.async_block_till_done()
     assert entry.runtime_data.detector.is_running
@@ -1792,6 +1791,72 @@ async def test_sun_protection_contact_tracks_position_without_running_output(
     assert not entry.runtime_data.detector.is_running
     assert entry.runtime_data.detector.last_cycle_duration == timedelta(seconds=12)
     assert hass.states.get(position_entity_id).state == "off"
+
+
+@pytest.mark.asyncio
+async def test_window_and_shutter_durations_are_independent_and_persisted(
+    hass, monkeypatch, enable_custom_integrations
+):
+    current_time = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: current_time[0])
+    config = {
+        CONF_APPLIANCE_TYPE: "opening",
+        CONF_APPLIANCE_CLASS: "window",
+        CONF_RUNNING_ENTITY: "binary_sensor.window_contact",
+        CONF_SHUTTER_COVER_ENTITY: "cover.window_shutter",
+        "name": "Window",
+    }
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "closed")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    registry = er.async_get(hass)
+    window_duration_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_last_cycle_duration"
+    )
+    shutter_duration_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_shutter_last_cycle_duration"
+    )
+    shutter_state_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_shutter"
+    )
+    assert window_duration_id is not None
+    assert shutter_duration_id is not None
+    assert shutter_state_id is not None
+    assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:blinds"
+    assert registry.async_get(window_duration_id).translation_key == "window_open_duration"
+    assert registry.async_get(shutter_duration_id).translation_key == "shutter_open_duration"
+
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
+    await hass.async_block_till_done()
+    current_time[0] += timedelta(seconds=10)
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "opening")
+    await hass.async_block_till_done()
+    current_time[0] += timedelta(seconds=10)
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "open")
+    await hass.async_block_till_done()
+    assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:blinds-open"
+    current_time[0] += timedelta(seconds=25)
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    await hass.async_block_till_done()
+    assert hass.states.get(window_duration_id).state == "00:00:45"
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    current_time[0] += timedelta(seconds=15)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "closing")
+    await hass.async_block_till_done()
+    assert entry.runtime_data.shutter_detector.is_running
+    current_time[0] += timedelta(seconds=15)
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "closed")
+    await hass.async_block_till_done()
+
+    assert hass.states.get(window_duration_id).state == "00:00:45"
+    assert hass.states.get(shutter_duration_id).state == "00:00:55"
+    assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:blinds"
+    assert await hass.config_entries.async_unload(entry.entry_id)
 
 
 @pytest.mark.asyncio
@@ -1819,6 +1884,9 @@ async def test_opening_contact_tracks_position_without_running_output(
     assert hass.states.get(position_entity_id).attributes["device_class"] == "opening"
     assert registry.async_get_entity_id(
         "binary_sensor", DOMAIN, f"{entry.entry_id}_running"
+    ) is None
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_shutter_last_cycle_duration"
     ) is None
 
     hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
@@ -1912,6 +1980,8 @@ async def test_access_cover_state_tracks_open_interval_not_motor_motion(
 async def test_opening_lock_and_shutter_actions_follow_stable_transitions(
     hass, monkeypatch
 ):
+    current_time = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: current_time[0])
     config = {
         CONF_APPLIANCE_TYPE: "opening",
         CONF_RUNNING_ENTITY: "binary_sensor.front_door",
@@ -1958,8 +2028,10 @@ async def test_opening_lock_and_shutter_actions_follow_stable_transitions(
     await hass.async_block_till_done()
     hass.states.async_set(config[CONF_SHUTTER_CONTACT_ENTITY], "on")
     await hass.async_block_till_done()
+    current_time[0] += timedelta(seconds=7)
     hass.states.async_set(config[CONF_SHUTTER_CONTACT_ENTITY], "off")
     await hass.async_block_till_done()
+    assert runtime.shutter_detector.last_cycle_duration == timedelta(seconds=7)
     hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
     await hass.async_block_till_done()
     hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
@@ -3293,7 +3365,7 @@ def test_input_and_runtime_binary_sensor_states_and_attributes(hass):
 
     assert input_sensor.available is False
     assert input_sensor.is_on is None
-    assert input_sensor.icon == "mdi:blinds-open"
+    assert input_sensor.icon == "mdi:storefront-outline"
     assert input_sensor.extra_state_attributes == {"source_entity": entity_id}
 
     hass.states.async_set(entity_id, "unknown")
@@ -3304,10 +3376,10 @@ def test_input_and_runtime_binary_sensor_states_and_attributes(hass):
     hass.states.async_set(entity_id, "off")
     assert input_sensor.available is True
     assert input_sensor.is_on is False
-    assert input_sensor.icon == "mdi:blinds"
+    assert input_sensor.icon == "mdi:storefront-outline"
     hass.states.async_set(entity_id, "on")
     assert input_sensor.is_on is True
-    assert input_sensor.icon == "mdi:blinds-open"
+    assert input_sensor.icon == "mdi:storefront-outline"
 
     running_value = [None]
     running_sensor = ApplianceBinarySensor(
@@ -3316,12 +3388,12 @@ def test_input_and_runtime_binary_sensor_states_and_attributes(hass):
     running_sensor.hass = hass
     assert running_sensor.available is True
     assert running_sensor.is_on is None
-    assert running_sensor.icon == "mdi:blinds-open"
+    assert running_sensor.icon == "mdi:storefront-outline"
     assert running_sensor.extra_state_attributes == {"source_entity": entity_id}
     running_value[0] = False
-    assert running_sensor.icon == "mdi:blinds"
+    assert running_sensor.icon == "mdi:storefront-outline"
     running_value[0] = True
-    assert running_sensor.icon == "mdi:blinds-open"
+    assert running_sensor.icon == "mdi:storefront-outline"
 
     door_sensor = ApplianceBinarySensor(runtime, entry, "door", lambda: None)
     door_sensor.hass = hass
@@ -3354,8 +3426,8 @@ def test_input_and_runtime_binary_sensor_states_and_attributes(hass):
         (
             "awning",
             "sun_protection_contact",
-            "mdi:awning",
-            "mdi:awning",
+            "mdi:storefront-outline",
+            "mdi:storefront-outline",
             "awning_state",
         ),
     ),

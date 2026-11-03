@@ -111,7 +111,6 @@ _DURATION_CONFIG_KEYS = (
     CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
 )
 _MAX_DURATION_SECONDS = 24 * 60 * 60
-_CLEAR_ASSOCIATED_SHUTTER = "clear_associated_shutter"
 
 
 def _required(key: str, values: dict[str, Any]) -> vol.Required:
@@ -132,7 +131,7 @@ def _profile_step_id(step: str, profile_name: str) -> str:
 
 class _OptionalEntitySelector(selector.EntitySelector):
     def __call__(self, data: Any) -> str | list[str] | None:
-        if data is None:
+        if data in (None, ""):
             return None
         return super().__call__(data)
 
@@ -367,6 +366,7 @@ def _normalize_sensor_values(
     profile: ApplianceTypeProfile,
     *,
     clear_missing_optional: bool = False,
+    existing_values: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     normalized = dict(values)
     for sensor_input in profile.sensor_inputs:
@@ -379,12 +379,16 @@ def _normalize_sensor_values(
                 sensor_input.config_key not in normalized
                 and clear_missing_optional
                 and not sensor_input.required
+                and existing_values is not None
+                and sensor_input.config_key in existing_values
             ):
                 normalized[sensor_input.config_key] = None
         elif (
             sensor_input.form_key not in normalized
             and clear_missing_optional
             and not sensor_input.required
+            and existing_values is not None
+            and sensor_input.config_key in existing_values
         ):
             normalized[sensor_input.config_key] = None
     return normalized
@@ -394,8 +398,6 @@ def _sensor_schema(
     values: dict[str, Any],
     profile: ApplianceTypeProfile,
     hass: HomeAssistant | None = None,
-    *,
-    allow_clear_shutter: bool = False,
 ) -> vol.Schema:
     schema: dict[Any, Any] = {}
     optional_keys = set()
@@ -420,13 +422,6 @@ def _sensor_schema(
             entity_selector
             if sensor_input.required
             else _OptionalEntitySelector(selector_config)
-        )
-    if allow_clear_shutter and (
-        values.get(CONF_SHUTTER_CONTACT_ENTITY)
-        or values.get(CONF_SHUTTER_COVER_ENTITY)
-    ):
-        schema[vol.Optional(_CLEAR_ASSOCIATED_SHUTTER, default=False)] = (
-            selector.BooleanSelector()
         )
     return _SensorSchema(schema, optional_keys)
 
@@ -942,7 +937,13 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> dict[str, Any]:
         if user_input is not None:
             profile = get_appliance_profile(self._draft[CONF_APPLIANCE_TYPE])
-            self._draft.update(_normalize_sensor_values(user_input, profile))
+            normalized_values = _normalize_sensor_values(
+                dict(user_input),
+                profile,
+                clear_missing_optional=True,
+                existing_values=self._draft,
+            )
+            self._draft.update(normalized_values)
             error = _sensor_validation_error(self._draft, profile)
             if error is not None:
                 return self.async_show_form(
@@ -950,7 +951,9 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                         "sensors", self._draft[CONF_APPLIANCE_TYPE]
                     ),
                     data_schema=_sensor_schema(
-                        _sensor_form_values(self._draft, profile), profile, self.hass
+                        _sensor_form_values(self._draft, profile),
+                        profile,
+                        self.hass,
                     ),
                     errors={"base": error},
                     last_step=False,
@@ -963,7 +966,9 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                         "sensors", self._draft[CONF_APPLIANCE_TYPE]
                     ),
                     data_schema=_sensor_schema(
-                        _sensor_form_values(self._draft, profile), profile, self.hass
+                        _sensor_form_values(self._draft, profile),
+                        profile,
+                        self.hass,
                     ),
                     errors={"base": "climate_entity_requires_no_device"},
                     last_step=False,
@@ -973,7 +978,9 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id=_profile_step_id("sensors", self._draft[CONF_APPLIANCE_TYPE]),
             data_schema=_sensor_schema(
-                _sensor_form_values(self._draft, profile), profile, self.hass
+                _sensor_form_values(self._draft, profile),
+                profile,
+                self.hass,
             ),
             last_step=False,
         )
@@ -1408,16 +1415,12 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         values = {**self._saved, **self._draft}
         if user_input is not None:
             profile = get_appliance_profile(values[CONF_APPLIANCE_TYPE])
-            sensor_values = dict(user_input)
-            clear_associated_shutter = sensor_values.pop(
-                _CLEAR_ASSOCIATED_SHUTTER, False
-            )
             normalized_values = _normalize_sensor_values(
-                sensor_values, profile, clear_missing_optional=True
+                dict(user_input),
+                profile,
+                clear_missing_optional=True,
+                existing_values=values,
             )
-            if clear_associated_shutter:
-                normalized_values[CONF_SHUTTER_CONTACT_ENTITY] = None
-                normalized_values[CONF_SHUTTER_COVER_ENTITY] = None
             self._draft.update(
                 normalized_values
             )
@@ -1430,7 +1433,6 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                         _sensor_form_values(values, profile),
                         profile,
                         self.hass,
-                        allow_clear_shutter=True,
                     ),
                     errors={"base": error},
                     last_step=False,
@@ -1447,7 +1449,6 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                         _sensor_form_values(values, profile),
                         profile,
                         self.hass,
-                        allow_clear_shutter=True,
                     ),
                     errors={"base": "climate_entity_requires_no_device"},
                     last_step=False,
@@ -1460,7 +1461,6 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                 _sensor_form_values(values, profile),
                 profile,
                 self.hass,
-                allow_clear_shutter=True,
             ),
             last_step=False,
         )

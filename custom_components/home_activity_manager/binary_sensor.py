@@ -37,7 +37,7 @@ _RUNNING_ICONS = {
     "refrigerator": ("mdi:fridge", "mdi:fridge-off"),
     "freezer": ("mdi:fridge", "mdi:fridge-off"),
     "blind": ("mdi:blinds-open", "mdi:blinds"),
-    "awning": ("mdi:awning", "mdi:awning"),
+    "awning": ("mdi:storefront-outline", "mdi:storefront-outline"),
     "door": ("mdi:door-open", "mdi:door-closed"),
     "window": ("mdi:window-open", "mdi:window-closed"),
     "access": ("mdi:parking", "mdi:parking"),
@@ -45,8 +45,8 @@ _RUNNING_ICONS = {
     "air_conditioner_contact": ("mdi:hvac", "mdi:hvac-off"),
     "air_conditioner_power": ("mdi:hvac", "mdi:hvac-off"),
     "refrigerator_switch": ("mdi:fridge", "mdi:fridge-off"),
-    "sun_protection_contact": ("mdi:blinds-open", "mdi:blinds"),
-    "sun_protection_cover": ("mdi:blinds-open", "mdi:blinds"),
+    "sun_protection_contact": ("mdi:storefront-outline", "mdi:storefront-outline"),
+    "sun_protection_cover": ("mdi:storefront-outline", "mdi:storefront-outline"),
     "opening": ("mdi:door-open", "mdi:door-closed"),
 }
 _STATE_TRANSLATION_KEYS = {
