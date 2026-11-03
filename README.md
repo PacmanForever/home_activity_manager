@@ -56,6 +56,8 @@ Laundry and drying
 
 Openings
 |-- Door
+|   `-- Activity detection with a contact sensor
+|-- Access (garage, shop, warehouse, etc.)
 |   |-- Activity detection with a contact sensor
 |   `-- Activity detection with a cover entity
 `-- Window
@@ -75,6 +77,31 @@ Sun protection
     `-- Activity detection with a cover entity
 ```
 
+### Activity detection examples
+
+The entity IDs below are examples; select entities from your own Home Assistant instance. The activity source answers one question: what state or measurement should start and end this appliance's activity cycle?
+
+| Group | Profile and mode | Example source | What counts as active |
+| --- | --- | --- | --- |
+| Climate control | Air conditioner: contact | `binary_sensor.air_conditioner_running` | `on` starts activity; `off` ends it. The sensor should represent the air conditioner's active state. |
+| Climate control | Air conditioner: power | `sensor.air_conditioner_power` | Power must stay above the configured start threshold for its confirmation time. Activity ends after it stays below the finish threshold for its confirmation time. |
+| Climate control | Thermostat | `climate.living_room` | Any climate state other than `off` is active, including when the thermostat is idle; `off` ends activity. |
+| Deliveries | Mailbox: interior motion | `binary_sensor.mailbox_motion` plus `binary_sensor.front_door` | A new motion `on` transition records an arrival. Opening the main-door contact ends the pending collection. |
+| Deliveries | Mailbox: mail-slot contact | `binary_sensor.mail_slot` plus `binary_sensor.front_door` | A new slot-contact `on` transition records an arrival. Opening the main-door contact ends the pending collection. |
+| Laundry and drying | Washer | `sensor.washer_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
+| Laundry and drying | Dryer | `sensor.dryer_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
+| Laundry and drying | Dishwasher | `sensor.dishwasher_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
+| Openings | Door: contact | `binary_sensor.front_door_contact` | `on` means open and starts activity; `off` means closed and ends it. |
+| Openings | Access: contact | `binary_sensor.garage_contact` | `on` means open and starts activity; `off` means closed and ends it. |
+| Openings | Access: cover | `cover.garage_door` | A settled `open` state starts activity and `closed` ends it. `opening` and `closing` keep the last settled state and do not trigger actions. |
+| Openings | Window: contact | `binary_sensor.bedroom_window_contact` | `on` means open and starts activity; `off` means closed and ends it. |
+| Refrigeration | Refrigerator: power | `sensor.refrigerator_power` plus `binary_sensor.refrigerator_door` | Power detects compressor activity; the required door contact supports the door-open alarm. |
+| Refrigeration | Refrigerator: smart switch | `switch.refrigerator_plug` plus `binary_sensor.refrigerator_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
+| Refrigeration | Freezer: power | `sensor.freezer_power` plus `binary_sensor.freezer_door` | Power detects compressor activity; the required door contact supports the door-open alarm. |
+| Refrigeration | Freezer: smart switch | `switch.freezer_plug` plus `binary_sensor.freezer_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
+| Sun protection | Awning: contact | `binary_sensor.awning_position` | Tracks open/closed position and cycle duration, not motor movement; it does not create a `running` entity. |
+| Sun protection | Awning: cover | `cover.awning` | A settled `open` state is active and `closed` is inactive. `opening` and `closing` keep the last settled state. |
+
 ### Climate control
 
 - **Air conditioner:** choose contact-sensor or power-based activity detection. Contact mode requires its binary sensor; power mode uses configurable thresholds and confirmation times.
@@ -90,7 +117,7 @@ Washer, dryer, and dishwasher profiles detect cycles from power thresholds and c
 
 ### Openings
 
-Windows use a required contact sensor. Doors can use that same contact mode or a cover entity representing the door itself; cover actions run only after the entity settles at `open` or `closed`, not while it is `opening` or `closing`. In contact mode, a door can optionally include a lock and an associated shutter. A shutter uses either a contact sensor or a cover, never both, and its contact must differ from the door contact. The primary door cover is not an associated shutter. Configured locks and covers are represented by native proxies; an associated shutter also exposes its open/closed state.
+Windows use a required contact sensor, and conventional doors use contact detection with an optional associated shutter. **Access** is for openings whose primary role is to let people or vehicles enter or leave a space, such as a garage, shop, or warehouse. This is a functional distinction, not a statement about size or motorization. Access can use a required contact sensor or a cover entity as its primary detector; it does not have a second associated cover. A lock is optional in either mode and reports its own state; it does not determine whether the access is open or closed. For a primary cover, `open` starts activity and `closed` ends it; actions run only after the entity settles at one of those states, not while it is `opening` or `closing`. A configured cover or lock with no device is reused directly on the managed device; one already assigned to a device keeps that association and is represented by a native proxy. An associated shutter on a contact-mode door also exposes its open/closed state.
 
 ### Refrigeration
 

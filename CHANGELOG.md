@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.36 - 2026-11-03
+
+### Added
+
+- Add an Access opening class for garage, shop, warehouse, and similar entries, with contact or primary-cover detection and an optional lock.
+- Migrate existing cover-detected doors to the Access class and document the distinction from conventional doors and windows.
+
 ## v0.9.35 - 2026-11-03
 
 ### Changed

@@ -310,6 +310,8 @@ def _migrate_appliance_record(record: dict) -> dict:
 		appliance_class = config.get(CONF_APPLIANCE_CLASS) or get_legacy_appliance_class(
 			appliance_type
 		)
+		if appliance_type == "opening_cover" and appliance_class == "door":
+			appliance_class = "access"
 		data[CONF_APPLIANCE_TYPE] = get_canonical_appliance_type(appliance_type)
 		if appliance_class is not None:
 			data[CONF_APPLIANCE_CLASS] = appliance_class
@@ -325,7 +327,7 @@ async def _async_migrate_appliance_groups(
 	"""Move legacy category entries into the new appliance groups."""
 	group = _entry_appliance_group(entry)
 	if group is None:
-		hass.config_entries.async_update_entry(entry, version=9)
+		hass.config_entries.async_update_entry(entry, version=10)
 		return True
 
 	matching_entries = [
@@ -392,7 +394,35 @@ async def _async_migrate_appliance_groups(
 	data = {"category": group, "appliances": records}
 	title = get_appliance_group_name(group, hass.config.language)
 	hass.config_entries.async_update_entry(
-		entry, data=data, options={}, title=title, version=9
+		entry, data=data, options={}, title=title, version=10
+	)
+	return True
+
+
+async def _async_migrate_access_class(
+	hass: HomeAssistant, entry: ConfigEntry
+) -> bool:
+	"""Move saved cover-detected doors into the Access class."""
+	data = dict(entry.data)
+	options = dict(entry.options)
+	appliances = data.get("appliances")
+	if isinstance(appliances, list):
+		data["appliances"] = [
+			_migrate_appliance_record(record)
+			if isinstance(record, dict)
+			else record
+			for record in appliances
+		]
+	else:
+		config = {**data, **options}
+		if (
+			config.get(CONF_APPLIANCE_TYPE) == "opening_cover"
+			and config.get(CONF_APPLIANCE_CLASS) == "door"
+		):
+			data[CONF_APPLIANCE_CLASS] = "access"
+			options.pop(CONF_APPLIANCE_CLASS, None)
+	hass.config_entries.async_update_entry(
+		entry, data=data, options=options, version=10
 	)
 	return True
 
@@ -412,15 +442,17 @@ async def _async_migrate_to_appliance_groups(
 			return False
 		if entry.version == 8:
 			return await _async_migrate_appliance_groups(hass, entry)
-		return entry.version == 9
+		return entry.version == 10
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	"""Migrate old settings and hide the integration's native-domain proxies."""
-	if entry.version > 9:
+	if entry.version > 10:
 		return False
-	if entry.version == 9:
+	if entry.version == 10:
 		return True
+	if entry.version == 9:
+		return await _async_migrate_access_class(hass, entry)
 	if entry.version == 8:
 		return await _async_migrate_to_appliance_groups(hass, entry)
 	if entry.version == 7:

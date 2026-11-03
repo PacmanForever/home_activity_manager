@@ -1172,7 +1172,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.35" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.36" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Laundry and drying · Washer · Power sensor",
         "Laundry and drying · Dishwasher · Power sensor",
@@ -2133,7 +2133,7 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
     integration_registry = er.async_get(hass)
     if appliance_type.startswith("mailbox_"):
         status_key = "pending_unload"
-    elif appliance_type in ("opening", "sun_protection_contact"):
+    elif appliance_type in ("opening", "access_contact", "sun_protection_contact"):
         status_key = None
     else:
         status_key = "running"

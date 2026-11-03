@@ -476,6 +476,30 @@ APPLIANCE_PROFILES = {
         estimates_remaining=False,
         supports_max_runtime=False,
     ),
+    "access_contact": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="access_contact_sensor",
+                config_key=CONF_RUNNING_ENTITY,
+                domain="binary_sensor",
+                device_classes=("opening", "door", "window"),
+                required=True,
+                detection_source="running_sensor",
+            ),
+            SensorInput(
+                form_key="access_lock_entity",
+                config_key=CONF_LOCK_ENTITY,
+                domain="lock",
+                create_wrapper=False,
+            ),
+        ),
+        parameter_groups=(),
+        action_groups=("cycle_start", "cycle_finish", "lock_locked", "lock_unlocked"),
+        output_entities=("last_cycle_duration",),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
     "opening_cover": ApplianceTypeProfile(
         sensor_inputs=(
             SensorInput(
@@ -562,7 +586,8 @@ APPLIANCE_CATEGORIES = {
     },
     "dryer": {"power": "dryer"},
     "mailbox": {"mail_slot": "mailbox_slot", "mail_motion": "mailbox_motion"},
-    "opening": {"running_sensor": "opening", "cover": "opening_cover"},
+    "opening": {"running_sensor": "opening"},
+    "access": {"running_sensor": "access_contact", "cover": "opening_cover"},
     "refrigerator": {"smart_plug": "refrigerator_switch", "power": "refrigerator"},
     "sun_protection": {
         "running_sensor": "sun_protection_contact",
@@ -586,8 +611,9 @@ APPLIANCE_GROUPS = {
         "dishwasher": {"power": "laundry"},
     },
     "openings": {
-        "door": {"running_sensor": "opening", "cover": "opening_cover"},
+        "door": {"running_sensor": "opening"},
         "window": {"running_sensor": "opening"},
+        "access": {"running_sensor": "access_contact", "cover": "opening_cover"},
     },
     "sun_protection": {
         "awning": {
@@ -651,6 +677,7 @@ APPLIANCE_CLASS_NAMES = {
     "dishwasher": "Dishwasher",
     "door": "Door",
     "window": "Window",
+    "access": "Access",
     "blind": "Blind",
     "awning": "Awning",
     "mailbox": "Mailbox",
@@ -669,6 +696,7 @@ APPLIANCE_CLASS_TRANSLATIONS = {
         "dishwasher": "Rentaplats",
         "door": "Porta",
         "window": "Finestra",
+        "access": "Accés",
         "blind": "Persiana",
         "awning": "Tendal",
         "mailbox": "Bústia",
@@ -685,6 +713,7 @@ APPLIANCE_CLASS_TRANSLATIONS = {
         "dishwasher": "Lavavajillas",
         "door": "Puerta",
         "window": "Ventana",
+        "access": "Acceso",
         "blind": "Persiana",
         "awning": "Toldo",
         "mailbox": "Buzón",
@@ -700,6 +729,7 @@ APPLIANCE_CATEGORY_NAMES = {
     "dryer": "Dryer",
     "mailbox": "Mailbox",
     "opening": "Opening",
+    "access": "Access",
     "refrigerator": "Refrigerator",
     "sun_protection": "Sun protection",
     "washer": "Washer",
@@ -712,6 +742,7 @@ APPLIANCE_CATEGORY_TRANSLATIONS = {
         "dryer": "Assecadora",
         "mailbox": "Bústia",
         "opening": "Obertura",
+        "access": "Accés",
         "refrigerator": "Nevera",
         "sun_protection": "Protecció solar",
         "washer": "Rentadora",
@@ -722,6 +753,7 @@ APPLIANCE_CATEGORY_TRANSLATIONS = {
         "dryer": "Secadora",
         "mailbox": "Buzón",
         "opening": "Apertura",
+        "access": "Acceso",
         "refrigerator": "Frigorífico",
         "sun_protection": "Protección solar",
         "washer": "Lavadora",
@@ -756,6 +788,7 @@ def get_appliance_class_name(appliance_class: str, language: str = "en") -> str:
 
 # Keep the selector alphabetized by its Catalan display labels.
 APPLIANCE_TYPES = (
+    "access_contact",
     "air_conditioner_contact",
     "air_conditioner_power",
     "dryer",
@@ -786,6 +819,7 @@ APPLIANCE_MODEL_NAMES = {
     "refrigerator_switch": "Refrigerator (smart switch)",
     "mailbox_motion": "Mailbox (interior motion sensor)",
     "mailbox_slot": "Mailbox (mail-slot contact/opening sensor)",
+    "access_contact": "Access (contact sensor)",
     "opening": "Opening (contact sensor)",
     "opening_cover": "Opening (cover)",
     "sun_protection_contact": "Sun protection (contact sensor)",
@@ -849,6 +883,7 @@ LEGACY_APPLIANCE_CLASSES = {
     "refrigerator_switch": "refrigerator",
     "mailbox_motion": "mailbox",
     "mailbox_slot": "mailbox",
+    "access_contact": "access",
     "opening": "opening",
     "opening_cover": "door",
     "sun_protection_contact": "sun_protection",
@@ -863,6 +898,7 @@ LEGACY_APPLIANCE_GROUPS = {
     "dishwasher": "laundry",
     "dryer": "laundry",
     "opening": "openings",
+    "access_contact": "openings",
     "opening_cover": "openings",
     "sun_protection_contact": "sun_protection",
     "sun_protection_cover": "sun_protection",

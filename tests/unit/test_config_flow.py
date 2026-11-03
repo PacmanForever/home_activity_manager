@@ -257,9 +257,67 @@ class ConfigFlowSchemaTests(unittest.TestCase):
     def test_appliance_class_names_follow_configured_language(self) -> None:
         self.assertEqual(get_appliance_class_name("washer", "ca"), "Rentadora")
         self.assertEqual(get_appliance_class_name("door", "es"), "Puerta")
+        self.assertEqual(get_appliance_class_name("access", "ca"), "Accés")
+        self.assertEqual(get_appliance_class_name("access", "es"), "Acceso")
         self.assertEqual(get_appliance_class_name("washer"), "Washer")
         self.assertTrue(APPLIANCE_PROFILES["washer"].supports_smart_plug)
         self.assertFalse(APPLIANCE_PROFILES["opening"].supports_smart_plug)
+
+    def test_access_contact_profile_has_no_associated_shutter(self) -> None:
+        profile = get_appliance_profile("access_contact")
+        input_keys = {item.config_key for item in profile.sensor_inputs}
+        action_keys = set(profile.action_groups)
+
+        self.assertIn(CONF_RUNNING_ENTITY, input_keys)
+        self.assertIn(CONF_LOCK_ENTITY, input_keys)
+        self.assertNotIn(CONF_SHUTTER_CONTACT_ENTITY, input_keys)
+        self.assertNotIn(CONF_SHUTTER_COVER_ENTITY, input_keys)
+        self.assertNotIn("shutter_open", action_keys)
+        self.assertNotIn("shutter_close", action_keys)
+
+    def test_access_selector_label_includes_examples_in_all_languages(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        expected = {
+            "strings.json": "Access (garage, shop, warehouse, etc.)",
+            "en.json": "Access (garage, shop, warehouse, etc.)",
+            "ca.json": "Accés (garatge, botiga, magatzem, etc.)",
+            "es.json": "Acceso (garaje, tienda, almacén, etc.)",
+        }
+        paths = {
+            "strings.json": root / "strings.json",
+            "en.json": root / "translations" / "en.json",
+            "ca.json": root / "translations" / "ca.json",
+            "es.json": root / "translations" / "es.json",
+        }
+        for name, path in paths.items():
+            translation = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                translation["selector"]["appliance_class"]["options"]["access"],
+                expected[name],
+            )
+
+    def test_translation_strings_do_not_contain_jinja_delimiters(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        paths = (
+            root / "strings.json",
+            root / "translations" / "en.json",
+            root / "translations" / "es.json",
+            root / "translations" / "ca.json",
+        )
+
+        def assert_no_jinja(value, path: str) -> None:
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    assert_no_jinja(child, f"{path}.{key}")
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    assert_no_jinja(child, f"{path}[{index}]")
+            elif isinstance(value, str):
+                self.assertNotIn("{{", value, path)
+                self.assertNotIn("}}", value, path)
+
+        for path in paths:
+            assert_no_jinja(json.loads(path.read_text(encoding="utf-8")), str(path))
 
     def test_legacy_blind_class_remains_editable_but_is_not_a_new_choice(self) -> None:
         self.assertNotIn("blind", APPLIANCE_GROUPS["sun_protection"])
@@ -487,6 +545,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         }
         expected_input_wrappers = {
             "opening": {CONF_RUNNING_ENTITY},
+            "access_contact": {CONF_RUNNING_ENTITY},
             "sun_protection_contact": {CONF_RUNNING_ENTITY},
         }
         for appliance_type, profile in APPLIANCE_PROFILES.items():
@@ -977,7 +1036,8 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                         translation[flow]["step"][f"actions_{profile_name}"]["data"][key]
                         for profile_name, profile in APPLIANCE_PROFILES.items()
                         if group in profile.action_groups
-                        and profile_name not in {"opening", "opening_cover"}
+                        and profile_name
+                        not in {"opening", "access_contact", "opening_cover"}
                     }
                     self.assertEqual(len(labels), 1, (path, flow, group))
 

@@ -205,7 +205,7 @@ async def test_add_appliance_through_four_config_flow_steps(
 
 
 @pytest.mark.asyncio
-async def test_add_door_with_primary_cover_mode(hass, enable_custom_integrations):
+async def test_add_access_with_primary_cover_mode(hass, enable_custom_integrations):
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
@@ -215,7 +215,7 @@ async def test_add_door_with_primary_cover_mode(hass, enable_custom_integrations
         {"name": "Garage door", CONF_APPLIANCE_GROUP: "openings"},
     )
     result = await hass.config_entries.flow.async_configure(
-        flow_id, {CONF_APPLIANCE_CLASS: "door"}
+        flow_id, {CONF_APPLIANCE_CLASS: "access"}
     )
     result = await hass.config_entries.flow.async_configure(
         flow_id, {"activity_mode": "cover"}
@@ -232,19 +232,70 @@ async def test_add_door_with_primary_cover_mode(hass, enable_custom_integrations
     assert result["type"] is FlowResultType.CREATE_ENTRY
     appliance = result["data"]["appliances"][0]
     assert appliance["data"][CONF_APPLIANCE_TYPE] == "opening_cover"
-    assert appliance["data"][CONF_APPLIANCE_CLASS] == "door"
+    assert appliance["data"][CONF_APPLIANCE_CLASS] == "access"
     assert appliance["data"][CONF_COVER_ENTITY] == "cover.garage_door"
 
 
 @pytest.mark.asyncio
-async def test_edit_door_with_primary_cover_mode(hass, enable_custom_integrations):
+async def test_add_access_with_contact_and_optional_lock(hass, enable_custom_integrations):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {"name": "Garage access", CONF_APPLIANCE_GROUP: "openings"},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_APPLIANCE_CLASS: "access"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {"activity_mode": "running_sensor"}
+    )
+    assert result["step_id"] == "sensors_access_contact"
+    sensor_keys = {marker.schema for marker in result["data_schema"].schema}
+    assert "access_contact_sensor" in sensor_keys
+    assert "access_lock_entity" in sensor_keys
+    assert CONF_SHUTTER_CONTACT_ENTITY not in sensor_keys
+    assert CONF_SHUTTER_COVER_ENTITY not in sensor_keys
+    assert CONF_COVER_ENTITY not in sensor_keys
+
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {
+            "access_contact_sensor": "binary_sensor.garage_access",
+            "access_lock_entity": "lock.garage_access",
+        },
+    )
+    assert result["step_id"] == "actions_access_contact"
+    action_keys = {marker.schema for marker in result["data_schema"].schema}
+    assert CONF_LOCK_LOCKED_ACTIONS in action_keys
+    assert CONF_LOCK_UNLOCKED_ACTIONS in action_keys
+    assert CONF_SHUTTER_OPEN_ACTIONS not in action_keys
+    assert CONF_SHUTTER_CLOSE_ACTIONS not in action_keys
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: []}
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    appliance = result["data"]["appliances"][0]
+    assert appliance["data"][CONF_APPLIANCE_TYPE] == "access_contact"
+    assert appliance["data"][CONF_APPLIANCE_CLASS] == "access"
+    assert appliance["data"][CONF_RUNNING_ENTITY] == "binary_sensor.garage_access"
+    assert appliance["data"][CONF_LOCK_ENTITY] == "lock.garage_access"
+    assert CONF_SHUTTER_CONTACT_ENTITY not in appliance["data"]
+    assert CONF_SHUTTER_COVER_ENTITY not in appliance["data"]
+
+
+@pytest.mark.asyncio
+async def test_edit_access_with_primary_cover_mode(hass, enable_custom_integrations):
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
             "category": "openings",
             "name": "Garage door",
             CONF_APPLIANCE_TYPE: "opening_cover",
-            CONF_APPLIANCE_CLASS: "door",
+            CONF_APPLIANCE_CLASS: "access",
             CONF_COVER_ENTITY: "cover.garage_door",
         },
     )
@@ -725,7 +776,7 @@ async def test_migrate_saved_duration_options_from_minutes_to_seconds(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 9
+    assert entry.version == 10
     assert entry.options == {
         "start_duration_seconds": 15,
         "finish_duration_seconds": 60,
@@ -735,12 +786,53 @@ async def test_migrate_saved_duration_options_from_minutes_to_seconds(hass):
 
 
 @pytest.mark.asyncio
+async def test_migrate_cover_door_to_access_class(hass):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=9,
+        data={
+            "category": "openings",
+            "appliances": [
+                {
+                    "id": "garage-access",
+                    "data": {
+                        CONF_APPLIANCE_TYPE: "opening_cover",
+                        CONF_APPLIANCE_CLASS: "door",
+                        CONF_COVER_ENTITY: "cover.garage_door",
+                    },
+                    "options": {},
+                },
+                {
+                    "id": "front-door",
+                    "data": {
+                        CONF_APPLIANCE_TYPE: "opening",
+                        CONF_APPLIANCE_CLASS: "door",
+                        CONF_RUNNING_ENTITY: "binary_sensor.front_door",
+                        CONF_SHUTTER_COVER_ENTITY: "cover.front_door_shutter",
+                    },
+                    "options": {},
+                },
+            ],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry)
+
+    assert entry.version == 10
+    access, door = entry.data["appliances"]
+    assert access["data"][CONF_APPLIANCE_CLASS] == "access"
+    assert door["data"][CONF_APPLIANCE_CLASS] == "door"
+    assert door["data"][CONF_SHUTTER_COVER_ENTITY] == "cover.front_door_shutter"
+
+
+@pytest.mark.asyncio
 async def test_migrate_future_config_entry_version_is_rejected(hass):
-    entry = MockConfigEntry(domain=DOMAIN, version=10)
+    entry = MockConfigEntry(domain=DOMAIN, version=11)
     entry.add_to_hass(hass)
 
     assert not await async_migrate_entry(hass, entry)
-    assert entry.version == 10
+    assert entry.version == 11
 
 
 @pytest.mark.asyncio
@@ -828,7 +920,7 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
     )
     merged = next(entry for entry in entries if entry is not survivor)
 
-    assert survivor.version == 9
+    assert survivor.version == 10
     assert survivor.data["category"] == "laundry"
     assert all(
         record["data"][CONF_APPLIANCE_TYPE] == "laundry"
@@ -887,7 +979,7 @@ async def test_migrate_hides_existing_proxies_without_overriding_user_choice(
 
     migrated_proxy = registry.async_get(proxy.entity_id)
     assert migrated_proxy.hidden_by == expected_hidden_by
-    assert entry.version == 9
+    assert entry.version == 10
 
     if expected_hidden_by == er.RegistryEntryHider.INTEGRATION:
         registry.async_update_entity(proxy.entity_id, hidden_by=None)
@@ -926,7 +1018,7 @@ async def test_migrate_releases_legacy_climate_device_assignment(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 9
+    assert entry.version == 10
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
 
 
@@ -954,7 +1046,7 @@ async def test_migrate_removes_unsupported_ac_contact_sensor(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 9
+    assert entry.version == 10
     assert entry.data["category"] == "climate"
     expected_type = (
         "thermostat_climate"
@@ -995,7 +1087,7 @@ async def test_migrate_removes_refrigerator_compressor_and_plug_alarms(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 9
+    assert entry.version == 10
     assert entry.data["appliances"][0]["data"][CONF_APPLIANCE_CLASS] == "refrigerator"
     assert entry.options == {}
     assert entry.data["appliances"][0]["options"] == {
