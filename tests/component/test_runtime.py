@@ -41,6 +41,8 @@ from custom_components.home_activity_manager.const import (
     CONF_MAIL_SLOT_ENTITY,
     CONF_LOCK_ENTITY,
     CONF_LOCK_ENTITY,
+    CONF_LOCK_LOCKED_ACTIONS,
+    CONF_LOCK_UNLOCKED_ACTIONS,
     CONF_MAX_RUNTIME_ACTIONS,
     CONF_MAX_RUNTIME_SECONDS,
     CONF_PENDING_ACTIONS,
@@ -53,6 +55,10 @@ from custom_components.home_activity_manager.const import (
     CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
     CONF_POWER_ENTITY,
     CONF_RUNNING_ENTITY,
+    CONF_SHUTTER_CONTACT_ENTITY,
+    CONF_SHUTTER_COVER_ENTITY,
+    CONF_SHUTTER_OPEN_ACTIONS,
+    CONF_SHUTTER_CLOSE_ACTIONS,
     CONF_START_ACTIONS,
     DOMAIN,
 )
@@ -1166,7 +1172,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.32" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.33" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Laundry and drying · Washer · Power sensor",
         "Laundry and drying · Dishwasher · Power sensor",
@@ -1825,6 +1831,171 @@ async def test_opening_contact_tracks_position_without_running_output(
     assert not entry.runtime_data.detector.is_running
     assert entry.runtime_data.detector.last_cycle_duration == timedelta(seconds=12)
     assert hass.states.get(position_entity_id).state == "off"
+
+
+@pytest.mark.asyncio
+async def test_opening_lock_and_shutter_actions_follow_stable_transitions(
+    hass, monkeypatch
+):
+    config = {
+        CONF_APPLIANCE_TYPE: "opening",
+        CONF_RUNNING_ENTITY: "binary_sensor.front_door",
+        CONF_LOCK_ENTITY: "lock.front_door",
+        CONF_SHUTTER_CONTACT_ENTITY: "binary_sensor.front_shutter",
+    }
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    hass.states.async_set(config[CONF_LOCK_ENTITY], "locked")
+    hass.states.async_set(config[CONF_SHUTTER_CONTACT_ENTITY], "off")
+    group_actions = {
+        key: [{"action": f"test.{key}"}]
+        for key in (
+            CONF_START_ACTIONS,
+            CONF_FINISH_ACTIONS,
+            CONF_LOCK_LOCKED_ACTIONS,
+            CONF_LOCK_UNLOCKED_ACTIONS,
+            CONF_SHUTTER_OPEN_ACTIONS,
+            CONF_SHUTTER_CLOSE_ACTIONS,
+        )
+    }
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"category": "openings"},
+        options={CONF_GROUP_ACTIONS: group_actions},
+    )
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    actions = []
+    monkeypatch.setattr(
+        runtime,
+        "_run_actions_in_background",
+        lambda key, source_entity_id=None: actions.append((key, source_entity_id)),
+    )
+    await runtime.async_setup()
+
+    hass.states.async_set(config[CONF_LOCK_ENTITY], "unlocking")
+    await hass.async_block_till_done()
+    assert actions == []
+    hass.states.async_set(config[CONF_LOCK_ENTITY], "unlocked")
+    await hass.async_block_till_done()
+    hass.states.async_set(config[CONF_LOCK_ENTITY], "locking")
+    await hass.async_block_till_done()
+    hass.states.async_set(config[CONF_LOCK_ENTITY], "locked")
+    await hass.async_block_till_done()
+    hass.states.async_set(config[CONF_SHUTTER_CONTACT_ENTITY], "on")
+    await hass.async_block_till_done()
+    hass.states.async_set(config[CONF_SHUTTER_CONTACT_ENTITY], "off")
+    await hass.async_block_till_done()
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
+    await hass.async_block_till_done()
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    await hass.async_block_till_done()
+
+    assert actions == [
+        (CONF_LOCK_UNLOCKED_ACTIONS, config[CONF_LOCK_ENTITY]),
+        (CONF_LOCK_LOCKED_ACTIONS, config[CONF_LOCK_ENTITY]),
+        (CONF_SHUTTER_OPEN_ACTIONS, config[CONF_SHUTTER_CONTACT_ENTITY]),
+        (CONF_SHUTTER_CLOSE_ACTIONS, config[CONF_SHUTTER_CONTACT_ENTITY]),
+        (CONF_START_ACTIONS, config[CONF_RUNNING_ENTITY]),
+        (CONF_FINISH_ACTIONS, config[CONF_RUNNING_ENTITY]),
+    ]
+    await runtime.async_unload()
+
+
+@pytest.mark.asyncio
+async def test_cover_actions_wait_for_settled_open_and_closed_states(
+    hass, monkeypatch
+):
+    config = {
+        CONF_APPLIANCE_TYPE: "opening_cover",
+        CONF_COVER_ENTITY: "cover.garage_door",
+    }
+    hass.states.async_set(config[CONF_COVER_ENTITY], "closed")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"category": "openings"},
+        options={
+            CONF_GROUP_ACTIONS: {
+                CONF_START_ACTIONS: [{"action": "test.group_start"}],
+                CONF_FINISH_ACTIONS: [{"action": "test.group_finish"}],
+            }
+        },
+    )
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    actions = []
+    monkeypatch.setattr(
+        runtime,
+        "_run_actions_in_background",
+        lambda key, source_entity_id=None: actions.append((key, source_entity_id)),
+    )
+    await runtime.async_setup()
+
+    hass.states.async_set(config[CONF_COVER_ENTITY], "opening")
+    await hass.async_block_till_done()
+    assert actions == []
+    hass.states.async_set(config[CONF_COVER_ENTITY], "open")
+    await hass.async_block_till_done()
+    hass.states.async_set(config[CONF_COVER_ENTITY], "closing")
+    await hass.async_block_till_done()
+    assert actions == [(CONF_START_ACTIONS, config[CONF_COVER_ENTITY])]
+    hass.states.async_set(config[CONF_COVER_ENTITY], "closed")
+    await hass.async_block_till_done()
+    assert actions == [
+        (CONF_START_ACTIONS, config[CONF_COVER_ENTITY]),
+        (CONF_FINISH_ACTIONS, config[CONF_COVER_ENTITY]),
+    ]
+    await runtime.async_unload()
+
+
+@pytest.mark.asyncio
+async def test_associated_shutter_cover_actions_wait_for_settled_states(
+    hass, monkeypatch
+):
+    config = {
+        CONF_APPLIANCE_TYPE: "opening",
+        CONF_RUNNING_ENTITY: "binary_sensor.front_door",
+        CONF_SHUTTER_COVER_ENTITY: "cover.front_shutter",
+    }
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "closed")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"category": "openings"},
+        options={
+            CONF_GROUP_ACTIONS: {
+                CONF_SHUTTER_OPEN_ACTIONS: [{"action": "test.shutter_open"}],
+                CONF_SHUTTER_CLOSE_ACTIONS: [{"action": "test.shutter_close"}],
+            }
+        },
+    )
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    actions = []
+    monkeypatch.setattr(
+        runtime,
+        "_run_actions_in_background",
+        lambda key, source_entity_id=None: actions.append((key, source_entity_id)),
+    )
+    await runtime.async_setup()
+
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "opening")
+    await hass.async_block_till_done()
+    assert actions == []
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "open")
+    await hass.async_block_till_done()
+    assert runtime.shutter_open is True
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "closing")
+    await hass.async_block_till_done()
+    assert len(actions) == 1
+    hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "closed")
+    await hass.async_block_till_done()
+
+    assert actions == [
+        (CONF_SHUTTER_OPEN_ACTIONS, config[CONF_SHUTTER_COVER_ENTITY]),
+        (CONF_SHUTTER_CLOSE_ACTIONS, config[CONF_SHUTTER_COVER_ENTITY]),
+    ]
+    assert runtime.shutter_open is False
+    await runtime.async_unload()
 
 
 @pytest.mark.parametrize(

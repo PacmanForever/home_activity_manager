@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_COVER_ENTITY
+from .const import CONF_COVER_ENTITY, CONF_SHUTTER_COVER_ENTITY, DOMAIN
 from .entity_proxy import EntityProxyMixin
 from .runtime import ApplianceRuntime, entry_runtimes
 
@@ -38,7 +38,8 @@ class ApplianceCoverProxy(EntityProxyMixin, CoverEntity):
         self._init_proxy(
             runtime,
             entry,
-            runtime.config[CONF_COVER_ENTITY],
+            runtime.config.get(CONF_COVER_ENTITY)
+            or runtime.config[CONF_SHUTTER_COVER_ENTITY],
             "cover",
             "cover_proxy",
         )
@@ -137,7 +138,14 @@ async def async_setup_entry(
     registry = er.async_get(hass)
     for runtime in entry_runtimes(entry):
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
-        if runtime.config.get(CONF_COVER_ENTITY):
+        stale_shutter_id = registry.async_get_entity_id(
+            "cover", DOMAIN, f"{appliance_id}_shutter"
+        )
+        if stale_shutter_id is not None:
+            registry.async_remove(stale_shutter_id)
+        if runtime.config.get(CONF_COVER_ENTITY) or runtime.config.get(
+            CONF_SHUTTER_COVER_ENTITY
+        ):
             async_add_entities([ApplianceCoverProxy(runtime, entry)])
             continue
         proxy_id = registry.async_get_entity_id(

@@ -24,7 +24,7 @@
       "appliance_class": {"title": "Classe de dispositiu", "description": "Tria una classe dins de l’agrupació seleccionada.", "data": {"appliance_class": "Classe de dispositiu"}},
       "activity_mode_climate": {"title": "Modalitat de detecció de climatització", "data": {"activity_mode": "Com detecta l’activitat aquest dispositiu de climatització"}, "data_description": {"activity_mode": "Tria la font d’activitat de el dispositiu."}},
       "activity_mode_laundry": {"title": "Modalitat de detecció de rentat i assecat", "data": {"activity_mode": "Com detecta l’activitat aquest dispositiu"}, "data_description": {"activity_mode": "Tria la font d’activitat de la rentadora, l’assecadora o el rentaplats."}},
-      "activity_mode_openings": {"title": "Modalitat de detecció d’obertures", "data": {"activity_mode": "Com informa de l’estat aquesta obertura"}, "data_description": {"activity_mode": "Tria el sensor que informa dels estats obert i tancat."}},
+      "activity_mode_openings": {"title": "Modalitat de detecció d’obertures", "data": {"activity_mode": "Com informa de l’estat aquesta obertura"}, "data_description": {"activity_mode": "Tria el sensor de contacte o una entitat cover que representi una porta."}},
       "activity_mode_deliveries": {"title": "Modalitat de detecció de lliuraments", "data": {"activity_mode": "Com detecta l’arribada de correu aquesta bústia"}, "data_description": {"activity_mode": "Tria el sensor d’arribada de correu."}},
       "activity_mode_refrigeration": {"title": "Modalitat de detecció de refrigeració", "data": {"activity_mode": "Com detecta l’activitat aquest dispositiu"}, "data_description": {"activity_mode": "Tria la font d’activitat de la nevera o el congelador."}},
       "sensors_laundry": {"title": "Sensors de rentat i assecat", "data": {"laundry_power_entity": "Sensor de potència en watts (obligatori)", "laundry_door_entity": "Sensor de porta de el dispositiu (opcional)", "laundry_plug_entity": "Endoll intel·ligent (opcional)", "laundry_energy_entity": "Sensor d’energia acumulada (opcional)"}},
@@ -38,9 +38,12 @@
       "activity_mode_dishwasher": {"title": "Modalitat de detecció del rentaplats", "data": {"activity_mode": "Com detecta l’activitat aquest rentaplats"}, "data_description": {"activity_mode": "Tria la modalitat de detecció pròpia del rentaplats."}},
       "activity_mode_opening": {"title": "Modalitat de detecció de l’obertura", "data": {"activity_mode": "Com informa del seu estat aquesta obertura"}, "data_description": {"activity_mode": "Tria el sensor de contacte que informa dels estats obert i tancat."}},
       "activity_mode_sun_protection": {"title": "Modalitat de detecció de la protecció solar", "data": {"activity_mode": "Com informa del seu estat aquesta protecció solar"}, "data_description": {"activity_mode": "El contacte informa de la posició obert/tancat, no del moviment del motor. L’entitat cover informa del seu estat."}},
-      "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)"}},
+      "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)", "opening_shutter_contact_entity": "Sensor de contacte de la persiana associada (opcional)", "opening_shutter_cover_entity": "Cover de la persiana associada (opcional)"}},
+      "sensors_opening_cover": {"title": "Sensors de la porta amb cover", "data": {"opening_cover_entity": "Entitat cover de la porta (obligatori)", "opening_cover_lock_entity": "Pany (opcional)"}},
+      "parameters_opening_cover": {"title": "Paràmetres de la porta", "data": {}},
+      "actions_opening_cover": {"title": "Accions de la porta", "data": {"start_actions": "Accions quan s’obre la porta (opcional)", "finish_actions": "Accions quan es tanca la porta (opcional)", "lock_locked_actions": "Accions quan es bloqueja el pany (opcional)", "lock_unlocked_actions": "Accions quan es desbloqueja el pany (opcional)"}},
       "parameters_opening": {"title": "Paràmetres de l’obertura", "data": {}},
-      "actions_opening": {"title": "Accions de l’obertura", "data": {"start_actions": "Accions quan comença el cicle (opcional)", "finish_actions": "Accions quan acaba el cicle (opcional)"}},
+      "actions_opening": {"title": "Accions de l’obertura", "data": {"start_actions": "Accions quan s’obre l’obertura (opcional)", "finish_actions": "Accions quan es tanca l’obertura (opcional)", "lock_locked_actions": "Accions quan es bloqueja el pany (opcional)", "lock_unlocked_actions": "Accions quan es desbloqueja el pany (opcional)", "shutter_open_actions": "Accions quan s’obre la persiana (opcional)", "shutter_close_actions": "Accions quan es tanca la persiana (opcional)"}},
       "sensors_sun_protection_contact": {"title": "Protecció solar (sensor de contacte)", "data": {"sun_protection_contact_sensor": "Sensor de contacte obert/tancat (obligatori)"}},
       "parameters_sun_protection_contact": {"title": "Paràmetres de protecció solar", "data": {}},
       "actions_sun_protection_contact": {"title": "Accions de protecció solar", "data": {"start_actions": "Accions quan comença el cicle (opcional)", "finish_actions": "Accions quan acaba el cicle (opcional)"}},
@@ -84,7 +87,9 @@
       "invalid_alarm_settings": "Els retards i l’interval han de ser enters positius. Les repeticions addicionals han de ser un enter no negatiu.",
       "invalid_plug_off_alarm_settings": "L’interval de repetició amb l’endoll apagat ha de ser un enter positiu i les alarmes addicionals, un enter no negatiu.",
       "appliance_type_immutable": "No es poden canviar el tipus de dispositiu ni la modalitat d'activitat després de configurar-lo. Afegeix un dispositiu nou per canviar-los.",
-      "mailbox_sensors_must_be_distinct": "El sensor d’arribada de correu i el sensor de la porta principal han de ser entitats diferents."
+      "mailbox_sensors_must_be_distinct": "El sensor d’arribada de correu i el sensor de la porta principal han de ser entitats diferents.",
+      "invalid_shutter_sources": "Tria el sensor de contacte o l’entitat cover de la persiana associada, però no tots dos.",
+      "shutter_sensors_must_be_distinct": "El contacte de l’obertura i el contacte de la persiana associada han de ser entitats diferents."
     }
   },
   "options": {
@@ -105,14 +110,14 @@
       "group_actions": {
         "title": "Accions de l’agrupació",
         "description": "Les accions compartides s’executen per separat per a cada dispositiu, abans que les accions locals. [Guia i exemples](https://github.com/PacmanForever/home_activity_manager#group-actions).",
-        "data": {"start_actions": "Accions quan comença l’activitat (opcional)", "finish_actions": "Accions quan acaba l’activitat (opcional)", "max_runtime_actions": "Accions si se supera el temps màxim (opcional)", "pending_actions": "Accions mentre està pendent de buidar o recollir (opcional)", "emptied_actions": "Accions quan es retira o recull el contingut (opcional)", "door_open_actions": "Accions mentre l’alarma de porta oberta està activa (opcional)", "compressor_inactive_actions": "Accions mentre l’alarma de compressor inactiu està activa (opcional)", "plug_off_actions": "Accions mentre l’endoll intel·ligent està apagat (opcional)"},
-        "data_description": {"start_actions": "S’executen quan la font d’activitat pròpia d’aquest dispositiu confirma l’inici. Els llindars o temps de confirmació que siguin aplicables es configuren per a cada dispositiu.", "finish_actions": "S’executen quan la font d’activitat pròpia d’aquest dispositiu confirma que l’activitat ha acabat. Els llindars o temps de confirmació que siguin aplicables es configuren per a cada dispositiu.", "max_runtime_actions": "S’executen una sola vegada quan aquest dispositiu supera el seu temps màxim configurat. Si no se n’ha configurat cap, aquesta acció no s’activa.", "pending_actions": "El retard inicial, l’interval i el límit de repeticions addicionals d’aquest dispositiu en determinen els avisos. El primer avís no compta com a repetició. Tres repeticions addicionals permeten fins a quatre execucions.", "emptied_actions": "S’executen quan es neteja l’estat pendent d’aquest dispositiu, per exemple en obrir-ne la porta o fer servir el control de buidatge.", "door_open_actions": "El retard de l’alarma de porta, l’interval i el límit de repeticions addicionals d’aquest dispositiu en determinen els avisos. La primera execució no compta com a repetició.", "compressor_inactive_actions": "El retard de l’alarma del compressor, l’interval i el límit de repeticions addicionals d’aquest dispositiu en determinen els avisos. La primera execució no compta com a repetició.", "plug_off_actions": "S’executen immediatament quan s’apaga l’endoll intel·ligent d’aquest dispositiu. El seu interval i el límit de repeticions addicionals en determinen les execucions posteriors. La primera execució no compta com a repetició."}
+        "data": {"start_actions": "Accions quan comença l’activitat (opcional)", "finish_actions": "Accions quan acaba l’activitat (opcional)", "max_runtime_actions": "Accions si se supera el temps màxim (opcional)", "pending_actions": "Accions mentre està pendent de buidar o recollir (opcional)", "emptied_actions": "Accions quan es retira o recull el contingut (opcional)", "door_open_actions": "Accions mentre l’alarma de porta oberta està activa (opcional)", "compressor_inactive_actions": "Accions mentre l’alarma de compressor inactiu està activa (opcional)", "plug_off_actions": "Accions mentre l’endoll intel·ligent està apagat (opcional)", "lock_locked_actions": "Accions quan es bloqueja el pany d’una obertura (opcional)", "lock_unlocked_actions": "Accions quan es desbloqueja el pany d’una obertura (opcional)", "shutter_open_actions": "Accions quan s’obre una persiana associada (opcional)", "shutter_close_actions": "Accions quan es tanca una persiana associada (opcional)"},
+        "data_description": {"start_actions": "S’executen quan la font d’activitat pròpia d’aquest dispositiu confirma l’inici. Els llindars o temps de confirmació que siguin aplicables es configuren per a cada dispositiu.", "finish_actions": "S’executen quan la font d’activitat pròpia d’aquest dispositiu confirma que l’activitat ha acabat. Els llindars o temps de confirmació que siguin aplicables es configuren per a cada dispositiu.", "max_runtime_actions": "S’executen una sola vegada quan aquest dispositiu supera el seu temps màxim configurat. Si no se n’ha configurat cap, aquesta acció no s’activa.", "pending_actions": "El retard inicial, l’interval i el límit de repeticions addicionals d’aquest dispositiu en determinen els avisos. El primer avís no compta com a repetició. Tres repeticions addicionals permeten fins a quatre execucions.", "emptied_actions": "S’executen quan es neteja l’estat pendent d’aquest dispositiu, per exemple en obrir-ne la porta o fer servir el control de buidatge.", "door_open_actions": "El retard de l’alarma de porta, l’interval i el límit de repeticions addicionals d’aquest dispositiu en determinen els avisos. La primera execució no compta com a repetició.", "compressor_inactive_actions": "El retard de l’alarma del compressor, l’interval i el límit de repeticions addicionals d’aquest dispositiu en determinen els avisos. La primera execució no compta com a repetició.", "plug_off_actions": "S’executen immediatament quan s’apaga l’endoll intel·ligent d’aquest dispositiu. El seu interval i el límit de repeticions addicionals en determinen les execucions posteriors. La primera execució no compta com a repetició.", "lock_locked_actions": "S’executen quan el pany d’aquesta obertura passa a bloquejat.", "lock_unlocked_actions": "S’executen quan el pany d’aquesta obertura passa a desbloquejat.", "shutter_open_actions": "S’executen quan la persiana associada arriba a l’estat obert.", "shutter_close_actions": "S’executen quan la persiana associada arriba a l’estat tancat."}
       },
       "edit_appliance": {"title": "Edita el dispositiu", "data": {"name": "Nom que es mostrarà per a aquest dispositiu", "appliance_group": "Agrupació de dispositius", "appliance_class": "Classe de dispositiu", "activity_mode": "Modalitat de detecció d'activitat"}},
       "appliance_class": {"title": "Classe de dispositiu", "data": {"appliance_class": "Classe de dispositiu"}},
       "activity_mode_climate": {"title": "Modalitat de detecció de climatització", "data": {"activity_mode": "Com detecta l’activitat aquest dispositiu de climatització"}},
       "activity_mode_laundry": {"title": "Modalitat de detecció de rentat i assecat", "data": {"activity_mode": "Com detecta l’activitat aquest dispositiu"}},
-      "activity_mode_openings": {"title": "Modalitat de detecció d’obertures", "data": {"activity_mode": "Com informa de l’estat aquesta obertura"}},
+      "activity_mode_openings": {"title": "Modalitat de detecció d’obertures", "data": {"activity_mode": "Com informa de l’estat aquesta obertura"}, "data_description": {"activity_mode": "Tria el sensor de contacte o una entitat cover que representi una porta."}},
       "activity_mode_deliveries": {"title": "Modalitat de detecció de lliuraments", "data": {"activity_mode": "Com detecta el correu aquesta bústia"}},
       "activity_mode_refrigeration": {"title": "Modalitat de detecció de refrigeració", "data": {"activity_mode": "Com detecta l’activitat aquest dispositiu"}},
       "sensors_laundry": {"title": "Sensors de rentat i assecat", "data": {"laundry_power_entity": "Sensor de potència en watts (obligatori)", "laundry_door_entity": "Sensor de porta de el dispositiu (opcional)", "laundry_plug_entity": "Endoll intel·ligent (opcional)", "laundry_energy_entity": "Sensor d’energia acumulada (opcional)"}},
@@ -126,9 +131,12 @@
       "activity_mode_dishwasher": {"title": "Modalitat de detecció del rentaplats", "data": {"activity_mode": "Com detecta l’activitat aquest rentaplats"}},
       "activity_mode_opening": {"title": "Modalitat de detecció de l’obertura", "data": {"activity_mode": "Com informa del seu estat aquesta obertura"}},
       "activity_mode_sun_protection": {"title": "Modalitat de detecció de la protecció solar", "data": {"activity_mode": "Com informa del seu estat aquesta protecció solar"}},
-      "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)"}},
+      "sensors_opening": {"title": "Sensors de l’obertura", "data": {"opening_sensor": "Sensor de contacte de l’obertura (obligatori)", "opening_lock_entity": "Pany (opcional)", "opening_shutter_contact_entity": "Sensor de contacte de la persiana associada (opcional)", "opening_shutter_cover_entity": "Cover de la persiana associada (opcional)"}},
+      "sensors_opening_cover": {"title": "Sensors de la porta amb cover", "data": {"opening_cover_entity": "Entitat cover de la porta (obligatori)", "opening_cover_lock_entity": "Pany (opcional)"}},
+      "parameters_opening_cover": {"title": "Paràmetres de la porta", "data": {}},
+      "actions_opening_cover": {"title": "Accions de la porta", "data": {"start_actions": "Accions quan s’obre la porta (opcional)", "finish_actions": "Accions quan es tanca la porta (opcional)", "lock_locked_actions": "Accions quan es bloqueja el pany (opcional)", "lock_unlocked_actions": "Accions quan es desbloqueja el pany (opcional)"}},
       "parameters_opening": {"title": "Paràmetres de l’obertura", "data": {}},
-      "actions_opening": {"title": "Accions de l’obertura", "data": {"start_actions": "Accions quan comença el cicle (opcional)", "finish_actions": "Accions quan acaba el cicle (opcional)"}},
+      "actions_opening": {"title": "Accions de l’obertura", "data": {"start_actions": "Accions quan s’obre l’obertura (opcional)", "finish_actions": "Accions quan es tanca l’obertura (opcional)", "lock_locked_actions": "Accions quan es bloqueja el pany (opcional)", "lock_unlocked_actions": "Accions quan es desbloqueja el pany (opcional)", "shutter_open_actions": "Accions quan s’obre la persiana (opcional)", "shutter_close_actions": "Accions quan es tanca la persiana (opcional)"}},
       "sensors_sun_protection_contact": {"title": "Protecció solar (sensor de contacte)", "data": {"sun_protection_contact_sensor": "Sensor de contacte obert/tancat (obligatori)"}},
       "parameters_sun_protection_contact": {"title": "Paràmetres de protecció solar", "data": {}},
       "actions_sun_protection_contact": {"title": "Accions de protecció solar", "data": {"start_actions": "Accions quan comença el cicle (opcional)", "finish_actions": "Accions quan acaba el cicle (opcional)"}},
@@ -173,6 +181,8 @@
       "invalid_plug_off_alarm_settings": "L’interval de repetició amb l’endoll apagat ha de ser un enter positiu i les alarmes addicionals, un enter no negatiu.",
       "appliance_type_immutable": "No es poden canviar el tipus de dispositiu ni la modalitat d'activitat després de configurar-lo. Afegeix un dispositiu nou per canviar-los.",
       "mailbox_sensors_must_be_distinct": "El sensor d’arribada de correu i el sensor de la porta principal han de ser entitats diferents.",
+      "invalid_shutter_sources": "Tria el sensor de contacte o l’entitat cover de la persiana associada, però no tots dos.",
+        "shutter_sensors_must_be_distinct": "El contacte de l’obertura i el contacte de la persiana associada han de ser entitats diferents.",
       "climate_entity_requires_no_device": "Tria una entitat climate existent o la que ja estigui assignada a aquest dispositiu."
     }
   },
@@ -189,7 +199,7 @@
     "activity_mode_thermostat": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte", "power": "Detecció d’activitat amb sensor de potència", "climate": "Detecció d’activitat amb entitat clima"}},
     "activity_mode_climate": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte", "power": "Detecció d’activitat amb sensor de potència", "climate": "Detecció d’activitat amb entitat clima"}},
     "activity_mode_laundry": {"options": {"power": "Detecció d’activitat amb sensor de potència"}},
-    "activity_mode_openings": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte"}},
+    "activity_mode_openings": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte", "cover": "Detecció d’activitat amb entitat cover"}},
     "activity_mode_deliveries": {"options": {"mail_slot": "Detecció d’activitat amb sensor de contacte de portella", "mail_motion": "Detecció d’activitat amb sensor de moviment interior"}},
     "activity_mode_refrigeration": {"options": {"smart_plug": "Detecció d’activitat amb interruptor intel·ligent", "power": "Detecció d’activitat amb sensor de potència"}},
     "activity_mode_dryer": {"options": {"power": "Detecció d’activitat amb sensor de potència"}},
@@ -197,7 +207,7 @@
     "activity_mode_refrigerator": {"options": {"smart_plug": "Detecció d’activitat amb interruptor intel·ligent", "power": "Detecció d’activitat amb sensor de potència"}},
     "activity_mode_washer": {"options": {"power": "Detecció d’activitat amb sensor de potència"}},
     "activity_mode_dishwasher": {"options": {"power": "Detecció d’activitat amb sensor de potència"}},
-    "activity_mode_opening": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte"}},
+    "activity_mode_opening": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte", "cover": "Detecció d’activitat amb entitat cover"}},
     "activity_mode_sun_protection": {"options": {"running_sensor": "Detecció d’activitat amb sensor de contacte", "cover": "Detecció d’activitat amb entitat cover"}},
     "appliance_type": {
       "options": {
@@ -213,6 +223,7 @@
         "mailbox_motion": "Bústia (sensor de moviment interior)",
         "mailbox_slot": "Bústia (sensor de contacte/obertura de portella)",
         "opening": "Obertura (sensor de contacte)",
+        "opening_cover": "Obertura (cover)",
         "sun_protection_contact": "Protecció solar (sensor de contacte)",
         "sun_protection_cover": "Protecció solar (cover)"
       }

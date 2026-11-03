@@ -19,7 +19,7 @@ from .appliance_types import (
     ApplianceTypeProfile,
     get_appliance_group_for_profile,
     get_appliance_group_name,
-    get_common_group_action_groups,
+    get_group_action_groups,
     get_legacy_appliance_class,
     get_appliance_profile,
 )
@@ -31,6 +31,8 @@ from .const import (
     CONF_ALARM_REPEAT_INTERVAL_SECONDS,
     CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
+    CONF_SHUTTER_CONTACT_ENTITY,
+    CONF_SHUTTER_COVER_ENTITY,
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
     CONF_DOOR_ENTITY,
@@ -88,6 +90,8 @@ _ENTRY_DATA_KEYS = {
     CONF_ENERGY_ENTITY,
     CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
+    CONF_SHUTTER_CONTACT_ENTITY,
+    CONF_SHUTTER_COVER_ENTITY,
     CONF_LOCK_ENTITY,
     CONF_RUNNING_ENTITY,
     CONF_DOOR_ENTITY,
@@ -517,6 +521,15 @@ def _action_schema(
 ) -> vol.Schema:
     schema: dict[Any, Any] = {}
     for group in profile.action_groups:
+        if group in ("lock_locked", "lock_unlocked") and not values.get(
+            CONF_LOCK_ENTITY
+        ):
+            continue
+        if group in ("shutter_open", "shutter_close") and not (
+            values.get(CONF_SHUTTER_CONTACT_ENTITY)
+            or values.get(CONF_SHUTTER_COVER_ENTITY)
+        ):
+            continue
         if group == "plug_off_alarm" and not values.get(CONF_PLUG_ENTITY):
             continue
         if group == "pending_unload" and not values.get(CONF_DOOR_ENTITY):
@@ -541,7 +554,7 @@ def _group_action_schema(
     appliance_group: str, values: dict[str, Any]
 ) -> vol.Schema:
     schema: dict[Any, Any] = {}
-    for action_group in get_common_group_action_groups(appliance_group):
+    for action_group in get_group_action_groups(appliance_group):
         key = ACTION_GROUP_CONFIG_KEYS[action_group]
         default = values.get(key, [])
         schema[vol.Optional(key, default=default)] = selector.ActionSelector()
@@ -604,6 +617,30 @@ def _validate_duration_limits(values: dict[str, Any]) -> bool:
 def _validate_sensor_values(
     values: dict[str, Any], profile: ApplianceTypeProfile
 ) -> bool:
+    return _sensor_validation_error(values, profile) is None
+
+
+def _sensor_validation_error(
+    values: dict[str, Any], profile: ApplianceTypeProfile
+) -> str | None:
+    if values.get(CONF_SHUTTER_CONTACT_ENTITY) and values.get(
+        CONF_SHUTTER_COVER_ENTITY
+    ):
+        return "invalid_shutter_sources"
+    primary_contact = next(
+        (
+            item.config_key
+            for item in profile.sensor_inputs
+            if item.detection_source == "running_sensor"
+        ),
+        None,
+    )
+    if (
+        primary_contact is not None
+        and values.get(CONF_SHUTTER_CONTACT_ENTITY)
+        and values.get(CONF_SHUTTER_CONTACT_ENTITY) == values.get(primary_contact)
+    ):
+        return "shutter_sensors_must_be_distinct"
     arrival_input = next(
         (
             item
@@ -613,10 +650,12 @@ def _validate_sensor_values(
         None,
     )
     if arrival_input is None:
-        return True
+        return None
     arrival_entity = values.get(arrival_input.config_key)
     door_entity = values.get(CONF_DOOR_ENTITY)
-    return arrival_entity is None or door_entity is None or arrival_entity != door_entity
+    if arrival_entity is not None and door_entity is not None and arrival_entity == door_entity:
+        return "mailbox_sensors_must_be_distinct"
+    return None
 
 
 def _validate_climate_entity(
@@ -728,6 +767,15 @@ def _entry_data(values: dict[str, Any]) -> dict[str, Any]:
             sensor_input.config_key == key for sensor_input in profile.sensor_inputs
         ):
             keys.discard(key)
+    for key in (
+        CONF_SHUTTER_CONTACT_ENTITY,
+        CONF_SHUTTER_COVER_ENTITY,
+        CONF_LOCK_ENTITY,
+    ):
+        if not any(
+            sensor_input.config_key == key for sensor_input in profile.sensor_inputs
+        ):
+            keys.discard(key)
     if not profile.supports_door_sensor:
         keys.discard(CONF_DOOR_ENTITY)
     if not profile.supports_smart_plug:
@@ -753,6 +801,23 @@ def _entry_options(values: dict[str, Any]) -> dict[str, Any]:
         unsupported.add(CONF_START_ACTIONS)
     if "cycle_finish" not in profile.action_groups:
         unsupported.add(CONF_FINISH_ACTIONS)
+    if not values.get(CONF_LOCK_ENTITY):
+        unsupported.update(
+            {
+                ACTION_GROUP_CONFIG_KEYS["lock_locked"],
+                ACTION_GROUP_CONFIG_KEYS["lock_unlocked"],
+            }
+        )
+    if not (
+        values.get(CONF_SHUTTER_CONTACT_ENTITY)
+        or values.get(CONF_SHUTTER_COVER_ENTITY)
+    ):
+        unsupported.update(
+            {
+                ACTION_GROUP_CONFIG_KEYS["shutter_open"],
+                ACTION_GROUP_CONFIG_KEYS["shutter_close"],
+            }
+        )
     if "emptied" not in profile.action_groups or not values.get(CONF_DOOR_ENTITY):
         unsupported.add(CONF_EMPTIED_ACTIONS)
     if "mail_arrival" not in profile.action_groups:
@@ -868,7 +933,8 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             profile = get_appliance_profile(self._draft[CONF_APPLIANCE_TYPE])
             self._draft.update(_normalize_sensor_values(user_input, profile))
-            if not _validate_sensor_values(self._draft, profile):
+            error = _sensor_validation_error(self._draft, profile)
+            if error is not None:
                 return self.async_show_form(
                     step_id=_profile_step_id(
                         "sensors", self._draft[CONF_APPLIANCE_TYPE]
@@ -876,7 +942,7 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                     data_schema=_sensor_schema(
                         _sensor_form_values(self._draft, profile), profile, self.hass
                     ),
-                    errors={"base": "mailbox_sensors_must_be_distinct"},
+                    errors={"base": error},
                     last_step=False,
                 )
             if "climate" in profile.detection_sources and not _validate_climate_entity(
@@ -1040,6 +1106,9 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_sensors_opening = async_step_sensors
     async_step_parameters_opening = async_step_parameters
     async_step_actions_opening = async_step_actions
+    async_step_sensors_opening_cover = async_step_sensors
+    async_step_parameters_opening_cover = async_step_parameters
+    async_step_actions_opening_cover = async_step_actions
     async_step_sensors_sun_protection_contact = async_step_sensors
     async_step_parameters_sun_protection_contact = async_step_parameters
     async_step_actions_sun_protection_contact = async_step_actions
@@ -1144,7 +1213,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         appliance_group = self.config_entry.data["category"]
-        common_groups = get_common_group_action_groups(appliance_group)
+        common_groups = get_group_action_groups(appliance_group)
         current_actions = self.config_entry.options.get(CONF_GROUP_ACTIONS, {})
         if not isinstance(current_actions, dict):
             current_actions = {}
@@ -1331,13 +1400,14 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                 )
             )
             values = {**self._saved, **self._draft}
-            if not _validate_sensor_values(values, profile):
+            error = _sensor_validation_error(values, profile)
+            if error is not None:
                 return self.async_show_form(
                     step_id=_profile_step_id("sensors", values[CONF_APPLIANCE_TYPE]),
                     data_schema=_sensor_schema(
                         _sensor_form_values(values, profile), profile, self.hass
                     ),
-                    errors={"base": "mailbox_sensors_must_be_distinct"},
+                    errors={"base": error},
                     last_step=False,
                 )
             if (
@@ -1506,6 +1576,9 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_sensors_opening = async_step_sensors
     async_step_parameters_opening = async_step_parameters
     async_step_actions_opening = async_step_actions
+    async_step_sensors_opening_cover = async_step_sensors
+    async_step_parameters_opening_cover = async_step_parameters
+    async_step_actions_opening_cover = async_step_actions
     async_step_sensors_sun_protection_contact = async_step_sensors
     async_step_parameters_sun_protection_contact = async_step_parameters
     async_step_actions_sun_protection_contact = async_step_actions

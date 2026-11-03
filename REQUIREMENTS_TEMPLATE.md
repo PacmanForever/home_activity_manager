@@ -56,13 +56,13 @@ Rentat i assecat (laundry)
 `-- Rentaplats -- Sensor de potència (laundry)
 
 Obertures (openings)
-|-- Porta -- Sensor de contacte (opening)
+|-- Porta
+|   |-- Sensor de contacte (opening)
+|   `-- Entitat cover (opening_cover)
 `-- Finestra -- Sensor de contacte (opening)
 
 Protecció solar (sun_protection)
-|-- Persiana
-|   |-- Sensor de contacte (sun_protection_contact)
-|   `-- Entitat cover (sun_protection_cover)
+
 `-- Tendal
 	|-- Sensor de contacte (sun_protection_contact)
 	`-- Entitat cover (sun_protection_cover)
@@ -81,7 +81,7 @@ Refrigeració (refrigeration)
 	`-- Interruptor intel·ligent (refrigerator_switch)
 ```
 
-Els noms entre parèntesis són identificadors de perfil, no nivells addicionals. Rentadora, assecadora i rentaplats comparteixen el perfil `laundry`; les modalitats de nevera i congelador comparteixen els perfils de refrigeració indicats.
+Els noms entre parèntesis són identificadors de perfil, no nivells addicionals. Rentadora, assecadora i rentaplats comparteixen el perfil `laundry`; les modalitats de nevera i congelador comparteixen els perfils de refrigeració indicats. Porta i finestra comparteixen el perfil de contacte; només la porta ofereix `opening_cover`, on el cover seleccionat representa la mateixa porta. La persiana associada és una capacitat opcional del perfil de porta per contacte, no una classe de protecció solar. Blind deixa d'estar disponible en les noves configuracions de protecció solar, però les entrades legacy amb classe `blind` han de continuar sent editables.
 
 ### 4.1 Flux de configuració
 
@@ -108,6 +108,8 @@ Aquest flux és el lloc central per configurar tot el comportament propi de l'el
 - **Switch de nevera**: al perfil `refrigerator`, selector opcional d'un endoll intel·ligent controlable que no altera la detecció per potència. Al perfil `refrigerator_switch`, el switch és obligatori, controla l'alimentació i és també la font binària d'activitat (`on` inicia i `off` finalitza el període).
 - **Arribada de correu**: `mailbox_motion` requereix un sensor binari de moviment interior i `mailbox_slot` un sensor binari a la portella d'entrada. Una transició `off`→`on` després d'haver observat `off` indica una arribada; l'estat inicial `on` no ha de generar una arribada falsa.
 - **Porta principal de la bústia**: selector obligatori dels dos perfils de bústia. L'obertura neteja «pendent de recollir» i cancel·la els recordatoris.
+- **Porta**: per contacte, requereix un contacte d'obertura i pot incloure un pany opcional i cap o una persiana associada. La persiana associada selecciona exactament una font (contacte o entitat `cover`), mai totes dues; el contacte de la persiana ha de ser diferent del contacte de la porta. En mode `cover`, l'entitat és la porta mateixa i no es mostra una segona font de persiana.
+- **Pany i persiana associada**: els hooks de pany bloquejat/desbloquejat i persiana oberta/tancada només s'executen en canvis d'estat estables de la font configurada. Un cover que es mou no es considera encara obert o tancat.
 - **Obertura de porta per a bugaderia**: selector opcional per a rentadora, rentaplats i assecadora; activa estat de porta i «pendent de buidar».
 - **Switch intel·ligent de l'endoll**: selector opcional en aparells endollats. La integració n'exposa el control; només determina l'activitat si és la font seleccionada.
 
@@ -148,7 +150,7 @@ Els tipus s'han de definir en un registre de perfils extensible. Cada perfil dec
 
 Cada dispositiu pot tenir llistes locals d'accions de Home Assistant configurables i editables, compatibles amb les accions estàndard de Home Assistant. L'usuari ha de poder afegir, eliminar i reordenar diverses accions. Les llistes poden quedar buides sense impedir que el dispositiu detecti i mostri els cicles. A més, cada entrada agrupada pot tenir llistes d'accions compartides pels seus dispositius.
 
-Les accions configurables al nivell d'agrupació són exclusivament la intersecció dels grups d'acció (`action_groups`) de tots els perfils descendents de `APPLIANCE_GROUPS`. Un hook que falti en qualsevol perfil descendent no s'ha de mostrar ni acceptar en desar la configuració global; no és suficient que el hook el suporti només algun dispositiu. Els hooks particulars continuen configurant-se localment a l'appliance. Aquesta regla s'ha d'aplicar al selector i validar-se també al runtime perquè les opcions globals antigues o obsoletes no s'executin.
+Les accions configurables al nivell d'agrupació són la unió ordenada dels grups d'acció (`action_groups`) dels perfils descendents de `APPLIANCE_GROUPS`. Un hook s'ofereix si almenys un perfil del grup el suporta. En runtime, cada appliance només l'executa si el seu perfil el declara, la capacitat corresponent està configurada i la seva pròpia entitat emet el canvi pertinent; no es tracta d'una difusió de l'acció a tots els membres. Això permet oferir pany bloquejat/desbloquejat i persiana oberta/tancada al grup `openings` sense executar-los als perfils que no tenen aquests inputs. Els hooks particulars continuen configurant-se localment a l'appliance, amb camps condicionats a la capacitat configurada. Les opcions globals obsoletes o no suportades no s'han d'executar.
 
 Quan es produeix un hook per a un appliance, s'executen primer les accions compartides del grup i després les accions locals d'aquell appliance. Les accions compartides s'executen per cada appliance i el seu propi esdeveniment, no una única vegada coordinada per a tot el grup. Una llista local buida no desactiva les accions globals. Les opcions globals s'han de conservar en editar o eliminar un dispositiu membre mentre l'entrada de grup continuï existint.
 
@@ -261,9 +263,9 @@ Les accions locals són configuració de cada dispositiu i les globals són conf
 45. Les proves comproven que només es creen els wrappers declarats pel perfil i que els wrappers obsolets de l'AC i la bústia s'eliminen del registre. Les sortides derivades segueixen les seves fonts; les lectures `unknown`, `unavailable`, la desaparició i la recuperació no han de finalitzar falsament el cicle ni mostrar valors antics com a actuals.
 46. Rentadora, rentaplats, assecadora i bústia ofereixen una acció opcional quan es buida la càrrega o es recull el correu. S'executa una sola vegada quan l'estat pendent passa a net per l'obertura de la porta o pel botó de buidatge, i no s'executa si no hi havia res pendent.
 47. La jerarquia d'agrupació → classe d'aparell → modalitat/perfil és la mateixa al flux, a `APPLIANCE_GROUPS`, al README i a aquest document; no hi ha arbres contradictoris.
-48. Les opcions d'accions de grup mostren exactament els hooks comuns a tots els perfils descendents. Hooks no comuns no es mostren ni es poden desar; hooks globals obsolets desats prèviament no s'executen.
+48. Les opcions d'accions de grup mostren la unió ordenada dels hooks suportats per almenys un perfil descendent. Cada appliance només executa hooks del seu perfil quan la capacitat i la font corresponents estan configurades; els hooks globals obsolets o incompatibles no s'executen.
 49. Per a cada esdeveniment d'un appliance, les accions globals s'executen abans que les accions locals. La mateixa configuració global executada per dos appliances rep variables pròpies de cadascun; `ham_device_area_name` pot ser `None`, i `ham_source_entity_id` només es passa quan hi ha una entitat d'origen.
-50. La configuració de grup es pot editar sense esborrar-la en editar o retirar un membre. El flux explica visualment, amb ajudes natives localitzades, la jerarquia, la intersecció de hooks, l'ordre i les variables de plantilla en anglès, castellà i català.
+50. La configuració de grup es pot editar sense esborrar-la en editar o retirar un membre. El flux explica visualment, amb ajudes natives localitzades, la jerarquia, la unió de hooks, l'ordre i les variables de plantilla en anglès, castellà i català.
 
 ## 9. Qualitat i proves
 

@@ -9,6 +9,8 @@ CONF_POWER_ENTITY = "power_entity"
 CONF_ENERGY_ENTITY = "energy_entity"
 CONF_CLIMATE_ENTITY = "climate_entity"
 CONF_COVER_ENTITY = "cover_entity"
+CONF_SHUTTER_CONTACT_ENTITY = "shutter_contact_entity"
+CONF_SHUTTER_COVER_ENTITY = "shutter_cover_entity"
 CONF_LOCK_ENTITY = "lock_entity"
 CONF_RUNNING_ENTITY = "running_entity"
 CONF_MAIL_MOTION_ENTITY = "mail_motion_entity"
@@ -16,6 +18,10 @@ CONF_MAIL_SLOT_ENTITY = "mail_slot_entity"
 CONF_MAIL_ARRIVAL_ACTIONS = "mail_arrival_actions"
 CONF_GROUP_ACTIONS = "group_actions"
 CONF_DOOR_OPEN_ACTIONS = "door_open_actions"
+CONF_LOCK_LOCKED_ACTIONS = "lock_locked_actions"
+CONF_LOCK_UNLOCKED_ACTIONS = "lock_unlocked_actions"
+CONF_SHUTTER_OPEN_ACTIONS = "shutter_open_actions"
+CONF_SHUTTER_CLOSE_ACTIONS = "shutter_close_actions"
 CONF_COMPRESSOR_INACTIVE_ACTIONS = "compressor_inactive_actions"
 CONF_PLUG_OFF_ACTIONS = "plug_off_actions"
 CONF_DOOR_OPEN_DELAY_SECONDS = "door_open_delay_seconds"
@@ -49,6 +55,10 @@ ACTION_GROUP_CONFIG_KEYS = {
 	"door_open_alarm": CONF_DOOR_OPEN_ACTIONS,
 	"compressor_inactive_alarm": CONF_COMPRESSOR_INACTIVE_ACTIONS,
 	"plug_off_alarm": CONF_PLUG_OFF_ACTIONS,
+	"lock_locked": CONF_LOCK_LOCKED_ACTIONS,
+	"lock_unlocked": CONF_LOCK_UNLOCKED_ACTIONS,
+	"shutter_open": CONF_SHUTTER_OPEN_ACTIONS,
+	"shutter_close": CONF_SHUTTER_CLOSE_ACTIONS,
 }
 
 DEFAULT_START_POWER_W = 4.0

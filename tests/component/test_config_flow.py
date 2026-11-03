@@ -40,6 +40,8 @@ from custom_components.home_activity_manager.const import (
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
     CONF_LOCK_ENTITY,
+    CONF_LOCK_LOCKED_ACTIONS,
+    CONF_LOCK_UNLOCKED_ACTIONS,
     CONF_PENDING_ACTIONS,
     CONF_PENDING_DELAY_SECONDS,
     CONF_PENDING_INTERVAL_SECONDS,
@@ -50,6 +52,10 @@ from custom_components.home_activity_manager.const import (
     CONF_PLUG_OFF_REPEAT_COUNT,
     CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
     CONF_RUNNING_ENTITY,
+    CONF_SHUTTER_CONTACT_ENTITY,
+    CONF_SHUTTER_COVER_ENTITY,
+    CONF_SHUTTER_OPEN_ACTIONS,
+    CONF_SHUTTER_CLOSE_ACTIONS,
     CONF_START_ACTIONS,
     CONF_MAX_RUNTIME_ACTIONS,
     CONF_MAX_RUNTIME_SECONDS,
@@ -196,6 +202,61 @@ async def test_add_appliance_through_four_config_flow_steps(
         if marker.schema == "appliance_action"
     )
     assert actions.config["options"] == ["edit", "remove", "group_actions"]
+
+
+@pytest.mark.asyncio
+async def test_add_door_with_primary_cover_mode(hass, enable_custom_integrations):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {"name": "Garage door", CONF_APPLIANCE_GROUP: "openings"},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_APPLIANCE_CLASS: "door"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {"activity_mode": "cover"}
+    )
+    assert result["step_id"] == "sensors_opening_cover"
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {"opening_cover_entity": "cover.garage_door"}
+    )
+    assert result["step_id"] == "actions_opening_cover"
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: []}
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    appliance = result["data"]["appliances"][0]
+    assert appliance["data"][CONF_APPLIANCE_TYPE] == "opening_cover"
+    assert appliance["data"][CONF_APPLIANCE_CLASS] == "door"
+    assert appliance["data"][CONF_COVER_ENTITY] == "cover.garage_door"
+
+
+@pytest.mark.asyncio
+async def test_edit_door_with_primary_cover_mode(hass, enable_custom_integrations):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "category": "openings",
+            "name": "Garage door",
+            CONF_APPLIANCE_TYPE: "opening_cover",
+            CONF_APPLIANCE_CLASS: "door",
+            CONF_COVER_ENTITY: "cover.garage_door",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"name": "Garage door"}
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "sensors_opening_cover"
 
 
 @pytest.mark.asyncio
@@ -976,6 +1037,8 @@ async def test_every_profile_supports_config_entry_crud(
         form_values: dict[str, str] = {}
         stored_values: dict[str, str] = {}
         for sensor_input in profile.sensor_inputs:
+            if sensor_input.config_key == CONF_SHUTTER_COVER_ENTITY:
+                continue
             if sensor_input.config_key == CONF_POWER_ENTITY:
                 entity_id = f"sensor.{revision}_power"
             elif sensor_input.config_key == CONF_ENERGY_ENTITY:
@@ -1052,6 +1115,10 @@ async def test_every_profile_supports_config_entry_crud(
         "door_open_alarm": CONF_DOOR_OPEN_ACTIONS,
         "compressor_inactive_alarm": CONF_COMPRESSOR_INACTIVE_ACTIONS,
         "plug_off_alarm": CONF_PLUG_OFF_ACTIONS,
+        "lock_locked": CONF_LOCK_LOCKED_ACTIONS,
+        "lock_unlocked": CONF_LOCK_UNLOCKED_ACTIONS,
+        "shutter_open": CONF_SHUTTER_OPEN_ACTIONS,
+        "shutter_close": CONF_SHUTTER_CLOSE_ACTIONS,
     }
     action_values = {action_keys[group]: [] for group in profile.action_groups}
 
@@ -1127,6 +1194,11 @@ async def test_every_profile_supports_config_entry_crud(
         CONF_APPLIANCE_TYPE: appliance_type,
         CONF_APPLIANCE_CLASS: _group_class_mode_for_profile(appliance_type)[1],
         **second_sensor_storage,
+        **(
+            {CONF_SHUTTER_COVER_ENTITY: None}
+            if appliance_type == "opening"
+            else {}
+        ),
     }
 
     await hass.config_entries.async_remove(entry.entry_id)

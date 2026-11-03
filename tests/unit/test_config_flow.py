@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 import pytest
 import voluptuous as vol
@@ -17,6 +18,7 @@ from custom_components.home_activity_manager.config_flow import (
     _entry_options,
     _group_action_schema,
     _normalize_sensor_values,
+    _options_identity_schema,
     _sensor_form_values,
     _sensor_schema,
     _threshold_schema,
@@ -25,6 +27,7 @@ from custom_components.home_activity_manager.config_flow import (
     _validate_duration_limits,
     _validate_plug_off_alarm_settings,
     _validate_pending,
+    _validate_sensor_values,
     _validate_thresholds,
 )
 from custom_components.home_activity_manager.appliance_types import (
@@ -37,7 +40,7 @@ from custom_components.home_activity_manager.appliance_types import (
     get_appliance_class_name,
     get_appliance_group_for_profile,
     get_appliance_model,
-    get_common_group_action_groups,
+    get_group_action_groups,
     get_legacy_appliance_class,
     get_appliance_profile,
 )
@@ -55,6 +58,9 @@ from custom_components.home_activity_manager.const import (
     CONF_EMPTIED_ACTIONS,
     CONF_FINISH_ACTIONS,
     CONF_GROUP_ACTIONS,
+    CONF_LOCK_ENTITY,
+    CONF_LOCK_LOCKED_ACTIONS,
+    CONF_LOCK_UNLOCKED_ACTIONS,
     CONF_MAIL_ARRIVAL_ACTIONS,
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
@@ -70,6 +76,10 @@ from custom_components.home_activity_manager.const import (
     CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
     CONF_POWER_ENTITY,
     CONF_RUNNING_ENTITY,
+    CONF_SHUTTER_CONTACT_ENTITY,
+    CONF_SHUTTER_COVER_ENTITY,
+    CONF_SHUTTER_OPEN_ACTIONS,
+    CONF_SHUTTER_CLOSE_ACTIONS,
     CONF_START_ACTIONS,
     DEFAULT_PENDING_DELAY_SECONDS,
     DEFAULT_PENDING_INTERVAL_SECONDS,
@@ -89,7 +99,10 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             for appliance_class in classes
         }
         self.assertTrue(mapped_classes <= set(APPLIANCE_CLASS_NAMES))
-        self.assertEqual(set(APPLIANCE_CLASS_NAMES) - mapped_classes, {"opening", "sun_protection"})
+        self.assertEqual(
+            set(APPLIANCE_CLASS_NAMES) - mapped_classes,
+            {"blind", "opening", "sun_protection"},
+        )
         for classes in APPLIANCE_GROUPS.values():
             for modes in classes.values():
                 for mode, profile_name in modes.items():
@@ -98,13 +111,13 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                         APPLIANCE_PROFILES[profile_name].detection_sources, (mode,)
                     )
 
-    def test_group_actions_are_the_intersection_of_all_descendant_profiles(self) -> None:
+    def test_group_actions_include_the_union_of_descendant_profiles(self) -> None:
         self.assertEqual(
-            get_common_group_action_groups("climate"),
+            get_group_action_groups("climate"),
             ("cycle_start", "cycle_finish", "plug_off_alarm"),
         )
         self.assertEqual(
-            get_common_group_action_groups("laundry"),
+            get_group_action_groups("laundry"),
             (
                 "cycle_start",
                 "cycle_finish",
@@ -115,15 +128,41 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            get_common_group_action_groups("refrigeration"),
+            get_group_action_groups("refrigeration"),
             ("cycle_start", "cycle_finish", "door_open_alarm"),
         )
         self.assertEqual(
-            get_common_group_action_groups("deliveries"),
+            get_group_action_groups("deliveries"),
             ("cycle_start", "cycle_finish", "pending_unload", "emptied"),
         )
 
-    def test_group_action_schema_only_offers_common_hooks(self) -> None:
+    def test_group_actions_include_hooks_from_heterogeneous_profiles(self) -> None:
+        with patch.dict(
+            APPLIANCE_GROUPS,
+            {
+                "heterogeneous": {
+                    "opening": {"contact": "opening"},
+                    "washer": {"power": "washer"},
+                }
+            },
+        ):
+            self.assertEqual(
+                get_group_action_groups("heterogeneous"),
+                (
+                    "cycle_start",
+                    "cycle_finish",
+                    "lock_locked",
+                    "lock_unlocked",
+                    "shutter_open",
+                    "shutter_close",
+                    "max_runtime",
+                    "pending_unload",
+                    "emptied",
+                    "plug_off_alarm",
+                ),
+            )
+
+    def test_group_action_schema_offers_all_group_hooks(self) -> None:
         schema = _group_action_schema("climate", {})
         fields = {marker.schema for marker in schema.schema}
 
@@ -222,6 +261,26 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertTrue(APPLIANCE_PROFILES["washer"].supports_smart_plug)
         self.assertFalse(APPLIANCE_PROFILES["opening"].supports_smart_plug)
 
+    def test_legacy_blind_class_remains_editable_but_is_not_a_new_choice(self) -> None:
+        self.assertNotIn("blind", APPLIANCE_GROUPS["sun_protection"])
+        self.assertEqual(
+            get_appliance_group_for_profile("sun_protection_contact", "blind"),
+            "sun_protection",
+        )
+        schema = _options_identity_schema(
+            {
+                CONF_APPLIANCE_TYPE: "sun_protection_contact",
+                CONF_APPLIANCE_CLASS: "blind",
+            },
+            "sun_protection",
+        )
+        class_marker = next(
+            marker
+            for marker in schema.schema
+            if marker.schema == CONF_APPLIANCE_CLASS
+        )
+        self.assertEqual(class_marker.default(), "blind")
+
     def test_unknown_profile_metadata_returns_none(self) -> None:
         self.assertIsNone(get_appliance_model("unknown_profile"))
         self.assertIsNone(get_legacy_appliance_class("unknown_profile"))
@@ -311,6 +370,64 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                         continue
                     self.assertIsNone(normalized[sensor_input.config_key])
                     self.assertIsNone(entry_data[sensor_input.config_key])
+
+    def test_opening_shutter_sources_are_optional_but_mutually_exclusive(self) -> None:
+        profile = get_appliance_profile("opening")
+        cases = (
+            ({}, True),
+            ({CONF_SHUTTER_CONTACT_ENTITY: "binary_sensor.shutter"}, True),
+            ({CONF_SHUTTER_COVER_ENTITY: "cover.shutter"}, True),
+            (
+                {
+                    CONF_SHUTTER_CONTACT_ENTITY: "binary_sensor.shutter",
+                    CONF_SHUTTER_COVER_ENTITY: "cover.shutter",
+                },
+                False,
+            ),
+            (
+                {
+                    CONF_RUNNING_ENTITY: "binary_sensor.opening",
+                    CONF_SHUTTER_CONTACT_ENTITY: "binary_sensor.opening",
+                },
+                False,
+            ),
+        )
+        for values, expected in cases:
+            with self.subTest(values=values):
+                self.assertEqual(_validate_sensor_values(values, profile), expected)
+
+    def test_opening_local_actions_follow_configured_capabilities(self) -> None:
+        profile = get_appliance_profile("opening")
+        action_keys = lambda values: {
+            marker.schema for marker in _action_schema(values, profile).schema
+        }
+        self.assertNotIn(CONF_LOCK_LOCKED_ACTIONS, action_keys({}))
+        self.assertNotIn(CONF_SHUTTER_OPEN_ACTIONS, action_keys({}))
+        self.assertIn(
+            CONF_LOCK_LOCKED_ACTIONS,
+            action_keys({CONF_LOCK_ENTITY: "lock.front_door"}),
+        )
+        self.assertNotIn(
+            CONF_SHUTTER_OPEN_ACTIONS,
+            action_keys({CONF_LOCK_ENTITY: "lock.front_door"}),
+        )
+        self.assertIn(
+            CONF_SHUTTER_OPEN_ACTIONS,
+            action_keys(
+                {CONF_SHUTTER_CONTACT_ENTITY: "binary_sensor.shutter_contact"}
+            ),
+        )
+        options = _entry_options(
+            {
+                CONF_APPLIANCE_TYPE: "opening",
+                CONF_LOCK_LOCKED_ACTIONS: [{"action": "test.locked"}],
+                CONF_LOCK_UNLOCKED_ACTIONS: [{"action": "test.unlocked"}],
+                CONF_SHUTTER_OPEN_ACTIONS: [{"action": "test.shutter_open"}],
+                CONF_SHUTTER_CLOSE_ACTIONS: [{"action": "test.shutter_close"}],
+            }
+        )
+        self.assertNotIn(CONF_LOCK_LOCKED_ACTIONS, options)
+        self.assertNotIn(CONF_SHUTTER_OPEN_ACTIONS, options)
 
     def test_ac_profiles_offer_auxiliary_sources(self) -> None:
         contact_profile = get_appliance_profile("air_conditioner_contact")
@@ -841,7 +958,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertEqual(values[CONF_PENDING_INTERVAL_SECONDS], 900)
         self.assertEqual(values[CONF_PENDING_REPEATS], 3)
 
-    def test_cycle_action_labels_are_consistent_across_profiles(self) -> None:
+    def test_cycle_action_labels_are_consistent_outside_openings(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
         paths = (
             root / "strings.json",
@@ -860,8 +977,31 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                         translation[flow]["step"][f"actions_{profile_name}"]["data"][key]
                         for profile_name, profile in APPLIANCE_PROFILES.items()
                         if group in profile.action_groups
+                        and profile_name not in {"opening", "opening_cover"}
                     }
                     self.assertEqual(len(labels), 1, (path, flow, group))
+
+    def test_opening_action_labels_describe_open_and_closed_states(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        paths = (
+            root / "strings.json",
+            root / "translations" / "en.json",
+            root / "translations" / "es.json",
+            root / "translations" / "ca.json",
+        )
+        for path in paths:
+            translation = json.loads(path.read_text(encoding="utf-8"))
+            for flow in ("config", "options"):
+                opening_actions = translation[flow]["step"]["actions_opening"]["data"]
+                cover_actions = translation[flow]["step"]["actions_opening_cover"]["data"]
+                self.assertNotEqual(
+                    opening_actions["start_actions"],
+                    cover_actions["start_actions"],
+                )
+                self.assertNotEqual(
+                    opening_actions["finish_actions"],
+                    cover_actions["finish_actions"],
+                )
 
     def test_duration_translation_labels_do_not_describe_text_format(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## v0.9.33 - 2026-11-03
+
+### Added
+
+- Add primary-cover detection for doors and optional lock and associated-shutter capabilities for contact-based openings.
+- Add open/closed and locked/unlocked group-action hooks, dispatched only for configured appliance capabilities.
+
+### Changed
+
+- Offer the ordered union of supported hooks in group action settings, and remove Blind from new sun-protection choices while preserving legacy entries.
+- Align opening selectors, translations, runtime behavior, and documentation with the shared Door/Window model.
+
 ## v0.9.32 - 2026-11-02
 
 ### Fixed

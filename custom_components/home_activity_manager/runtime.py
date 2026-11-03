@@ -37,7 +37,7 @@ from .appliance_types import (
     APPLIANCE_GROUPS,
     get_appliance_group_for_profile,
     get_appliance_profile,
-    get_common_group_action_groups,
+    get_group_action_groups,
 )
 from .const import (
     ACTION_GROUP_CONFIG_KEYS,
@@ -63,6 +63,9 @@ from .const import (
     CONF_FINISH_ACTIONS,
     CONF_FINISH_DURATION_SECONDS,
     CONF_FINISH_POWER_W,
+    CONF_LOCK_ENTITY,
+    CONF_SHUTTER_CONTACT_ENTITY,
+    CONF_SHUTTER_COVER_ENTITY,
     CONF_MAX_RUNTIME_ACTIONS,
     CONF_MAX_RUNTIME_SECONDS,
     CONF_PENDING_ACTIONS,
@@ -168,7 +171,7 @@ class ApplianceRuntime:
         if not isinstance(configured_group_actions, dict):
             configured_group_actions = {}
         common_action_groups = (
-            get_common_group_action_groups(appliance_group)
+            get_group_action_groups(appliance_group)
             if appliance_group in APPLIANCE_GROUPS
             else ()
         )
@@ -217,6 +220,8 @@ class ApplianceRuntime:
         )
         self._mail_sensor_ready = False
         self.mail_slot_open: bool | None = None
+        self.lock_state: str | None = None
+        self.shutter_open: bool | None = None
         self.energy_kwh = 0.0
         self.door_open: bool | None = None
         self.pending_unload = False
@@ -276,6 +281,28 @@ class ApplianceRuntime:
         for entity_id in entity_ids:
             self._update_input_availability(
                 entity_id, self.hass.states.get(entity_id)
+            )
+
+        lock_entity = self.config.get(CONF_LOCK_ENTITY)
+        if lock_entity:
+            self._apply_lock_state(
+                self.hass.states.get(lock_entity), lock_entity, initialize=True
+            )
+        shutter_contact = self.config.get(CONF_SHUTTER_CONTACT_ENTITY)
+        shutter_cover = self.config.get(CONF_SHUTTER_COVER_ENTITY)
+        if shutter_contact:
+            self._apply_shutter_state(
+                self.hass.states.get(shutter_contact),
+                shutter_contact,
+                is_cover=False,
+                initialize=True,
+            )
+        elif shutter_cover:
+            self._apply_shutter_state(
+                self.hass.states.get(shutter_cover),
+                shutter_cover,
+                is_cover=True,
+                initialize=True,
             )
         energy_entity = self.config.get(CONF_ENERGY_ENTITY)
         if energy_entity:
@@ -507,6 +534,15 @@ class ApplianceRuntime:
             and entity_id == self.config.get(CONF_PLUG_ENTITY)
         ):
             self._apply_running_state(new_state, now, source_entity_id=entity_id)
+        elif entity_id == self.config.get(CONF_LOCK_ENTITY):
+            self._apply_lock_state(new_state, entity_id)
+            self._notify()
+        elif entity_id == self.config.get(CONF_SHUTTER_CONTACT_ENTITY):
+            self._apply_shutter_state(new_state, entity_id, is_cover=False)
+            self._notify()
+        elif entity_id == self.config.get(CONF_SHUTTER_COVER_ENTITY):
+            self._apply_shutter_state(new_state, entity_id, is_cover=True)
+            self._notify()
         elif entity_id == self.config.get(CONF_DOOR_ENTITY):
             self._apply_door_state(new_state, now, source_entity_id=entity_id)
         elif entity_id == self.config.get(CONF_PLUG_ENTITY):
@@ -609,9 +645,78 @@ class ApplianceRuntime:
     ) -> None:
         value = None
         if state is not None and state.state not in ("unknown", "unavailable"):
-            value = "off" if state.state == "closed" else "on"
+            if state.state == "open":
+                value = "on"
+            elif state.state == "closed":
+                value = "off"
+            else:
+                return
 
         self._apply_running_value(value, now, initialize, source_entity_id)
+
+    def _apply_lock_state(
+        self,
+        state: Any,
+        source_entity_id: str,
+        *,
+        initialize: bool = False,
+    ) -> None:
+        value = state.state if state is not None else None
+        if value not in ("locked", "unlocked"):
+            if value in (None, "unknown", "unavailable"):
+                self.lock_state = None
+            return
+        previous = self.lock_state
+        self.lock_state = value
+        if initialize or previous is None or previous == value:
+            return
+        action_group = "lock_locked" if value == "locked" else "lock_unlocked"
+        self._queue_capability_action(
+            action_group, CONF_LOCK_ENTITY, source_entity_id
+        )
+
+    def _apply_shutter_state(
+        self,
+        state: Any,
+        source_entity_id: str,
+        *,
+        is_cover: bool,
+        initialize: bool = False,
+    ) -> None:
+        value = state.state if state is not None else None
+        if value in (None, "unknown", "unavailable"):
+            self.shutter_open = None
+            return
+        if is_cover:
+            if value not in ("open", "closed"):
+                return
+            is_open = value == "open"
+        else:
+            if value not in ("on", "off"):
+                self.shutter_open = None
+                return
+            is_open = value == "on"
+
+        previous = self.shutter_open
+        self.shutter_open = is_open
+        if initialize or previous is None or previous == is_open:
+            return
+        action_group = "shutter_open" if is_open else "shutter_close"
+        entity_key = (
+            CONF_SHUTTER_COVER_ENTITY if is_cover else CONF_SHUTTER_CONTACT_ENTITY
+        )
+        self._queue_capability_action(action_group, entity_key, source_entity_id)
+
+    def _queue_capability_action(
+        self, action_group: str, entity_key: str, source_entity_id: str
+    ) -> None:
+        if (
+            action_group in self.profile.action_groups
+            and self.config.get(entity_key)
+        ):
+            self._queue_actions(
+                ACTION_GROUP_CONFIG_KEYS[action_group], source_entity_id
+            )
 
     def _apply_running_value(
         self,

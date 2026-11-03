@@ -18,6 +18,8 @@ from .const import (
     CONF_APPLIANCE_CLASS,
     CONF_DOOR_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
+    CONF_SHUTTER_CONTACT_ENTITY,
+    CONF_SHUTTER_COVER_ENTITY,
     DOMAIN,
 )
 from .device import appliance_device_info
@@ -96,6 +98,14 @@ class ApplianceBinarySensor(BinarySensorEntity):
         if source_key is not None:
             state = self.hass.states.get(self._runtime.config.get(source_key))
             return state is not None and state.state != "unavailable"
+        if self._key == "shutter":
+            source_key = (
+                CONF_SHUTTER_CONTACT_ENTITY
+                if self._runtime.config.get(CONF_SHUTTER_CONTACT_ENTITY)
+                else CONF_SHUTTER_COVER_ENTITY
+            )
+            state = self.hass.states.get(self._runtime.config.get(source_key))
+            return state is not None and state.state != "unavailable"
         source_input = next(
             (
                 item
@@ -134,6 +144,12 @@ class ApplianceBinarySensor(BinarySensorEntity):
             source_key = CONF_DOOR_ENTITY
         elif self._key == "mail_slot":
             source_key = CONF_MAIL_SLOT_ENTITY
+        elif self._key == "shutter":
+            source_key = (
+                CONF_SHUTTER_CONTACT_ENTITY
+                if self._runtime.config.get(CONF_SHUTTER_CONTACT_ENTITY)
+                else CONF_SHUTTER_COVER_ENTITY
+            )
         source_entity = self._runtime.config.get(source_key) if source_key else None
         return {"source_entity": source_entity} if source_entity else None
 
@@ -164,6 +180,8 @@ class ApplianceBinarySensor(BinarySensorEntity):
             if self.is_on is None:
                 return "mdi:mailbox-outline"
             return "mdi:mailbox-open-up" if self.is_on else "mdi:mailbox-up"
+        if self._key == "shutter":
+            return "mdi:blinds-open" if self.is_on else "mdi:blinds"
         if self._key == "pending_unload":
             if appliance_type in ("mailbox_motion", "mailbox_slot"):
                 return "mdi:email-alert" if self.is_on else "mdi:email-outline"
@@ -316,6 +334,22 @@ async def async_setup_entry(
                     "mail_slot",
                     lambda runtime=runtime: runtime.mail_slot_open,
                     BinarySensorDeviceClass.DOOR,
+                )
+            )
+        if (
+            "shutter" in runtime.profile.output_entities
+            and (
+                runtime.config.get(CONF_SHUTTER_CONTACT_ENTITY)
+                or runtime.config.get(CONF_SHUTTER_COVER_ENTITY)
+            )
+        ):
+            runtime_entities.append(
+                ApplianceBinarySensor(
+                    runtime,
+                    entry,
+                    "shutter",
+                    lambda runtime=runtime: runtime.shutter_open,
+                    BinarySensorDeviceClass.OPENING,
                 )
             )
         input_wrappers = tuple(

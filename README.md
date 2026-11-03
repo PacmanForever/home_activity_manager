@@ -56,7 +56,8 @@ Laundry and drying
 
 Openings
 |-- Door
-|   `-- Activity detection with a contact sensor
+|   |-- Activity detection with a contact sensor
+|   `-- Activity detection with a cover entity
 `-- Window
     `-- Activity detection with a contact sensor
 
@@ -69,9 +70,6 @@ Refrigeration
     `-- Activity detection with a smart switch
 
 Sun protection
-|-- Blind
-|   |-- Activity detection with a contact sensor
-|   `-- Activity detection with a cover entity
 `-- Awning
     |-- Activity detection with a contact sensor
     `-- Activity detection with a cover entity
@@ -92,7 +90,7 @@ Washer, dryer, and dishwasher profiles detect cycles from power thresholds and c
 
 ### Openings
 
-Door and window profiles expose the required contact's open/closed position; they do not report whether the opening is moving. Contact transitions track activity actions and duration. An optional lock is represented by a native lock proxy on the managed device; standard controls forward to the original lock, which remains unchanged on its existing device.
+Windows use a required contact sensor. Doors can use that same contact mode or a cover entity representing the door itself; cover actions run only after the entity settles at `open` or `closed`, not while it is `opening` or `closing`. In contact mode, a door can optionally include a lock and an associated shutter. A shutter uses either a contact sensor or a cover, never both, and its contact must differ from the door contact. The primary door cover is not an associated shutter. Configured locks and covers are represented by native proxies; an associated shutter also exposes its open/closed state.
 
 ### Refrigeration
 
@@ -101,7 +99,7 @@ Refrigerator and freezer profiles offer the same two modes. Power mode requires 
 ### Sun protection
 
 - **Contact-sensor mode:** exposes open/closed position, not motor movement, so it has no `running` entity. Contact transitions still track actions and duration.
-- **Cover mode:** open, opening, and closing states are active; closed is inactive. A native cover proxy is added to the managed device and forwards standard controls without moving or modifying the original entity. Vendor-specific services are not proxied.
+- **Cover mode:** settled `open` is active and settled `closed` is inactive; `opening` and `closing` retain the last settled state. A native cover proxy is added to the managed device and forwards standard controls without moving or modifying the original entity. Vendor-specific services are not proxied.
 
 ### Shared behavior
 
@@ -113,16 +111,16 @@ Refrigerator and freezer profiles offer the same two modes. Power mode requires 
 
 ### Group actions
 
-Configure shared actions from the group's options. Only hooks supported by every activity profile under that group are offered. Each appliance runs the shared action when its own event occurs, before its device-specific actions; a group action is not a single once-per-group event. Each event is determined by that appliance's own activity source and applicable parameters. For timed hooks, timers and repeat limits come from the appliance's parameters, not the group action settings. This applies to maximum-runtime actions, pending reminders, and door, compressor, or smart-plug alarms. A hook runs only when that appliance emits the corresponding event; for example, the maximum-runtime hook requires a maximum runtime to be configured. Omitted optional values use the integration's defaults. Repeat counts are additional runs after the first, so three additional repeats allow up to four runs for that appliance.
+Configure shared actions from the group's options. The offered hooks are the ordered union of hooks supported by profiles under that group. Each appliance runs a shared action only when its own profile supports that hook and its configured source emits the event; optional lock and shutter hooks, for example, run only for an appliance with that configured capability. A group action is not a single once-per-group event. Each event is determined by that appliance's own activity source and applicable parameters. For timed hooks, timers and repeat limits come from the appliance's parameters, not the group action settings. This applies to maximum-runtime actions, pending reminders, and door, compressor, or smart-plug alarms. A hook runs only when that appliance emits the corresponding event; for example, the maximum-runtime hook requires a maximum runtime to be configured. Omitted optional values use the integration's defaults. Repeat counts are additional runs after the first, so three additional repeats allow up to four runs for that appliance.
 
 For example, the shared smart-plug-off action runs immediately for each appliance whose plug turns off. That appliance's repeat interval and additional-repeat count control later runs independently of the other appliances in the group. The first action is not counted as a repeat. These alarm parameters are configured with the appliance, not in the group actions form.
 
-| Group | Hooks common to every profile |
+| Group | Hooks offered across its profiles |
 | --- | --- |
 | Climate control | Activity starts, activity ends, smart plug off |
 | Deliveries | Arrival, collection reminder, collected |
 | Laundry and drying | Activity starts, activity ends, maximum runtime, pending unload, emptied, smart plug off |
-| Openings | Activity starts, activity ends |
+| Openings | Activity starts, activity ends, lock locked, lock unlocked, shutter open, shutter closed |
 | Refrigeration | Activity starts, activity ends, door-open alarm |
 | Sun protection | Activity starts, activity ends |
 
@@ -145,12 +143,12 @@ Each group has one config entry. Add, edit, or remove appliances from that group
 Each group entry groups its appliances on the integration page. Only configured appliances are registered as devices; the group itself is not added as an empty device.
 
 1. A group, appliance class, editable name, and activity mode when that profile offers a choice.
-2. The required activity source and any optional compatible sensors or controls. A refrigerator requires a door contact; a mailbox requires a separate main-door contact; opening can optionally include a lock.
+2. The required activity source and any optional compatible sensors or controls. A refrigerator requires a door contact; a mailbox requires a separate main-door contact; a contact-based door can optionally include a lock and one associated shutter source (contact or cover).
 3. The profile's parameters and actions, when available. Empty parameter forms are skipped.
 
 Editing shows the fixed group, class, and mode alongside the name, followed by that profile's sensors, parameters, and actions. The activity source can be replaced with a compatible entity. A running cycle retains its start time after replacement unless the new source confirms it has stopped. An unavailable source does not cause a transition.
 
-Each device-type-and-mode profile uses its own sensor, parameter and action fields. Cycle-start and cycle-end actions use the same labels across profiles; optional fields are marked explicitly in the selected profile's form.
+Each device-type-and-mode profile uses its own sensor, parameter and action fields. Cycle-start and cycle-end actions use the same labels across profiles; opening actions describe open/closed transitions. Optional lock and shutter actions appear only when that input is configured.
 
 For profiles with a power sensor, a cumulative energy sensor can be selected independently of the activity source. Its total is displayed in kWh and is never changed by this integration. Leave it empty to calculate a persistent total from power readings. The device reset button is available whenever a power sensor is configured. It resets the integration's displayed energy total to zero without writing to the external sensor; when an external sensor is selected, its current reading becomes the reset baseline and later increases are shown as consumption since reset. The calculated total is maintained separately, so switching energy sources can change the displayed total; an unavailable external sensor does not fall back to the calculated total.
 
@@ -158,7 +156,7 @@ Power-cycle defaults are 4 W for 15 seconds to start and 1 W for 60 seconds to f
 
 ## Entities and automations
 
-Outputs depend on the selected profile and configured inputs. A selected power sensor provides a power entity; an energy sensor or power sensor provides an energy entity. Cycle-based profiles provide activity state and last-activity duration; estimated remaining time is limited to laundry profiles. Both refrigerator modes expose activity and a door-open alarm; neither has a compressor-inactivity or plug-off alarm. Mailboxes expose their main-door and pending-collection states, plus a button to clear pending status. Detecting mail starts the mailbox cycle and runs its start actions; opening the main door or pressing the clear button ends the cycle, runs its end actions, and cancels reminders. A selected smart plug is exposed as a switch on the managed device. Climate, cover, and optional opening-lock sources are represented by native-domain proxy entities on the managed device.
+Outputs depend on the selected profile and configured inputs. A selected power sensor provides a power entity; an energy sensor or power sensor provides an energy entity. Cycle-based profiles provide activity state and last-activity duration; estimated remaining time is limited to laundry profiles. Both refrigerator modes expose activity and a door-open alarm; neither has a compressor-inactivity or plug-off alarm. Mailboxes expose their main-door and pending-collection states, plus a button to clear pending status. Detecting mail starts the mailbox cycle and runs its start actions; opening the main door or pressing the clear button ends the cycle, runs its end actions, and cancels reminders. A selected smart plug is exposed as a switch on the managed device. Climate, cover, and optional opening-lock sources are represented by native-domain proxy entities on the managed device. Contact-based doors with an associated shutter expose its open/closed state.
 
 Configured inputs are represented by their corresponding integration output when one exists. The air conditioner's louver sensor is represented by its running state, without a separate input entity. Mailbox sensors likewise do not create standalone input wrappers; the main-door, pending-collection, and mail-slot outputs remain available. Climate, cover, and lock proxies mirror standard state and supported features and forward standard actions to their configured source entities. These proxies are hidden by default to reduce duplicate entries in normal dashboards; they remain active and can be shown from the entity registry. Hidden proxies are not included when an automation targets the whole device or area. The source entities are never reassigned or modified by normal setup, editing, or removal of the managed device. Entries created by older versions that assigned the original climate entity are migrated to use a proxy and release that legacy device association.
 

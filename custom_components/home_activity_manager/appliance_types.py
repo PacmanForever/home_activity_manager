@@ -13,6 +13,8 @@ from .const import (
     CONF_PLUG_ENTITY,
     CONF_POWER_ENTITY,
     CONF_RUNNING_ENTITY,
+    CONF_SHUTTER_CONTACT_ENTITY,
+    CONF_SHUTTER_COVER_ENTITY,
 )
 
 
@@ -445,10 +447,55 @@ APPLIANCE_PROFILES = {
                 domain="lock",
                 create_wrapper=False,
             ),
+            SensorInput(
+                form_key="opening_shutter_contact_entity",
+                config_key=CONF_SHUTTER_CONTACT_ENTITY,
+                domain="binary_sensor",
+                device_classes=("opening", "door", "window"),
+                output_entity="shutter",
+            ),
+            SensorInput(
+                form_key="opening_shutter_cover_entity",
+                config_key=CONF_SHUTTER_COVER_ENTITY,
+                domain="cover",
+                output_entity="shutter",
+                create_wrapper=False,
+            ),
         ),
         parameter_groups=(),
-        action_groups=("cycle_start", "cycle_finish"),
-        output_entities=("last_cycle_duration",),
+        action_groups=(
+            "cycle_start",
+            "cycle_finish",
+            "lock_locked",
+            "lock_unlocked",
+            "shutter_open",
+            "shutter_close",
+        ),
+        output_entities=("last_cycle_duration", "shutter"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
+    "opening_cover": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="opening_cover_entity",
+                config_key=CONF_COVER_ENTITY,
+                domain="cover",
+                required=True,
+                detection_source="cover",
+                create_wrapper=False,
+            ),
+            SensorInput(
+                form_key="opening_cover_lock_entity",
+                config_key=CONF_LOCK_ENTITY,
+                domain="lock",
+                create_wrapper=False,
+            ),
+        ),
+        parameter_groups=(),
+        action_groups=("cycle_start", "cycle_finish", "lock_locked", "lock_unlocked"),
+        output_entities=("last_cycle_duration", "running"),
         supports_pending_unload=False,
         estimates_remaining=False,
         supports_max_runtime=False,
@@ -515,7 +562,7 @@ APPLIANCE_CATEGORIES = {
     },
     "dryer": {"power": "dryer"},
     "mailbox": {"mail_slot": "mailbox_slot", "mail_motion": "mailbox_motion"},
-    "opening": {"running_sensor": "opening"},
+    "opening": {"running_sensor": "opening", "cover": "opening_cover"},
     "refrigerator": {"smart_plug": "refrigerator_switch", "power": "refrigerator"},
     "sun_protection": {
         "running_sensor": "sun_protection_contact",
@@ -538,12 +585,11 @@ APPLIANCE_GROUPS = {
         "dryer": {"power": "laundry"},
         "dishwasher": {"power": "laundry"},
     },
-    "openings": {"door": {"running_sensor": "opening"}, "window": {"running_sensor": "opening"}},
+    "openings": {
+        "door": {"running_sensor": "opening", "cover": "opening_cover"},
+        "window": {"running_sensor": "opening"},
+    },
     "sun_protection": {
-        "blind": {
-            "running_sensor": "sun_protection_contact",
-            "cover": "sun_protection_cover",
-        },
         "awning": {
             "running_sensor": "sun_protection_contact",
             "cover": "sun_protection_cover",
@@ -718,6 +764,7 @@ APPLIANCE_TYPES = (
     "laundry",
     "refrigerator_switch",
     "refrigerator",
+    "opening_cover",
     "opening",
     "sun_protection_cover",
     "sun_protection_contact",
@@ -740,6 +787,7 @@ APPLIANCE_MODEL_NAMES = {
     "mailbox_motion": "Mailbox (interior motion sensor)",
     "mailbox_slot": "Mailbox (mail-slot contact/opening sensor)",
     "opening": "Opening (contact sensor)",
+    "opening_cover": "Opening (cover)",
     "sun_protection_contact": "Sun protection (contact sensor)",
     "sun_protection_cover": "Sun protection (cover)",
 }
@@ -802,6 +850,7 @@ LEGACY_APPLIANCE_CLASSES = {
     "mailbox_motion": "mailbox",
     "mailbox_slot": "mailbox",
     "opening": "opening",
+    "opening_cover": "door",
     "sun_protection_contact": "sun_protection",
     "sun_protection_cover": "sun_protection",
 }
@@ -814,6 +863,7 @@ LEGACY_APPLIANCE_GROUPS = {
     "dishwasher": "laundry",
     "dryer": "laundry",
     "opening": "openings",
+    "opening_cover": "openings",
     "sun_protection_contact": "sun_protection",
     "sun_protection_cover": "sun_protection",
     "mailbox_motion": "deliveries",
@@ -885,8 +935,8 @@ def get_appliance_group_for_profile(
     return LEGACY_APPLIANCE_GROUPS.get(appliance_type)
 
 
-def get_common_group_action_groups(appliance_group: str) -> tuple[str, ...]:
-    """Return actions supported by every profile below a group."""
+def get_group_action_groups(appliance_group: str) -> tuple[str, ...]:
+    """Return all actions supported by profiles below a group, in order."""
     profiles = [
         APPLIANCE_PROFILES[profile_name]
         for classes in APPLIANCE_GROUPS[appliance_group].values()
@@ -895,14 +945,12 @@ def get_common_group_action_groups(appliance_group: str) -> tuple[str, ...]:
     if not profiles:
         return ()
 
-    common_actions = set(profiles[0].action_groups)
-    for profile in profiles[1:]:
-        common_actions.intersection_update(profile.action_groups)
-    return tuple(
+    action_groups = dict.fromkeys(
         action_group
-        for action_group in profiles[0].action_groups
-        if action_group in common_actions
+        for profile in profiles
+        for action_group in profile.action_groups
     )
+    return tuple(action_groups)
 
 
 def get_canonical_appliance_type(appliance_type: str) -> str:
