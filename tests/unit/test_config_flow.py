@@ -1025,7 +1025,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 self.assertTrue(all(label.strip() for label in options.values()))
             self.assertEqual(len(mode_labels), len(set(mode_labels)))
 
-    def test_group_action_help_explains_common_hooks_and_template_variables(self) -> None:
+    def test_group_action_help_links_to_documentation_and_examples(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
         paths = (
             root / "strings.json",
@@ -1047,20 +1047,11 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 )
             )
             help_text = translation["options"]["step"]["group_actions"]["description"]
-            self.assertIn("ham_device_name", help_text)
-            self.assertIn("ham_device_area_name", help_text)
-            self.assertIn("ham_source_entity_id", help_text)
-            self.assertIn("ham_appliance_name", help_text)
-            self.assertIn("ham_area_name", help_text)
-            self.assertTrue(
-                any(term in help_text.casefold() for term in ("proxy", "wrapper"))
+            self.assertIn(
+                "https://github.com/PacmanForever/home_activity_manager#group-actions",
+                help_text,
             )
-            self.assertTrue(
-                any(
-                    term in help_text.casefold()
-                    for term in ("timer", "temporitzador", "temporizador")
-                )
-            )
+            self.assertLess(len(help_text), 200)
             self.assertNotIn("{{", help_text)
             self.assertNotIn("}}", help_text)
             action_help = translation["options"]["step"]["group_actions"][
@@ -1077,6 +1068,18 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 "plug_off_actions",
             ):
                 self.assertTrue(action_help[action_key].strip(), (path, action_key))
+
+        readme = (Path(__file__).parents[2] / "README.md").read_text(encoding="utf-8")
+        for term in (
+            "ham_device_name",
+            "ham_device_area_name",
+            "ham_source_entity_id",
+            "ham_appliance_name",
+            "ham_area_name",
+            "notify.send_message",
+        ):
+            self.assertIn(term, readme)
+        self.assertIn("default('timer', true)", readme)
 
     def test_last_appliance_removed_abort_is_translated(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
