@@ -37,6 +37,7 @@ from .device import (
 	move_device_to_config_entry,
 	remove_appliance_group_devices,
 )
+from .entity_proxy import release_directly_attached_entities
 from .runtime import (
 	ApplianceRuntime,
 	ApplianceRuntimeCollection,
@@ -160,6 +161,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
 		return False
 	for runtime in entry_runtimes(entry):
+		release_directly_attached_entities(hass, runtime)
 		await runtime.async_unload()
 	return True
 

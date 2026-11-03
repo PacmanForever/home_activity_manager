@@ -1172,7 +1172,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.34" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.35" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Laundry and drying · Washer · Power sensor",
         "Laundry and drying · Dishwasher · Power sensor",
@@ -2156,12 +2156,17 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
         source = source_registry.async_get(source_entity_id)
         assert source is not None
         if input_config.domain in ("climate", "cover", "lock"):
-            assert source.device_id == original_device_id
             wrapper_id = integration_registry.async_get_entity_id(
                 input_config.domain,
                 DOMAIN,
                 f"{entry.entry_id}_{input_config.domain}_proxy",
             )
+            if original_device_id is None:
+                assert source.device_id == device_id
+                assert wrapper_id is None
+                continue
+
+            assert source.device_id == original_device_id
             assert wrapper_id is not None
             wrapper = integration_registry.async_get(wrapper_id)
             assert wrapper is not None
@@ -2816,7 +2821,7 @@ async def test_plug_off_alarm_repeats_pauses_persists_and_rearms(
 
 
 @pytest.mark.asyncio
-async def test_climate_wrapper_preserves_and_tracks_source_entity(
+async def test_unassigned_climate_source_is_attached_and_tracked(
     hass, enable_custom_integrations
 ):
     climate_entry = MockConfigEntry(domain="climate_source")
@@ -2848,24 +2853,11 @@ async def test_climate_wrapper_preserves_and_tracks_source_entity(
     registered_climate = er.async_get(hass).async_get(climate_entity.entity_id)
     assert registered_climate is not None
     assert registered_climate.config_entry_id == climate_entry.entry_id
-    assert registered_climate.device_id is None
+    assert registered_climate.device_id == device_id
     proxy_entity_id = er.async_get(hass).async_get_entity_id(
         "climate", DOMAIN, f"{entry.entry_id}_climate_proxy"
     )
-    assert proxy_entity_id is not None
-    registered_proxy = er.async_get(hass).async_get(proxy_entity_id)
-    assert registered_proxy is not None
-    assert registered_proxy.config_entry_id == entry.entry_id
-    assert registered_proxy.device_id == device_id
-    assert registered_proxy.hidden_by == er.RegistryEntryHider.INTEGRATION
-    assert proxy_entity_id == (
-        "climate.air_conditioner_"
-        f"{climate_entity.entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
-    )
-    custom_proxy_entity_id = "climate.custom_air_conditioner_proxy"
-    er.async_get(hass).async_update_entity(
-        proxy_entity_id, new_entity_id=custom_proxy_entity_id
-    )
+    assert proxy_entity_id is None
     assert entry.runtime_data.detector.is_running
 
     hass.states.async_set(
@@ -2888,7 +2880,7 @@ async def test_climate_wrapper_preserves_and_tracks_source_entity(
     await hass.async_block_till_done()
     assert entry.runtime_data.detector.is_running
 
-    assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
+    assert er.async_get(hass).async_get(climate_entity.entity_id).device_id == device_id
 
     appliance_record = dict(entry.data["appliances"][0])
     appliance_data = dict(appliance_record["data"])
@@ -2899,14 +2891,14 @@ async def test_climate_wrapper_preserves_and_tracks_source_entity(
         data={**entry.data, "appliances": [appliance_record]},
     )
     await hass.async_block_till_done()
+    assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
+    assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id == device_id
     assert (
         er.async_get(hass).async_get_entity_id(
             "climate", DOMAIN, f"{entry.entry_id}_climate_proxy"
         )
-        == custom_proxy_entity_id
+        is None
     )
-    assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
-    assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id is None
 
     appliance_record = dict(entry.data["appliances"][0])
     appliance_data = dict(appliance_record["data"])
@@ -3320,10 +3312,69 @@ async def test_climate_entity_with_existing_parent_is_not_reassigned(
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id == (
         existing_device.id
     )
+    proxy_entity_id = er.async_get(hass).async_get_entity_id(
+        "climate", DOMAIN, f"{entry.entry_id}_climate_proxy"
+    )
+    assert proxy_entity_id is not None
+    assert er.async_get(hass).async_get(proxy_entity_id).device_id == (
+        _async_appliance_device_id(hass, entry)
+    )
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id == (
         existing_device.id
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("source_domain", "entity_domain", "unique_id", "appliance_type", "source_key"),
+    [
+        ("cover_source", "cover", "blind", "sun_protection_cover", CONF_COVER_ENTITY),
+        ("lock_source", "lock", "front_door", "opening", CONF_LOCK_ENTITY),
+    ],
+)
+async def test_unassigned_cover_and_lock_sources_are_attached_directly(
+    hass,
+    enable_custom_integrations,
+    source_domain,
+    entity_domain,
+    unique_id,
+    appliance_type,
+    source_key,
+):
+    source_config_entry = MockConfigEntry(domain=source_domain)
+    source_config_entry.add_to_hass(hass)
+    source_entity = er.async_get(hass).async_get_or_create(
+        entity_domain,
+        source_domain,
+        unique_id,
+        config_entry=source_config_entry,
+    )
+    hass.states.async_set(source_entity.entity_id, "open")
+    appliance_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_APPLIANCE_TYPE: appliance_type,
+            source_key: source_entity.entity_id,
+            "name": unique_id,
+        },
+    )
+    appliance_entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(appliance_entry.entry_id)
+    device_id = _async_appliance_device_id(hass, appliance_entry)
+    assert device_id is not None
+    assert er.async_get(hass).async_get(source_entity.entity_id).device_id == device_id
+    assert (
+        er.async_get(hass).async_get_entity_id(
+            entity_domain,
+            DOMAIN,
+            f"{appliance_entry.entry_id}_{entity_domain}_proxy",
+        )
+        is None
+    )
+    assert await hass.config_entries.async_unload(appliance_entry.entry_id)
+    assert er.async_get(hass).async_get(source_entity.entity_id).device_id is None
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## v0.9.35 - 2026-11-03
+
+### Changed
+
+- Reuse unassigned climate, cover, and lock source entities on the managed device; retain native proxies when a source already belongs to a device.
+- Release direct source-device associations on unload when the source still points to the managed device.
+- Document the source association and proxy behavior in the requirements and README.
 
 ## v0.9.34 - 2026-11-03
 

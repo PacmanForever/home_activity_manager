@@ -5,8 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
+from .const import DOMAIN
 from .device import appliance_device_info
 from .runtime import ApplianceRuntime
 
@@ -17,6 +19,55 @@ def _suggested_proxy_object_id(source_entity_id: str) -> str:
     if not separator:
         object_id = source_entity_id
     return f"{object_id}_ham_proxy"
+
+
+def use_source_entity_on_appliance(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    runtime: ApplianceRuntime,
+    source_entity_id: str,
+) -> bool:
+    """Use an unassigned source entity directly on its appliance device."""
+    entity_registry = er.async_get(hass)
+    source_entry = entity_registry.async_get(source_entity_id)
+    if source_entry is None:
+        return False
+
+    appliance_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        **appliance_device_info(entry, runtime.config, hass),
+    )
+    if source_entry.device_id not in (None, appliance_device.id):
+        return False
+    if source_entry.device_id is None:
+        entity_registry.async_update_entity(
+            source_entity_id, device_id=appliance_device.id
+        )
+    runtime._ham_directly_attached_entities[source_entity_id] = appliance_device.id
+    return True
+
+
+def release_directly_attached_entities(
+    hass: HomeAssistant, runtime: ApplianceRuntime
+) -> None:
+    """Restore source entities directly attached to an appliance device."""
+    entity_registry = er.async_get(hass)
+    for entity_id, device_id in tuple(
+        runtime._ham_directly_attached_entities.items()
+    ):
+        entity_entry = entity_registry.async_get(entity_id)
+        if entity_entry is not None and entity_entry.device_id == device_id:
+            entity_registry.async_update_entity(entity_id, device_id=None)
+    runtime._ham_directly_attached_entities.clear()
+
+
+def remove_proxy_entity(registry: Any, domain: str, appliance_id: str) -> None:
+    """Remove a stale native-domain proxy for an appliance."""
+    proxy_id = registry.async_get_entity_id(
+        domain, DOMAIN, f"{appliance_id}_{domain}_proxy"
+    )
+    if proxy_id is not None:
+        registry.async_remove(proxy_id)
 
 
 class EntityProxyMixin:

@@ -161,6 +161,7 @@ class ApplianceRuntime:
         self.entry = entry
         self.config = config
         self.appliance_id = config.get("_appliance_id", entry.entry_id)
+        self._ham_directly_attached_entities: dict[str, str] = {}
         self.profile = get_appliance_profile(config.get(CONF_APPLIANCE_TYPE, "washer"))
         appliance_group = entry.data.get("category")
         if appliance_group not in APPLIANCE_GROUPS:
