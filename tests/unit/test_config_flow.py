@@ -1165,7 +1165,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 self.assertTrue(all(label.strip() for label in options.values()))
             self.assertEqual(len(mode_labels), len(set(mode_labels)))
 
-    def test_group_action_help_links_to_documentation_and_examples(self) -> None:
+    def test_group_action_help_points_to_readme_without_urls(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
         paths = (
             root / "strings.json",
@@ -1187,10 +1187,8 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 )
             )
             help_text = translation["options"]["step"]["group_actions"]["description"]
-            self.assertIn(
-                "https://github.com/PacmanForever/home_activity_manager#group-actions",
-                help_text,
-            )
+            self.assertIn("readme", help_text.casefold())
+            self.assertNotIn("https://", help_text)
             self.assertLess(len(help_text), 200)
             self.assertNotIn("{{", help_text)
             self.assertNotIn("}}", help_text)

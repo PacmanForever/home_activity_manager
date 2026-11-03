@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.9.34 - 2026-11-03
+
+### Fixed
+
+- Remove embedded documentation URLs from translated group-action help so Hassfest validation passes.
+
 ## v0.9.33 - 2026-11-03
 
 ### Added
