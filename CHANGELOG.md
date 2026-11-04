@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.43 - 2026-11-04
+
+### Changed
+
+- Apply consistent direct association and proxy duplication rules to visible source entities across appliance profiles.
+- Name source-backed proxies with the `(HAM Proxy)` suffix and source-derived entity IDs, including translated fallback names.
+- Always proxy external cumulative-energy sensors so reset baselines remain local and the original source is unchanged.
+
+### Fixed
+
+- Normalize legacy proxy entity IDs without overwriting existing entities or repeatedly prefixing canonical IDs.
+
 ## v0.9.42 - 2026-11-04
 
 ### Fixed

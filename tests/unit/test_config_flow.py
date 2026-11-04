@@ -56,6 +56,7 @@ from custom_components.home_activity_manager.const import (
     CONF_DOOR_OPEN_ACTIONS,
     CONF_DOOR_OPEN_DELAY_SECONDS,
     CONF_EMPTIED_ACTIONS,
+    CONF_ENERGY_ENTITY,
     CONF_FINISH_ACTIONS,
     CONF_GROUP_ACTIONS,
     CONF_LOCK_ENTITY,
@@ -573,8 +574,29 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             "access_contact": {CONF_RUNNING_ENTITY},
             "sun_protection_contact": {CONF_RUNNING_ENTITY},
         }
+        internal_only_inputs = {
+            ("air_conditioner_contact", CONF_RUNNING_ENTITY),
+            ("mailbox_motion", CONF_MAIL_MOTION_ENTITY),
+        }
         for appliance_type, profile in APPLIANCE_PROFILES.items():
             with self.subTest(appliance_type=appliance_type):
+                self.assertEqual(
+                    {
+                        input_config.config_key
+                        for input_config in profile.sensor_inputs
+                        if input_config.requires_source_representation
+                    },
+                    {
+                        input_config.config_key
+                        for input_config in profile.sensor_inputs
+                        if (appliance_type, input_config.config_key)
+                        not in internal_only_inputs
+                    },
+                )
+                for input_config in profile.sensor_inputs:
+                    if input_config.proxy_always:
+                        self.assertEqual(input_config.config_key, CONF_ENERGY_ENTITY)
+                        self.assertEqual(input_config.output_entity, "total_energy")
                 self.assertEqual(
                     {
                         item.config_key

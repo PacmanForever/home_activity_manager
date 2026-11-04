@@ -32,6 +32,12 @@ from .const import (
 )
 from .appliance_types import SensorInput
 from .device import appliance_device_info
+from .entity_proxy import (
+    _ham_proxy_name,
+    _source_entity_name,
+    _suggested_proxy_object_id,
+    use_source_entity_on_appliance,
+)
 from .runtime import ApplianceRuntime, entry_runtimes
 
 _DURATION_TRANSLATION_KEYS = {
@@ -66,12 +72,24 @@ class ApplianceSensor(SensorEntity):
         unit: str | None,
         device_class: SensorDeviceClass | None,
         state_class: SensorStateClass | None,
+        source_entity_id: str | None = None,
     ) -> None:
         self._runtime = runtime
         self._key = key
         self._value_fn = value_fn
+        self._source_entity_id = source_entity_id
         self._attr_unique_id = f"{getattr(runtime, 'appliance_id', entry.entry_id)}_{key}"
-        self._attr_translation_key = key
+        self._attr_translation_key = (
+            f"proxy_{key}" if source_entity_id else key
+        )
+        if source_entity_id:
+            self._appliance_name = runtime.config.get("name", entry.title)
+            source_name = _source_entity_name(runtime.hass, source_entity_id)
+            self._attr_has_entity_name = source_name is None
+            if source_name is None:
+                self._appliance_name = None
+            if source_name is not None:
+                self._attr_name = _ham_proxy_name(source_name)
         appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)
         if key == "last_cycle_duration":
             self._attr_translation_key = _DURATION_TRANSLATION_KEYS.get(
@@ -99,6 +117,15 @@ class ApplianceSensor(SensorEntity):
         if self._key == "power" and not self._runtime.power_available:
             return None
         return self._value_fn()
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Suggest a source-derived ID for source-backed sensor proxies."""
+        if self._source_entity_id is None:
+            return super().suggested_object_id
+        return _suggested_proxy_object_id(
+            self._source_entity_id, self._appliance_name
+        )
 
     @property
     def available(self) -> bool:
@@ -154,11 +181,18 @@ class ApplianceInputSensor(SensorEntity):
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = runtime.config[input_config.config_key]
+        self._appliance_name = runtime.config.get("name", entry.title)
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_"
             f"{input_config.output_entity}"
         )
-        self._attr_translation_key = input_config.output_entity
+        self._attr_translation_key = f"proxy_{input_config.output_entity}"
+        source_name = _source_entity_name(runtime.hass, self._source_entity_id)
+        self._attr_has_entity_name = source_name is None
+        if source_name is None:
+            self._appliance_name = None
+        if source_name is not None:
+            self._attr_name = _ham_proxy_name(source_name)
         self._attr_icon = {
             "illuminance": "mdi:brightness-5",
             "water_temperature": "mdi:thermometer-water",
@@ -194,6 +228,13 @@ class ApplianceInputSensor(SensorEntity):
         return value if math.isfinite(value) else None
 
     @property
+    def suggested_object_id(self) -> str:
+        """Suggest a source-derived ID for the wrapped sensor."""
+        return _suggested_proxy_object_id(
+            self._source_entity_id, self._appliance_name
+        )
+
+    @property
     def available(self) -> bool:
         state = self._runtime.hass.states.get(self._source_entity_id)
         return state is not None and state.state != "unavailable"
@@ -220,6 +261,22 @@ async def async_setup_entry(
     registry = er.async_get(hass)
     for runtime in entry_runtimes(entry):
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
+        proxy_sources: dict[str, str] = {}
+        directly_attached_outputs: set[str] = set()
+        for input_config in runtime.profile.sensor_inputs:
+            if input_config.domain != "sensor" or input_config.output_entity is None:
+                continue
+            source_entity_id = runtime.config.get(input_config.config_key)
+            if source_entity_id is None:
+                continue
+            if input_config.proxy_always:
+                proxy_sources[input_config.output_entity] = source_entity_id
+            elif use_source_entity_on_appliance(
+                hass, entry, runtime, source_entity_id
+            ):
+                directly_attached_outputs.add(input_config.output_entity)
+            else:
+                proxy_sources[input_config.output_entity] = source_entity_id
         sensors = {
             "power": ApplianceSensor(
                 runtime,
@@ -229,6 +286,7 @@ async def async_setup_entry(
                 UnitOfPower.WATT,
                 SensorDeviceClass.POWER,
                 SensorStateClass.MEASUREMENT,
+                proxy_sources.get("power"),
             ),
             "total_energy": ApplianceSensor(
                 runtime,
@@ -238,6 +296,7 @@ async def async_setup_entry(
                 UnitOfEnergy.KILO_WATT_HOUR,
                 SensorDeviceClass.ENERGY,
                 SensorStateClass.TOTAL_INCREASING,
+                proxy_sources.get("total_energy"),
             ),
             "last_cycle_duration": ApplianceSensor(
                 runtime,
@@ -282,6 +341,7 @@ async def async_setup_entry(
                 and key is not None
                 and key not in sensors
                 and runtime.config.get(input_config.config_key)
+                and key in proxy_sources
             ):
                 sensors[key] = ApplianceInputSensor(runtime, entry, input_config)
         input_outputs = {
@@ -312,6 +372,7 @@ async def async_setup_entry(
             if (
                 config_key is not None
                 and runtime.config.get(config_key)
+                and key not in directly_attached_outputs
             ) or (
                 config_key is None
                 and key in runtime.profile.output_entities

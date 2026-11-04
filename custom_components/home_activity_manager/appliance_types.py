@@ -34,6 +34,16 @@ class SensorInput:
     detection_source: str | None = None
     output_entity: str | None = None
     create_wrapper: bool = True
+    proxy_always: bool = False
+
+    @property
+    def requires_source_representation(self) -> bool:
+        """Return whether this input is represented by a visible source entity."""
+        if self.domain in ("climate", "cover", "lock"):
+            return True
+        if self.output_entity == "running":
+            return False
+        return self.create_wrapper
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +126,7 @@ APPLIANCE_PROFILES = {
                 domain="sensor",
                 device_classes=("energy",),
                 output_entity="total_energy",
+                proxy_always=True,
             ),
         ),
         parameter_groups=("plug_off_alarm",),
@@ -153,6 +164,7 @@ APPLIANCE_PROFILES = {
                 domain="sensor",
                 device_classes=("energy",),
                 output_entity="total_energy",
+                proxy_always=True,
             ),
         ),
         parameter_groups=("power_cycle", "max_runtime", "pending_unload", "plug_off_alarm"),
@@ -192,6 +204,7 @@ APPLIANCE_PROFILES = {
                 domain="sensor",
                 device_classes=("energy",),
                 output_entity="total_energy",
+                proxy_always=True,
             ),
         ),
         parameter_groups=("power_cycle", "max_runtime", "pending_unload", "plug_off_alarm"),
@@ -231,6 +244,7 @@ APPLIANCE_PROFILES = {
                 domain="sensor",
                 device_classes=("energy",),
                 output_entity="total_energy",
+                proxy_always=True,
             ),
         ),
         parameter_groups=("power_cycle", "max_runtime", "pending_unload", "plug_off_alarm"),
@@ -270,6 +284,7 @@ APPLIANCE_PROFILES = {
                 domain="sensor",
                 device_classes=("energy",),
                 output_entity="total_energy",
+                proxy_always=True,
             ),
         ),
         parameter_groups=("plug_off_alarm",),
@@ -300,6 +315,7 @@ APPLIANCE_PROFILES = {
                 domain="sensor",
                 device_classes=("energy",),
                 output_entity="total_energy",
+                proxy_always=True,
             ),
         ),
         parameter_groups=("power_cycle", "plug_off_alarm"),
@@ -338,6 +354,7 @@ APPLIANCE_PROFILES = {
                 domain="sensor",
                 device_classes=("energy",),
                 output_entity="total_energy",
+                proxy_always=True,
             ),
         ),
         parameter_groups=(
@@ -386,6 +403,7 @@ APPLIANCE_PROFILES = {
                     domain="sensor",
                     device_classes=("energy",),
                     output_entity="total_energy",
+                    proxy_always=True,
                 ),
             ),
             parameter_groups=("door_alarm", "alarm_repeats"),
@@ -708,6 +726,7 @@ APPLIANCE_PROFILES["aquarium_plug"] = ApplianceTypeProfile(
             domain="sensor",
             device_classes=("energy",),
             output_entity="total_energy",
+            proxy_always=True,
         ),
         *_aquarium_optional_inputs("aquarium_plug"),
     ),
@@ -752,6 +771,7 @@ APPLIANCE_PROFILES["aquarium_power"] = ApplianceTypeProfile(
             domain="sensor",
             device_classes=("energy",),
             output_entity="total_energy",
+            proxy_always=True,
         ),
         *_aquarium_optional_inputs("aquarium_power"),
     ),

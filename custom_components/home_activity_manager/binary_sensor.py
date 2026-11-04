@@ -28,6 +28,7 @@ from .entity_proxy import (
     _ham_proxy_name,
     _source_entity_name,
     _suggested_proxy_object_id,
+    use_source_entity_on_appliance,
 )
 from .runtime import ApplianceRuntime, entry_runtimes
 
@@ -89,12 +90,23 @@ class ApplianceBinarySensor(BinarySensorEntity):
         key: str,
         value_fn: Callable[[], bool | None],
         device_class: BinarySensorDeviceClass | None = None,
+        source_entity_id: str | None = None,
     ) -> None:
         self._runtime = runtime
         self._key = key
         self._value_fn = value_fn
+        self._source_entity_id = source_entity_id
         self._attr_unique_id = f"{getattr(runtime, 'appliance_id', entry.entry_id)}_{key}"
         self._attr_translation_key = key
+        if source_entity_id:
+            self._appliance_name = runtime.config.get("name", entry.title)
+            source_name = _source_entity_name(runtime.hass, source_entity_id)
+            self._attr_has_entity_name = source_name is None
+            if source_name is None:
+                self._appliance_name = None
+            if source_name is not None:
+                self._attr_name = _ham_proxy_name(source_name)
+            self._attr_translation_key = f"proxy_{key}"
         appliance_type = runtime.config.get("appliance_type")
         appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)
         detection_sources = getattr(
@@ -118,6 +130,15 @@ class ApplianceBinarySensor(BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return the current runtime state."""
         return self._value_fn()
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Suggest a source-derived ID for source-backed binary proxies."""
+        if self._source_entity_id is None:
+            return super().suggested_object_id
+        return _suggested_proxy_object_id(
+            self._source_entity_id, self._appliance_name
+        )
 
     @property
     def available(self) -> bool:
@@ -243,6 +264,10 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
         self._runtime = runtime
         self._source_entity_id = runtime.config[input_config.config_key]
         self._appliance_name = runtime.config.get("name", entry.title)
+        source_name = _source_entity_name(runtime.hass, self._source_entity_id)
+        self._attr_has_entity_name = source_name is None
+        if source_name is None:
+            self._appliance_name = None
         input_name = input_config.config_key.removesuffix("_entity")
         self._input_name = input_name
         self._attr_unique_id = (
@@ -257,9 +282,8 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
         self._attr_device_info = appliance_device_info(
             entry, runtime.config, getattr(runtime, "hass", None)
         )
-        self._attr_name = _ham_proxy_name(
-            _source_entity_name(runtime.hass, self._source_entity_id)
-        )
+        if source_name is not None:
+            self._attr_name = _ham_proxy_name(source_name)
         if input_config.device_classes:
             self._attr_device_class = BinarySensorDeviceClass(
                 input_config.device_classes[0]
@@ -338,6 +362,24 @@ async def async_setup_entry(
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
         entity_prefixes.add(f"{appliance_id}_")
         runtime_entities = []
+        proxy_sources: dict[str, str] = {}
+        directly_attached_outputs: set[str] = set()
+        for input_config in runtime.profile.sensor_inputs:
+            if (
+                input_config.domain != "binary_sensor"
+                or input_config.output_entity is None
+                or not input_config.requires_source_representation
+            ):
+                continue
+            source_entity_id = runtime.config.get(input_config.config_key)
+            if source_entity_id is None:
+                continue
+            if use_source_entity_on_appliance(
+                hass, entry, runtime, source_entity_id
+            ):
+                directly_attached_outputs.add(input_config.output_entity)
+            else:
+                proxy_sources[input_config.output_entity] = source_entity_id
         if "running" in runtime.profile.output_entities:
             running_device_class = (
                 BinarySensorDeviceClass.OPENING
@@ -356,6 +398,7 @@ async def async_setup_entry(
         if (
             "door" in runtime.profile.output_entities
             and runtime.config.get(CONF_DOOR_ENTITY)
+            and "door" not in directly_attached_outputs
         ):
             runtime_entities.append(
                 ApplianceBinarySensor(
@@ -364,6 +407,7 @@ async def async_setup_entry(
                     "door",
                     lambda runtime=runtime: runtime.door_open,
                     BinarySensorDeviceClass.DOOR,
+                    proxy_sources.get("door"),
                 )
             )
         if (
@@ -387,6 +431,7 @@ async def async_setup_entry(
         if (
             "mail_slot" in runtime.profile.output_entities
             and runtime.config.get(CONF_MAIL_SLOT_ENTITY)
+            and "mail_slot" not in directly_attached_outputs
         ):
             runtime_entities.append(
                 ApplianceBinarySensor(
@@ -395,6 +440,7 @@ async def async_setup_entry(
                     "mail_slot",
                     lambda runtime=runtime: runtime.mail_slot_open,
                     BinarySensorDeviceClass.DOOR,
+                    proxy_sources.get("mail_slot"),
                 )
             )
         if (
@@ -403,6 +449,7 @@ async def async_setup_entry(
                 runtime.config.get(CONF_SHUTTER_CONTACT_ENTITY)
                 or runtime.config.get(CONF_SHUTTER_COVER_ENTITY)
             )
+            and "shutter" not in directly_attached_outputs
         ):
             runtime_entities.append(
                 ApplianceBinarySensor(
@@ -411,6 +458,7 @@ async def async_setup_entry(
                     "shutter",
                     lambda runtime=runtime: runtime.shutter_open,
                     BinarySensorDeviceClass.OPENING,
+                    proxy_sources.get("shutter"),
                 )
             )
         input_wrappers = tuple(
@@ -418,6 +466,12 @@ async def async_setup_entry(
             for input_config in runtime.profile.inputs_requiring_wrapper
             if input_config.domain == "binary_sensor"
             and runtime.config.get(input_config.config_key)
+            and not use_source_entity_on_appliance(
+                hass,
+                entry,
+                runtime,
+                runtime.config[input_config.config_key],
+            )
         )
         entities.extend(runtime_entities)
         expected_unique_ids.update(entity.unique_id for entity in runtime_entities)

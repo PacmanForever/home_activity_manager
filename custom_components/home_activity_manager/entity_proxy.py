@@ -119,10 +119,12 @@ class EntityProxyMixin:
         self._appliance_name = runtime.config.get("name", entry.title)
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
         self._attr_unique_id = f"{appliance_id}_{domain}_proxy"
-        self._attr_has_entity_name = False
-        self._attr_name = _ham_proxy_name(
-            _source_entity_name(runtime.hass, source_entity_id)
-        )
+        source_name = _source_entity_name(runtime.hass, source_entity_id)
+        self._attr_has_entity_name = source_name is None
+        if source_name is None:
+            self._appliance_name = None
+        if source_name is not None:
+            self._attr_name = _ham_proxy_name(source_name)
         self._attr_should_poll = False
         self._attr_translation_key = translation_key
         self._attr_device_info = appliance_device_info(

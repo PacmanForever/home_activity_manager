@@ -8,6 +8,7 @@
 
 ## Documentation
 
+- Before making any implementation or behavior change, read `REQUIREMENTS_TEMPLATE.md` in full and treat it as the normative project contract. If it conflicts with the requested change, surface the conflict before proceeding.
 - At the end of every change, always review both `README.md` and `REQUIREMENTS_TEMPLATE.md` for consistency with the implementation.
 - Update either document whenever behavior, configuration, supported profiles, or project requirements change. Do not leave stale or contradictory descriptions; if a document needs no edit, confirm that it was reviewed in the completion summary.
 

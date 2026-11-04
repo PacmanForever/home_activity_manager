@@ -16,6 +16,7 @@ from .entity_proxy import (
     _ham_proxy_name,
     _source_entity_name,
     _suggested_proxy_object_id,
+    use_source_entity_on_appliance,
 )
 from .runtime import ApplianceRuntime, entry_runtimes
 
@@ -34,9 +35,12 @@ class AppliancePlugSwitch(SwitchEntity):
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_plug"
         )
-        self._attr_name = _ham_proxy_name(
-            _source_entity_name(runtime.hass, self._entity_id)
-        )
+        source_name = _source_entity_name(runtime.hass, self._entity_id)
+        self._attr_has_entity_name = source_name is None
+        if source_name is None:
+            self._appliance_name = None
+        if source_name is not None:
+            self._attr_name = _ham_proxy_name(source_name)
         self._attr_device_info = appliance_device_info(
             entry, runtime.config, getattr(runtime, "hass", None)
         )
@@ -104,16 +108,21 @@ async def async_setup_entry(
     registry = er.async_get(hass)
     for runtime in entry_runtimes(entry):
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
-        switches = (
-            [AppliancePlugSwitch(runtime, entry)]
-            if runtime.config.get(CONF_PLUG_ENTITY)
-            else []
-        )
-        if not switches:
+        source_entity_id = runtime.config.get(CONF_PLUG_ENTITY)
+        if source_entity_id and use_source_entity_on_appliance(
+            hass, entry, runtime, source_entity_id
+        ):
             entity_id = registry.async_get_entity_id(
                 "switch", DOMAIN, f"{appliance_id}_plug"
             )
             if entity_id is not None:
                 registry.async_remove(entity_id)
-        if switches:
-            async_add_entities(switches)
+            continue
+        if source_entity_id:
+            async_add_entities([AppliancePlugSwitch(runtime, entry)])
+            continue
+        entity_id = registry.async_get_entity_id(
+            "switch", DOMAIN, f"{appliance_id}_plug"
+        )
+        if entity_id is not None:
+            registry.async_remove(entity_id)
