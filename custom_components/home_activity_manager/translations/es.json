@@ -242,18 +242,18 @@
     }
   },
   "entity": {
-    "climate": {"climate_proxy": {"name": "Controles de climate"}},
-    "cover": {"cover_proxy": {"name": "Controles de cover"}},
-    "lock": {"lock_proxy": {"name": "Controles de la cerradura"}},
+    "climate": {"climate_proxy": {"name": "Controles de climate (HAM Proxy)"}},
+    "cover": {"cover_proxy": {"name": "Controles de cover (HAM Proxy)"}},
+    "lock": {"lock_proxy": {"name": "Controles de la cerradura (HAM Proxy)"}},
     "sensor": {
       "power": {"name": "Potencia actual"},
       "total_energy": {"name": "Energía total"},
       "last_cycle_duration": {"name": "Duración del último ciclo"},
-      "door_open_duration": {"name": "Duración de apertura de la puerta"},
-      "window_open_duration": {"name": "Duración de apertura de la ventana"},
-      "access_open_duration": {"name": "Duración de apertura del acceso"},
-      "awning_open_duration": {"name": "Duración de apertura del toldo"},
-      "shutter_open_duration": {"name": "Duración de apertura de la persiana"},
+      "door_open_duration": {"name": "Tiempo que la puerta ha estado abierta"},
+      "window_open_duration": {"name": "Tiempo que la ventana ha estado abierta"},
+      "access_open_duration": {"name": "Tiempo que el acceso ha estado abierto"},
+      "awning_open_duration": {"name": "Tiempo que el toldo ha estado abierto"},
+      "shutter_open_duration": {"name": "Tiempo que la persiana ha estado abierta"},
       "estimated_remaining": {"name": "Tiempo restante estimado"}
     },
     "binary_sensor": {

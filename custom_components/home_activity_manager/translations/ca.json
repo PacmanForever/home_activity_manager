@@ -242,18 +242,18 @@
     }
   },
   "entity": {
-    "climate": {"climate_proxy": {"name": "Controls de climate"}},
-    "cover": {"cover_proxy": {"name": "Controls del cover"}},
-    "lock": {"lock_proxy": {"name": "Controls del pany"}},
+    "climate": {"climate_proxy": {"name": "Controls de climate (HAM Proxy)"}},
+    "cover": {"cover_proxy": {"name": "Controls del cover (HAM Proxy)"}},
+    "lock": {"lock_proxy": {"name": "Controls del pany (HAM Proxy)"}},
     "sensor": {
       "power": {"name": "Potència actual"},
       "total_energy": {"name": "Energia total"},
       "last_cycle_duration": {"name": "Durada de l’últim cicle"},
-      "door_open_duration": {"name": "Durada d’obertura de la porta"},
-      "window_open_duration": {"name": "Durada d’obertura de la finestra"},
-      "access_open_duration": {"name": "Durada d’obertura de l’accés"},
-      "awning_open_duration": {"name": "Durada d’obertura del tendal"},
-      "shutter_open_duration": {"name": "Durada d’obertura de la persiana"},
+      "door_open_duration": {"name": "Temps que la porta ha estat oberta"},
+      "window_open_duration": {"name": "Temps que la finestra ha estat oberta"},
+      "access_open_duration": {"name": "Temps que l’accés ha estat obert"},
+      "awning_open_duration": {"name": "Temps que el tendal ha estat obert"},
+      "shutter_open_duration": {"name": "Temps que la persiana ha estat oberta"},
       "estimated_remaining": {"name": "Temps restant estimat"}
     },
     "binary_sensor": {

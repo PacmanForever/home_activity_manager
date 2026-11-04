@@ -207,7 +207,7 @@ class ApplianceBinarySensor(BinarySensorEntity):
                 return "mdi:mailbox-outline"
             return "mdi:mailbox-open-up" if self.is_on else "mdi:mailbox-up"
         if self._key == "shutter":
-            return "mdi:blinds-open" if self.is_on else "mdi:blinds"
+            return "mdi:window-shutter-open" if self.is_on else "mdi:window-shutter"
         if self._key == "pending_unload":
             if appliance_type in ("mailbox_motion", "mailbox_slot"):
                 return "mdi:email-alert" if self.is_on else "mdi:email-outline"

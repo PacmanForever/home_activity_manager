@@ -126,17 +126,16 @@ def _async_release_climate_entity(
 		entity_registry.async_update_entity(climate_entity_id, device_id=None)
 
 
-def _async_hide_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+def _async_show_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
 	entity_registry = er.async_get(hass)
-	proxy_unique_ids = {
-		f"{entry.entry_id}_{domain}_proxy"
-		for domain in ("climate", "cover", "lock")
-	}
 	for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
-		if entity.unique_id in proxy_unique_ids and entity.hidden_by is None:
+		if (
+			entity.domain in ("climate", "cover", "lock")
+			and entity.unique_id.endswith(f"_{entity.domain}_proxy")
+			and entity.hidden_by == er.RegistryEntryHider.INTEGRATION
+		):
 			entity_registry.async_update_entity(
-				entity.entity_id,
-				hidden_by=er.RegistryEntryHider.INTEGRATION,
+				entity.entity_id, hidden_by=None
 			)
 
 
@@ -327,7 +326,7 @@ async def _async_migrate_appliance_groups(
 	"""Move legacy category entries into the new appliance groups."""
 	group = _entry_appliance_group(entry)
 	if group is None:
-		hass.config_entries.async_update_entry(entry, version=10)
+		hass.config_entries.async_update_entry(entry, version=11)
 		return True
 
 	matching_entries = [
@@ -394,7 +393,7 @@ async def _async_migrate_appliance_groups(
 	data = {"category": group, "appliances": records}
 	title = get_appliance_group_name(group, hass.config.language)
 	hass.config_entries.async_update_entry(
-		entry, data=data, options={}, title=title, version=10
+		entry, data=data, options={}, title=title, version=11
 	)
 	return True
 
@@ -422,7 +421,7 @@ async def _async_migrate_access_class(
 			data[CONF_APPLIANCE_CLASS] = "access"
 			options.pop(CONF_APPLIANCE_CLASS, None)
 	hass.config_entries.async_update_entry(
-		entry, data=data, options=options, version=10
+		entry, data=data, options=options, version=11
 	)
 	return True
 
@@ -442,14 +441,18 @@ async def _async_migrate_to_appliance_groups(
 			return False
 		if entry.version == 8:
 			return await _async_migrate_appliance_groups(hass, entry)
-		return entry.version == 10
+		return entry.version == 11
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-	"""Migrate old settings and hide the integration's native-domain proxies."""
-	if entry.version > 10:
+	"""Migrate old settings and show native-domain proxies."""
+	if entry.version > 11:
 		return False
+	if entry.version == 11:
+		return True
+	_async_show_proxy_entities(hass, entry)
 	if entry.version == 10:
+		hass.config_entries.async_update_entry(entry, version=11)
 		return True
 	if entry.version == 9:
 		return await _async_migrate_access_class(hass, entry)
@@ -458,14 +461,12 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	if entry.version == 7:
 		return await _async_migrate_to_appliance_groups(hass, entry)
 	if entry.version == 6:
-		_async_hide_proxy_entities(hass, entry)
 		hass.config_entries.async_update_entry(entry, version=7)
 		return await _async_migrate_to_appliance_groups(hass, entry)
 	if entry.version == 5:
 		_async_release_climate_entity(
 			hass, entry, {**entry.data, **entry.options}.get(CONF_CLIMATE_ENTITY)
 		)
-		_async_hide_proxy_entities(hass, entry)
 		hass.config_entries.async_update_entry(entry, version=7)
 		return await _async_migrate_to_appliance_groups(hass, entry)
 
@@ -505,7 +506,6 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	_async_release_climate_entity(
 		hass, entry, {**data, **options}.get(CONF_CLIMATE_ENTITY)
 	)
-	_async_hide_proxy_entities(hass, entry)
 	hass.config_entries.async_update_entry(
 		entry, data=data, options=options, version=7
 	)

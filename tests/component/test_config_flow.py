@@ -819,7 +819,7 @@ async def test_migrate_saved_duration_options_from_minutes_to_seconds(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 10
+    assert entry.version == 11
     assert entry.options == {
         "start_duration_seconds": 15,
         "finish_duration_seconds": 60,
@@ -862,7 +862,7 @@ async def test_migrate_cover_door_to_access_class(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 10
+    assert entry.version == 11
     access, door = entry.data["appliances"]
     assert access["data"][CONF_APPLIANCE_CLASS] == "access"
     assert door["data"][CONF_APPLIANCE_CLASS] == "door"
@@ -871,11 +871,11 @@ async def test_migrate_cover_door_to_access_class(hass):
 
 @pytest.mark.asyncio
 async def test_migrate_future_config_entry_version_is_rejected(hass):
-    entry = MockConfigEntry(domain=DOMAIN, version=11)
+    entry = MockConfigEntry(domain=DOMAIN, version=12)
     entry.add_to_hass(hass)
 
     assert not await async_migrate_entry(hass, entry)
-    assert entry.version == 11
+    assert entry.version == 12
 
 
 @pytest.mark.asyncio
@@ -963,7 +963,7 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
     )
     merged = next(entry for entry in entries if entry is not survivor)
 
-    assert survivor.version == 10
+    assert survivor.version == 11
     assert survivor.data["category"] == "laundry"
     assert all(
         record["data"][CONF_APPLIANCE_TYPE] == "laundry"
@@ -996,17 +996,22 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
 
 
 @pytest.mark.parametrize(
+    "version",
+    (5, 6, 9, 10),
+)
+@pytest.mark.parametrize(
     ("initial_hidden_by", "expected_hidden_by"),
     (
-        (None, er.RegistryEntryHider.INTEGRATION),
+        (None, None),
+        (er.RegistryEntryHider.INTEGRATION, None),
         (er.RegistryEntryHider.USER, er.RegistryEntryHider.USER),
     ),
 )
 @pytest.mark.asyncio
-async def test_migrate_hides_existing_proxies_without_overriding_user_choice(
-    hass, initial_hidden_by, expected_hidden_by
+async def test_migrate_shows_existing_proxies_without_overriding_user_choice(
+    hass, version, initial_hidden_by, expected_hidden_by
 ):
-    entry = MockConfigEntry(domain=DOMAIN, version=6)
+    entry = MockConfigEntry(domain=DOMAIN, version=version)
     entry.add_to_hass(hass)
     registry = er.async_get(hass)
     proxy = registry.async_get_or_create(
@@ -1015,19 +1020,26 @@ async def test_migrate_hides_existing_proxies_without_overriding_user_choice(
         f"{entry.entry_id}_climate_proxy",
         config_entry=entry,
     )
+    appliance_proxy = registry.async_get_or_create(
+        "climate",
+        DOMAIN,
+        "another_appliance_climate_proxy",
+        config_entry=entry,
+    )
+    proxies = (proxy, appliance_proxy)
     if initial_hidden_by is not None:
-        registry.async_update_entity(proxy.entity_id, hidden_by=initial_hidden_by)
+        for proxy_entry in proxies:
+            registry.async_update_entity(
+                proxy_entry.entity_id, hidden_by=initial_hidden_by
+            )
 
     assert await async_migrate_entry(hass, entry)
 
-    migrated_proxy = registry.async_get(proxy.entity_id)
-    assert migrated_proxy.hidden_by == expected_hidden_by
-    assert entry.version == 10
-
-    if expected_hidden_by == er.RegistryEntryHider.INTEGRATION:
-        registry.async_update_entity(proxy.entity_id, hidden_by=None)
-        assert await async_migrate_entry(hass, entry)
-        assert registry.async_get(proxy.entity_id).hidden_by is None
+    assert all(
+        registry.async_get(proxy_entry.entity_id).hidden_by == expected_hidden_by
+        for proxy_entry in proxies
+    )
+    assert entry.version == 11
 
 
 @pytest.mark.asyncio
@@ -1061,7 +1073,7 @@ async def test_migrate_releases_legacy_climate_device_assignment(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 10
+    assert entry.version == 11
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
 
 
@@ -1089,7 +1101,7 @@ async def test_migrate_removes_unsupported_ac_contact_sensor(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 10
+    assert entry.version == 11
     assert entry.data["category"] == "climate"
     expected_type = (
         "thermostat_climate"
@@ -1130,7 +1142,7 @@ async def test_migrate_removes_refrigerator_compressor_and_plug_alarms(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 10
+    assert entry.version == 11
     assert entry.data["appliances"][0]["data"][CONF_APPLIANCE_CLASS] == "refrigerator"
     assert entry.options == {}
     assert entry.data["appliances"][0]["options"] == {
@@ -1419,3 +1431,83 @@ async def test_options_flow_keeps_optional_climate_inputs_cleared(
     assert "thermostat_climate_power_entity" not in defaults
     assert "thermostat_climate_plug_entity" not in defaults
     assert "thermostat_climate_energy_entity" not in defaults
+
+
+@pytest.mark.asyncio
+async def test_options_flow_removes_one_appliance_and_preserves_group_members(
+    hass, enable_custom_integrations
+):
+    removed_id = "washer_to_remove"
+    retained_id = "washer_to_keep"
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Laundry and drying",
+        data={
+            "category": "laundry",
+            "appliances": [
+                {
+                    "id": appliance_id,
+                    "data": {
+                        "name": name,
+                        CONF_APPLIANCE_TYPE: "laundry",
+                        CONF_APPLIANCE_CLASS: "washer",
+                    },
+                    "options": {},
+                }
+                for appliance_id, name in (
+                    (removed_id, "Washer to remove"),
+                    (retained_id, "Washer to keep"),
+                )
+            ],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    device_registry = dr.async_get(hass)
+    removed_device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, removed_id)},
+        name="Washer to remove",
+    )
+    retained_device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, retained_id)},
+        name="Washer to keep",
+    )
+    entity_registry = er.async_get(hass)
+    removed_entity = entity_registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{removed_id}_power",
+        config_entry=entry,
+        device_id=removed_device.id,
+    )
+    retained_entity = entity_registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{retained_id}_power",
+        config_entry=entry,
+        device_id=retained_device.id,
+    )
+    store = Store(hass, 1, f"{DOMAIN}_{removed_id}")
+    await store.async_save({"last_cycle_duration_seconds": 60})
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_action": "remove"}
+    )
+    assert result["step_id"] == "select_appliance"
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_id": removed_id}
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert [record["id"] for record in entry.data["appliances"]] == [retained_id]
+    assert entity_registry.async_get(removed_entity.entity_id) is None
+    assert entity_registry.async_get(retained_entity.entity_id) is not None
+    assert device_registry.async_get_device(
+        identifiers={(DOMAIN, removed_id)}
+    ) is None
+    assert device_registry.async_get(retained_device.id) is not None
+    assert await store.async_load() is None

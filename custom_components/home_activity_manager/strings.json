@@ -242,18 +242,18 @@
     }
   },
   "entity": {
-    "climate": {"climate_proxy": {"name": "Climate controls"}},
-    "cover": {"cover_proxy": {"name": "Cover controls"}},
-    "lock": {"lock_proxy": {"name": "Lock controls"}},
+    "climate": {"climate_proxy": {"name": "Climate controls (HAM Proxy)"}},
+    "cover": {"cover_proxy": {"name": "Cover controls (HAM Proxy)"}},
+    "lock": {"lock_proxy": {"name": "Lock controls (HAM Proxy)"}},
     "sensor": {
       "power": {"name": "Current Power"},
       "total_energy": {"name": "Total energy"},
       "last_cycle_duration": {"name": "Last cycle duration"},
-      "door_open_duration": {"name": "Door open duration"},
-      "window_open_duration": {"name": "Window open duration"},
-      "access_open_duration": {"name": "Access open duration"},
-      "awning_open_duration": {"name": "Awning open duration"},
-      "shutter_open_duration": {"name": "Shutter open duration"},
+      "door_open_duration": {"name": "Time the door was open"},
+      "window_open_duration": {"name": "Time the window was open"},
+      "access_open_duration": {"name": "Time the access was open"},
+      "awning_open_duration": {"name": "Time the awning was open"},
+      "shutter_open_duration": {"name": "Time the shutter was open"},
       "estimated_remaining": {"name": "Estimated remaining time"}
     },
     "binary_sensor": {

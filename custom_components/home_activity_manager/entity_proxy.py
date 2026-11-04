@@ -73,7 +73,7 @@ def remove_proxy_entity(registry: Any, domain: str, appliance_id: str) -> None:
 class EntityProxyMixin:
     """Share source lookup, device association, and forwarding helpers."""
 
-    _attr_entity_registry_visible_default = False
+    _attr_entity_registry_visible_default = True
 
     @property
     def suggested_object_id(self) -> str:
@@ -92,8 +92,14 @@ class EntityProxyMixin:
         self._source_entity_id = source_entity_id
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
         self._attr_unique_id = f"{appliance_id}_{domain}_proxy"
-        self._attr_has_entity_name = True
-        self._attr_name = None
+        self._attr_has_entity_name = False
+        source_entry = er.async_get(runtime.hass).async_get(source_entity_id)
+        source_name = (
+            source_entry.name or source_entry.original_name
+            if source_entry is not None
+            else None
+        )
+        self._attr_name = f"{source_name} (HAM Proxy)" if source_name else None
         self._attr_should_poll = False
         self._attr_translation_key = translation_key
         self._attr_device_info = appliance_device_info(

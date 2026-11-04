@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.9.40 - 2026-11-04
+
+### Changed
+
+- Associate unassigned climate, cover, and lock sources directly with their managed appliance, and release those associations on unload.
+- Show native-domain proxies by default, label them with the `(HAM Proxy)` suffix, and reveal integration-hidden proxies during migration without overriding user-hidden choices.
+- Clarify open-duration sensor labels and use a window-shutter icon for associated shutters.
+
 ## v0.9.39 - 2026-11-03
 
 ### Added

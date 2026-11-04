@@ -1173,7 +1173,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.38" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.40" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Laundry and drying · Washer · Power sensor",
         "Laundry and drying · Dishwasher · Power sensor",
@@ -1825,7 +1825,7 @@ async def test_window_and_shutter_durations_are_independent_and_persisted(
     assert window_duration_id is not None
     assert shutter_duration_id is not None
     assert shutter_state_id is not None
-    assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:blinds"
+    assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:window-shutter"
     assert registry.async_get(window_duration_id).translation_key == "window_open_duration"
     assert registry.async_get(shutter_duration_id).translation_key == "shutter_open_duration"
 
@@ -1837,7 +1837,7 @@ async def test_window_and_shutter_durations_are_independent_and_persisted(
     current_time[0] += timedelta(seconds=10)
     hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "open")
     await hass.async_block_till_done()
-    assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:blinds-open"
+    assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:window-shutter-open"
     current_time[0] += timedelta(seconds=25)
     hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
     await hass.async_block_till_done()
@@ -1855,7 +1855,7 @@ async def test_window_and_shutter_durations_are_independent_and_persisted(
 
     assert hass.states.get(window_duration_id).state == "00:00:45"
     assert hass.states.get(shutter_duration_id).state == "00:00:55"
-    assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:blinds"
+    assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:window-shutter"
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
@@ -3528,6 +3528,10 @@ async def test_climate_entity_with_existing_parent_is_not_reassigned(
         "air_conditioner",
         config_entry=climate_entry,
         device_id=existing_device.id,
+        original_name="Lock source name",
+    )
+    er.async_get(hass).async_update_entity(
+        climate_entity.entity_id, name="pany porta"
     )
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -3550,6 +3554,8 @@ async def test_climate_entity_with_existing_parent_is_not_reassigned(
     assert er.async_get(hass).async_get(proxy_entity_id).device_id == (
         _async_appliance_device_id(hass, entry)
     )
+    proxy = er.async_get(hass).async_get(proxy_entity_id)
+    assert proxy.original_name == "pany porta (HAM Proxy)"
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id == (
         existing_device.id
@@ -3580,6 +3586,10 @@ async def test_unassigned_cover_and_lock_sources_are_attached_directly(
         source_domain,
         unique_id,
         config_entry=source_config_entry,
+        original_name="pany porta",
+    )
+    er.async_get(hass).async_update_entity(
+        source_entity.entity_id, name="pany porta"
     )
     hass.states.async_set(source_entity.entity_id, "open")
     appliance_entry = MockConfigEntry(
@@ -3595,7 +3605,10 @@ async def test_unassigned_cover_and_lock_sources_are_attached_directly(
     assert await hass.config_entries.async_setup(appliance_entry.entry_id)
     device_id = _async_appliance_device_id(hass, appliance_entry)
     assert device_id is not None
-    assert er.async_get(hass).async_get(source_entity.entity_id).device_id == device_id
+    attached_source = er.async_get(hass).async_get(source_entity.entity_id)
+    assert attached_source.device_id == device_id
+    assert attached_source.name == "pany porta"
+    assert attached_source.original_name == "pany porta"
     assert (
         er.async_get(hass).async_get_entity_id(
             entity_domain,
