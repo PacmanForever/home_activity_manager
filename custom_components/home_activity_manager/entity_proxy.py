@@ -29,9 +29,12 @@ def _source_entity_name(hass: HomeAssistant, source_entity_id: str) -> str | Non
     """Return the best available display name for a source entity."""
     source_entry = er.async_get(hass).async_get(source_entity_id)
     if source_entry is not None:
-        source_name = source_entry.name or source_entry.original_name
-        if source_name:
-            return source_name
+        source_name = (
+            source_entry.name
+            or getattr(source_entry, "original_name_unprefixed", None)
+            or source_entry.original_name
+        )
+        return source_name or None
     source_state = hass.states.get(source_entity_id)
     friendly_name = source_state.attributes.get("friendly_name") if source_state else None
     return friendly_name if isinstance(friendly_name, str) and friendly_name else None

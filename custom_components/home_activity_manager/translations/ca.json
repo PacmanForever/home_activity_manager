@@ -269,7 +269,7 @@
       "power": {"name": "Potència actual"},
       "proxy_power": {"name": "Potència actual (HAM Proxy)"},
       "illuminance": {"name": "Lluminositat"},
-      "proxy_illuminance": {"name": "Lluminositat (HAM Proxy)"},
+      "proxy_illuminance": {"name": "Il·luminació (HAM Proxy)"},
       "water_temperature": {"name": "Temperatura de l’aigua"},
       "proxy_water_temperature": {"name": "Temperatura de l’aigua (HAM Proxy)"},
       "ph": {"name": "pH"},

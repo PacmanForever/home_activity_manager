@@ -431,7 +431,9 @@ async def test_setup_adds_appliance_to_existing_group(
         "sensor.another_washer_power"
     )
     assert len(hass.config_entries.async_entries(DOMAIN)) == 1
-    assert len(existing_entry.runtime_data) == 2
+    updated_entry = hass.config_entries.async_get_entry(existing_entry.entry_id)
+    assert updated_entry is not None
+    assert len(updated_entry.runtime_data) == 2
 
 
 @pytest.mark.asyncio
@@ -1582,8 +1584,8 @@ async def test_options_flow_removes_one_appliance_and_preserves_group_members(
     assert [record["id"] for record in entry.data["appliances"]] == [retained_id]
     assert entity_registry.async_get(removed_entity.entity_id) is None
     assert entity_registry.async_get(retained_entity.entity_id) is not None
-    assert device_registry.async_get_device(
-        identifiers={(DOMAIN, removed_id)}
+    assert device_module._get_device_by_identifier(
+        device_registry, (DOMAIN, removed_id), entry.entry_id
     ) is None
     assert device_registry.async_get(retained_device.id) is not None
     assert await store.async_load() is None

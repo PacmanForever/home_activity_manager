@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.44 - 2026-11-04
+
+### Fixed
+
+- Support Home Assistant 2026.10 entity and device registry naming, including unprefixed source names and legacy device cleanup.
+- Use a translated Catalan illuminance proxy fallback when the source has no registered name.
+
 ## v0.9.43 - 2026-11-04
 
 ### Changed

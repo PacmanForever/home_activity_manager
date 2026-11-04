@@ -1203,7 +1203,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.43" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.44" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -1407,7 +1407,7 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
         "switch.air_conditioner_"
         f"{config[CONF_PLUG_ENTITY].split('.', maxsplit=1)[1]}_ham_proxy"
     )
-    assert hass.states.get(plug_id).attributes["friendly_name"] == (
+    assert hass.states.get(plug_id).attributes["friendly_name"].endswith(
         "Kitchen outlet (HAM Proxy)"
     )
     plug_entry = registry.async_get(plug_id)
@@ -1426,7 +1426,7 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
     assert plug_entry.has_entity_name is False
     assert plug_entry.name is None
     assert plug_entry.original_name == "Kitchen outlet (HAM Proxy)"
-    assert hass.states.get(plug_id).attributes["friendly_name"] == (
+    assert hass.states.get(plug_id).attributes["friendly_name"].endswith(
         "Kitchen outlet (HAM Proxy)"
     )
     if reset_button_id is not None:
@@ -2357,6 +2357,8 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
     hass, appliance_type, enable_custom_integrations
 ):
     profile = APPLIANCE_PROFILES[appliance_type]
+    if any(item.output_entity == "illuminance" for item in profile.sensor_inputs):
+        hass.config.language = "ca"
     source_entry = MockConfigEntry(domain=f"source_{appliance_type}")
     source_entry.add_to_hass(hass)
     source_registry = er.async_get(hass)
@@ -2398,7 +2400,14 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             hass.states.async_set(
                 source.entity_id,
                 "0",
-                {ATTR_UNIT_OF_MEASUREMENT: unit},
+                {
+                    ATTR_UNIT_OF_MEASUREMENT: unit,
+                    **(
+                        {"friendly_name": "Il·luminació 01 (Peixera Menjador)"}
+                        if input_config.output_entity == "illuminance"
+                        else {}
+                    ),
+                },
             )
         elif input_config.domain == "climate":
             hass.states.async_set(
@@ -2458,8 +2467,12 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             wrapper = integration_registry.async_get(wrapper_id)
             assert wrapper is not None
             assert wrapper.device_id == device_id
-            source_name = source.name or source.original_name
-            assert hass.states.get(wrapper_id).attributes["friendly_name"] == (
+            source_name = (
+                source.name
+                or getattr(source, "original_name_unprefixed", None)
+                or source.original_name
+            )
+            assert hass.states.get(wrapper_id).attributes["friendly_name"].endswith(
                 f"{source_name} (HAM Proxy)"
             )
             assert wrapper_id.endswith(
@@ -2506,13 +2519,17 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
         )
         wrapper_state = hass.states.get(wrapper.entity_id)
         assert wrapper_state is not None
-        source_name = source.name or source.original_name
+        source_name = (
+            source.name
+            or getattr(source, "original_name_unprefixed", None)
+            or source.original_name
+        )
         if source_name is None:
-            assert wrapper_state.attributes["friendly_name"] == (
-                "Light level (HAM Proxy)"
+            assert wrapper_state.attributes["friendly_name"].endswith(
+                "Il·luminació (HAM Proxy)"
             )
         else:
-            assert wrapper_state.attributes["friendly_name"] == (
+            assert wrapper_state.attributes["friendly_name"].endswith(
                 f"{source_name} (HAM Proxy)"
             )
         assert wrapper_state.attributes["source_entity"] == source_entity_id
@@ -3853,13 +3870,21 @@ async def test_lock_source_with_existing_parent_uses_named_visible_proxy(
         "lock", DOMAIN, f"{entry.entry_id}_lock_proxy"
     )
     assert proxy_id is not None
-    assert proxy_id == "lock.porta_lock_source_front_door_ham_proxy"
+    assert proxy_id == (
+        f"lock.porta_{source_entity.entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
+    )
     proxy = er.async_get(hass).async_get(proxy_id)
     assert proxy.device_id == _async_appliance_device_id(hass, entry)
-    assert proxy.original_name == "Pany porta (HAM Proxy)"
+    source_name = (
+        source.name
+        or getattr(source, "original_name_unprefixed", None)
+        or source.original_name
+    )
+    expected_proxy_name = f"{source_name} (HAM Proxy)"
+    assert proxy.original_name == expected_proxy_name
     assert proxy.hidden_by is None
-    assert hass.states.get(proxy_id).attributes["friendly_name"] == (
-        "Pany porta (HAM Proxy)"
+    assert hass.states.get(proxy_id).attributes["friendly_name"].endswith(
+        expected_proxy_name
     )
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert er.async_get(hass).async_get(source_entity.entity_id).device_id == (

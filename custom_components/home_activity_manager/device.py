@@ -75,12 +75,25 @@ def move_device_to_config_entry(
 def remove_appliance_group_devices(hass: HomeAssistant) -> None:
     """Remove empty category/profile parents and detach their appliance devices."""
     registry = dr.async_get(hass)
-    device_entries = registry.devices
-    devices = tuple(
-        device_entries.values()
-        if hasattr(device_entries, "values")
-        else device_entries
-    )
+    config_entries = hass.config_entries.async_entries(DOMAIN)
+    if config_entries:
+        devices = tuple(
+            device
+            for entry in config_entries
+            for device in dr.async_entries_for_config_entry(
+                registry, entry.entry_id
+            )
+        )
+    else:
+        get_devices = getattr(registry, "async_get_devices", None)
+        devices = tuple(get_devices()) if get_devices is not None else ()
+        if not devices:
+            device_entries = registry.devices
+            devices = tuple(
+                device_entries.values()
+                if hasattr(device_entries, "values")
+                else device_entries
+            )
     update_device = getattr(registry, "async_update_device", None)
     update_parameters = (
         inspect.signature(update_device).parameters
