@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.41 - 2026-11-04
+
+### Added
+
+- Add Aquarium profiles with smart-plug or power activity detection and optional illuminance, water-temperature, pH, and water-level readings.
+
+### Changed
+
+- Combine laundry and refrigeration under Large appliances, and place Aquarium under Animal care.
+- Merge legacy laundry and refrigeration entries while preserving and deduplicating group actions; run each shared action only for profiles that support its hook.
+- Expose only configured optional sensor readings and preserve unknown source states.
+
 ## v0.9.40 - 2026-11-04
 
 ### Changed

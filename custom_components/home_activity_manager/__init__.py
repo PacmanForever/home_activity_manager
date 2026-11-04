@@ -23,6 +23,7 @@ from .appliance_types import (
 from .const import (
 	CONF_APPLIANCE_CLASS,
 	CONF_APPLIANCE_TYPE,
+	CONF_GROUP_ACTIONS,
 	CONF_CLIMATE_ENTITY,
 	CONF_COMPRESSOR_INACTIVE_ACTIONS,
 	CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
@@ -280,12 +281,14 @@ def _entry_appliance_group(entry: ConfigEntry) -> str | None:
 		return category
 	legacy_categories = {
 		"thermostat": "climate",
-		"washer": "laundry",
-		"dryer": "laundry",
-		"dishwasher": "laundry",
+		"washer": "large_appliances",
+		"dryer": "large_appliances",
+		"dishwasher": "large_appliances",
+		"laundry": "large_appliances",
 		"opening": "openings",
 		"mailbox": "deliveries",
-		"refrigerator": "refrigeration",
+		"refrigerator": "large_appliances",
+		"refrigeration": "large_appliances",
 	}
 	if category in legacy_categories:
 		return legacy_categories[category]
@@ -326,19 +329,29 @@ async def _async_migrate_appliance_groups(
 	"""Move legacy category entries into the new appliance groups."""
 	group = _entry_appliance_group(entry)
 	if group is None:
-		hass.config_entries.async_update_entry(entry, version=11)
+		hass.config_entries.async_update_entry(entry, version=12)
 		return True
 
 	matching_entries = [
 		candidate
 		for candidate in hass.config_entries.async_entries(DOMAIN)
-		if candidate.version < 9 and _entry_appliance_group(candidate) == group
+		if candidate.version < 12 and _entry_appliance_group(candidate) == group
 	]
 	if entry not in matching_entries:
 		matching_entries.append(entry)
 
 	records = []
+	group_actions: dict[str, list] = {}
 	for candidate in matching_entries:
+		candidate_group_actions = candidate.options.get(CONF_GROUP_ACTIONS, {})
+		if isinstance(candidate_group_actions, dict):
+			for key, actions in candidate_group_actions.items():
+				if not isinstance(actions, list):
+					continue
+				merged_actions = group_actions.setdefault(key, [])
+				merged_actions.extend(
+					action for action in actions if action not in merged_actions
+				)
 		if isinstance(candidate.data.get("appliances"), list):
 			records.extend(
 				_migrate_appliance_record(record)
@@ -393,7 +406,11 @@ async def _async_migrate_appliance_groups(
 	data = {"category": group, "appliances": records}
 	title = get_appliance_group_name(group, hass.config.language)
 	hass.config_entries.async_update_entry(
-		entry, data=data, options={}, title=title, version=11
+		entry,
+		data=data,
+		options={CONF_GROUP_ACTIONS: group_actions} if group_actions else {},
+		title=title,
+		version=12,
 	)
 	return True
 
@@ -439,23 +456,27 @@ async def _async_migrate_to_appliance_groups(
 			return True
 		if entry.version == 7 and not await _async_migrate_category_entries(hass, entry):
 			return False
-		if entry.version == 8:
+		if entry.version in (8, 9, 10, 11):
 			return await _async_migrate_appliance_groups(hass, entry)
-		return entry.version == 11
+		return entry.version == 12
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	"""Migrate old settings and show native-domain proxies."""
-	if entry.version > 11:
+	if entry.version > 12:
 		return False
-	if entry.version == 11:
+	if entry.version == 12:
 		return True
 	_async_show_proxy_entities(hass, entry)
+	if entry.version == 11:
+		return await _async_migrate_to_appliance_groups(hass, entry)
 	if entry.version == 10:
 		hass.config_entries.async_update_entry(entry, version=11)
-		return True
+		return await _async_migrate_to_appliance_groups(hass, entry)
 	if entry.version == 9:
-		return await _async_migrate_access_class(hass, entry)
+		if not await _async_migrate_access_class(hass, entry):
+			return False
+		return await _async_migrate_to_appliance_groups(hass, entry)
 	if entry.version == 8:
 		return await _async_migrate_to_appliance_groups(hass, entry)
 	if entry.version == 7:

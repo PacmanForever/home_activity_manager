@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import timedelta
+import math
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -20,11 +21,16 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import (
     CONF_APPLIANCE_CLASS,
     CONF_ENERGY_ENTITY,
+    CONF_ILLUMINANCE_ENTITY,
+    CONF_PH_ENTITY,
     CONF_POWER_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
     CONF_SHUTTER_COVER_ENTITY,
+    CONF_TEMPERATURE_ENTITY,
+    CONF_WATER_LEVEL_ENTITY,
     DOMAIN,
 )
+from .appliance_types import SensorInput
 from .device import appliance_device_info
 from .runtime import ApplianceRuntime, entry_runtimes
 
@@ -134,6 +140,77 @@ class ApplianceSensor(SensorEntity):
         self.async_write_ha_state()
 
 
+class ApplianceInputSensor(SensorEntity):
+    """Expose an optional external sensor as part of its appliance device."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(
+        self,
+        runtime: ApplianceRuntime,
+        entry: ConfigEntry,
+        input_config: SensorInput,
+    ) -> None:
+        self._runtime = runtime
+        self._source_entity_id = runtime.config[input_config.config_key]
+        self._attr_unique_id = (
+            f"{getattr(runtime, 'appliance_id', entry.entry_id)}_"
+            f"{input_config.output_entity}"
+        )
+        self._attr_translation_key = input_config.output_entity
+        self._attr_icon = {
+            "illuminance": "mdi:brightness-5",
+            "water_temperature": "mdi:thermometer-water",
+            "ph": "mdi:ph",
+            "water_level": "mdi:waves-arrow-up",
+        }.get(input_config.output_entity)
+        source_state = runtime.hass.states.get(self._source_entity_id)
+        attributes = source_state.attributes if source_state is not None else {}
+        self._attr_native_unit_of_measurement = attributes.get("unit_of_measurement")
+        try:
+            self._attr_device_class = SensorDeviceClass(
+                attributes.get("device_class")
+            )
+        except (TypeError, ValueError):
+            self._attr_device_class = None
+        try:
+            self._attr_state_class = SensorStateClass(attributes.get("state_class"))
+        except (TypeError, ValueError):
+            self._attr_state_class = None
+        self._attr_device_info = appliance_device_info(
+            entry, runtime.config, getattr(runtime, "hass", None)
+        )
+
+    @property
+    def native_value(self) -> float | str | None:
+        state = self._runtime.hass.states.get(self._source_entity_id)
+        if state is None or state.state in ("unknown", "unavailable"):
+            return None
+        try:
+            value = float(state.state)
+        except ValueError:
+            return state.state
+        return value if math.isfinite(value) else None
+
+    @property
+    def available(self) -> bool:
+        state = self._runtime.hass.states.get(self._source_entity_id)
+        return state is not None and state.state != "unavailable"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        return {"source_entity": self._source_entity_id}
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(self._runtime.subscribe(self._handle_runtime_update))
+
+    @callback
+    def _handle_runtime_update(self) -> None:
+        self.async_write_ha_state()
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -198,6 +275,15 @@ async def async_setup_entry(
                 None,
             ),
         }
+        for input_config in runtime.profile.sensor_inputs:
+            key = input_config.output_entity
+            if (
+                input_config.domain == "sensor"
+                and key is not None
+                and key not in sensors
+                and runtime.config.get(input_config.config_key)
+            ):
+                sensors[key] = ApplianceInputSensor(runtime, entry, input_config)
         input_outputs = {
             input_config.output_entity: input_config.config_key
             for input_config in runtime.profile.sensor_inputs
@@ -225,7 +311,13 @@ async def async_setup_entry(
             ):
                 expected_keys.add(key)
 
-        for key in set(sensors) - expected_keys:
+        known_sensor_keys = set(sensors) | {
+            input_config.output_entity
+            for input_config in runtime.profile.sensor_inputs
+            if input_config.domain == "sensor"
+            and input_config.output_entity is not None
+        }
+        for key in known_sensor_keys - expected_keys:
             entity_id = registry.async_get_entity_id(
                 "sensor", DOMAIN, f"{appliance_id}_{key}"
             )

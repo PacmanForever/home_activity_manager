@@ -40,7 +40,7 @@ _RUNNING_ICONS = {
     "awning": ("mdi:storefront-outline", "mdi:storefront-outline"),
     "door": ("mdi:door-open", "mdi:door-closed"),
     "window": ("mdi:window-open", "mdi:window-closed"),
-    "access": ("mdi:parking", "mdi:parking"),
+    "access": ("mdi:garage-open", "mdi:garage"),
     "thermostat_climate": ("mdi:hvac", "mdi:hvac-off"),
     "air_conditioner_contact": ("mdi:hvac", "mdi:hvac-off"),
     "air_conditioner_power": ("mdi:hvac", "mdi:hvac-off"),

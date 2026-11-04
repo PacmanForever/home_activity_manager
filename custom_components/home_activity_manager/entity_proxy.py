@@ -99,6 +99,10 @@ class EntityProxyMixin:
             if source_entry is not None
             else None
         )
+        if source_name is None:
+            source_state = runtime.hass.states.get(source_entity_id)
+            if source_state is not None:
+                source_name = source_state.attributes.get("friendly_name")
         self._attr_name = f"{source_name} (HAM Proxy)" if source_name else None
         self._attr_should_poll = False
         self._attr_translation_key = translation_key

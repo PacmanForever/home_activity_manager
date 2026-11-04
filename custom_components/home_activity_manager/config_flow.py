@@ -60,6 +60,10 @@ from .const import (
     CONF_PENDING_REPEATS,
     CONF_PLUG_ENTITY,
     CONF_POWER_ENTITY,
+    CONF_ILLUMINANCE_ENTITY,
+    CONF_TEMPERATURE_ENTITY,
+    CONF_PH_ENTITY,
+    CONF_WATER_LEVEL_ENTITY,
     CONF_RUNNING_ENTITY,
     CONF_START_ACTIONS,
     CONF_START_DURATION_SECONDS,
@@ -88,6 +92,10 @@ _ENTRY_DATA_KEYS = {
     CONF_APPLIANCE_CLASS,
     CONF_POWER_ENTITY,
     CONF_ENERGY_ENTITY,
+    CONF_ILLUMINANCE_ENTITY,
+    CONF_TEMPERATURE_ENTITY,
+    CONF_PH_ENTITY,
+    CONF_WATER_LEVEL_ENTITY,
     CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
@@ -1080,10 +1088,18 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_activity_mode_sun_protection = async_step_activity_mode
     async_step_activity_mode_climate = async_step_activity_mode
     async_step_activity_mode_laundry = async_step_activity_mode
+    async_step_activity_mode_large_appliances = async_step_activity_mode
+    async_step_activity_mode_animal_care = async_step_activity_mode
     async_step_activity_mode_openings = async_step_activity_mode
     async_step_activity_mode_deliveries = async_step_activity_mode
     async_step_activity_mode_refrigeration = async_step_activity_mode
     async_step_sensors_thermostat_climate = async_step_sensors
+    async_step_sensors_aquarium_plug = async_step_sensors
+    async_step_sensors_aquarium_power = async_step_sensors
+    async_step_parameters_aquarium_plug = async_step_parameters
+    async_step_parameters_aquarium_power = async_step_parameters
+    async_step_actions_aquarium_plug = async_step_actions
+    async_step_actions_aquarium_power = async_step_actions
     async_step_parameters_thermostat_climate = async_step_parameters
     async_step_actions_thermostat_climate = async_step_actions
     async_step_activity_mode_climate = async_step_activity_mode
@@ -1561,6 +1577,12 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_sensors_thermostat_climate = async_step_sensors
     async_step_parameters_thermostat_climate = async_step_parameters
     async_step_actions_thermostat_climate = async_step_actions
+    async_step_sensors_aquarium_plug = async_step_sensors
+    async_step_parameters_aquarium_plug = async_step_parameters
+    async_step_actions_aquarium_plug = async_step_actions
+    async_step_sensors_aquarium_power = async_step_sensors
+    async_step_parameters_aquarium_power = async_step_parameters
+    async_step_actions_aquarium_power = async_step_actions
     async_step_activity_mode_thermostat = async_step_activity_mode
     async_step_activity_mode_dryer = async_step_activity_mode
     async_step_activity_mode_mailbox = async_step_activity_mode

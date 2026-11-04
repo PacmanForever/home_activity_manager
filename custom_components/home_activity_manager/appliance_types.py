@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from .const import (
     CONF_DOOR_ENTITY,
     CONF_ENERGY_ENTITY,
+    CONF_ILLUMINANCE_ENTITY,
     CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
     CONF_LOCK_ENTITY,
@@ -12,9 +13,12 @@ from .const import (
     CONF_MAIL_SLOT_ENTITY,
     CONF_PLUG_ENTITY,
     CONF_POWER_ENTITY,
+    CONF_PH_ENTITY,
     CONF_RUNNING_ENTITY,
+    CONF_TEMPERATURE_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
     CONF_SHUTTER_COVER_ENTITY,
+    CONF_WATER_LEVEL_ENTITY,
 )
 
 
@@ -609,10 +613,21 @@ APPLIANCE_GROUPS = {
         },
         "thermostat": {"climate": "thermostat_climate"},
     },
-    "laundry": {
+    "large_appliances": {
         "washer": {"power": "laundry"},
-        "dryer": {"power": "laundry"},
-        "dishwasher": {"power": "laundry"},
+        "dryer": {"power": "dryer"},
+        "dishwasher": {"power": "dishwasher"},
+        "refrigerator": {
+            "smart_plug": "refrigerator_switch",
+            "power": "refrigerator",
+        },
+        "freezer": {"smart_plug": "refrigerator_switch", "power": "refrigerator"},
+    },
+    "animal_care": {
+        "aquarium": {
+            "smart_plug": "aquarium_plug",
+            "power": "aquarium_power",
+        },
     },
     "openings": {
         "door": {"running_sensor": "opening"},
@@ -628,13 +643,6 @@ APPLIANCE_GROUPS = {
     "deliveries": {
         "mailbox": {"mail_slot": "mailbox_slot", "mail_motion": "mailbox_motion"}
     },
-    "refrigeration": {
-        "refrigerator": {
-            "smart_plug": "refrigerator_switch",
-            "power": "refrigerator",
-        },
-        "freezer": {"smart_plug": "refrigerator_switch", "power": "refrigerator"},
-    },
 }
 
 APPLIANCE_PROFILES["laundry"] = replace(
@@ -645,31 +653,136 @@ APPLIANCE_PROFILES["laundry"] = replace(
     ),
 )
 
+
+def _aquarium_optional_inputs(prefix: str) -> tuple[SensorInput, ...]:
+    return (
+        SensorInput(
+            form_key=f"{prefix}_illuminance_entity",
+            config_key=CONF_ILLUMINANCE_ENTITY,
+            domain="sensor",
+            device_classes=("illuminance",),
+            output_entity="illuminance",
+        ),
+        SensorInput(
+            form_key=f"{prefix}_temperature_entity",
+            config_key=CONF_TEMPERATURE_ENTITY,
+            domain="sensor",
+            device_classes=("temperature",),
+            output_entity="water_temperature",
+        ),
+        SensorInput(
+            form_key=f"{prefix}_ph_entity",
+            config_key=CONF_PH_ENTITY,
+            domain="sensor",
+            output_entity="ph",
+        ),
+        SensorInput(
+            form_key=f"{prefix}_water_level_entity",
+            config_key=CONF_WATER_LEVEL_ENTITY,
+            domain="sensor",
+            output_entity="water_level",
+        ),
+    )
+
+
+APPLIANCE_PROFILES["aquarium_plug"] = ApplianceTypeProfile(
+    sensor_inputs=(
+        SensorInput(
+            form_key="aquarium_plug_entity",
+            config_key=CONF_PLUG_ENTITY,
+            domain="switch",
+            required=True,
+            detection_source="smart_plug",
+            output_entity="plug",
+        ),
+        SensorInput(
+            form_key="aquarium_plug_power_entity",
+            config_key=CONF_POWER_ENTITY,
+            domain="sensor",
+            device_classes=("power",),
+            output_entity="power",
+        ),
+        *_aquarium_optional_inputs("aquarium_plug"),
+    ),
+    parameter_groups=(),
+    action_groups=("cycle_start", "cycle_finish"),
+    output_entities=(
+        "plug",
+        "power",
+        "illuminance",
+        "water_temperature",
+        "ph",
+        "water_level",
+        "last_cycle_duration",
+        "running",
+    ),
+    supports_pending_unload=False,
+    estimates_remaining=False,
+    supports_max_runtime=False,
+)
+
+APPLIANCE_PROFILES["aquarium_power"] = ApplianceTypeProfile(
+    sensor_inputs=(
+        SensorInput(
+            form_key="aquarium_power_entity",
+            config_key=CONF_POWER_ENTITY,
+            domain="sensor",
+            device_classes=("power",),
+            required=True,
+            detection_source="power",
+            output_entity="power",
+        ),
+        SensorInput(
+            form_key="aquarium_power_plug_entity",
+            config_key=CONF_PLUG_ENTITY,
+            domain="switch",
+            output_entity="plug",
+        ),
+        *_aquarium_optional_inputs("aquarium_power"),
+    ),
+    parameter_groups=("power_cycle",),
+    action_groups=("cycle_start", "cycle_finish"),
+    output_entities=(
+        "power",
+        "total_energy",
+        "plug",
+        "illuminance",
+        "water_temperature",
+        "ph",
+        "water_level",
+        "last_cycle_duration",
+        "running",
+    ),
+    supports_pending_unload=False,
+    estimates_remaining=False,
+    supports_max_runtime=False,
+)
+
 APPLIANCE_GROUP_NAMES = {
     "climate": "Climate control",
-    "laundry": "Laundry and drying",
+    "large_appliances": "Large appliances",
+    "animal_care": "Animal care",
     "openings": "Openings",
     "sun_protection": "Sun protection",
     "deliveries": "Deliveries",
-    "refrigeration": "Refrigeration",
 }
 
 APPLIANCE_GROUP_TRANSLATIONS = {
     "ca": {
         "climate": "Climatització",
-        "laundry": "Rentat i assecat",
+        "large_appliances": "Grans electrodomèstics",
+        "animal_care": "Cura d'animals",
         "openings": "Tancament",
         "sun_protection": "Protecció solar",
         "deliveries": "Lliurament",
-        "refrigeration": "Refrigeració",
     },
     "es": {
         "climate": "Climatización",
-        "laundry": "Lavado y secado",
+        "large_appliances": "Grandes electrodomésticos",
+        "animal_care": "Cuidado de animales",
         "openings": "Aberturas",
         "sun_protection": "Protección solar",
         "deliveries": "Entregas",
-        "refrigeration": "Refrigeración",
     },
 }
 
@@ -687,6 +800,7 @@ APPLIANCE_CLASS_NAMES = {
     "mailbox": "Mailbox",
     "refrigerator": "Refrigerator",
     "freezer": "Freezer",
+    "aquarium": "Aquarium",
     "opening": "Opening",
     "sun_protection": "Sun protection",
 }
@@ -738,6 +852,9 @@ APPLIANCE_CATEGORY_NAMES = {
     "sun_protection": "Sun protection",
     "washer": "Washer",
     "dishwasher": "Dishwasher",
+    "aquarium": "Aquarium",
+    "aquarium": "Aquari",
+    "aquarium": "Acuario",
 }
 
 APPLIANCE_CATEGORY_TRANSLATIONS = {
@@ -795,6 +912,8 @@ APPLIANCE_TYPES = (
     "access_contact",
     "air_conditioner_contact",
     "air_conditioner_power",
+    "aquarium_plug",
+    "aquarium_power",
     "dryer",
     "mailbox_slot",
     "mailbox_motion",
@@ -812,6 +931,8 @@ APPLIANCE_TYPES = (
 
 
 APPLIANCE_MODEL_NAMES = {
+        "aquarium_plug": "Aquarium (smart plug)",
+        "aquarium_power": "Aquarium (power sensor)",
     "laundry": "Laundry appliance",
     "thermostat_climate": "Thermostat (climate entity)",
     "washer": "Washer",
@@ -885,6 +1006,8 @@ LEGACY_APPLIANCE_CLASSES = {
     "air_conditioner_power": "air_conditioner",
     "refrigerator": "refrigerator",
     "refrigerator_switch": "refrigerator",
+        "aquarium_plug": "aquarium",
+        "aquarium_power": "aquarium",
     "mailbox_motion": "mailbox",
     "mailbox_slot": "mailbox",
     "access_contact": "access",
@@ -895,12 +1018,13 @@ LEGACY_APPLIANCE_CLASSES = {
 }
 
 LEGACY_APPLIANCE_GROUPS = {
+    "laundry": "large_appliances",
     "thermostat_climate": "climate",
     "air_conditioner_contact": "climate",
     "air_conditioner_power": "climate",
-    "washer": "laundry",
-    "dishwasher": "laundry",
-    "dryer": "laundry",
+    "washer": "large_appliances",
+    "dishwasher": "large_appliances",
+    "dryer": "large_appliances",
     "opening": "openings",
     "access_contact": "openings",
     "opening_cover": "openings",
@@ -908,8 +1032,10 @@ LEGACY_APPLIANCE_GROUPS = {
     "sun_protection_cover": "sun_protection",
     "mailbox_motion": "deliveries",
     "mailbox_slot": "deliveries",
-    "refrigerator": "refrigeration",
-    "refrigerator_switch": "refrigeration",
+    "refrigerator": "large_appliances",
+    "refrigerator_switch": "large_appliances",
+    "aquarium_plug": "animal_care",
+    "aquarium_power": "animal_care",
 }
 
 
@@ -926,7 +1052,7 @@ def get_appliance_model(
     appliance_class = appliance_class or get_legacy_appliance_class(appliance_type)
     group = get_appliance_group_for_profile(appliance_type, appliance_class)
     if appliance_class is None and appliance_type in APPLIANCE_UNCLASSIFIED_MODEL_NAMES:
-        group = "laundry"
+        group = "large_appliances"
     if profile is not None and profile.detection_sources and group is not None:
         detection_names = APPLIANCE_DETECTION_MODEL_NAMES.get(
             profile.detection_sources[0]

@@ -720,6 +720,33 @@ async def test_group_actions_run_before_local_with_appliance_context(hass, monke
     ]
 
 
+def test_group_actions_are_limited_to_supported_profile_hooks(hass):
+    group_actions = {
+        CONF_START_ACTIONS: [{"action": "test.start"}],
+        CONF_PENDING_ACTIONS: [{"action": "test.pending"}],
+        CONF_EMPTIED_ACTIONS: [{"action": "test.emptied"}],
+    }
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"category": "large_appliances"},
+        options={CONF_GROUP_ACTIONS: group_actions},
+    )
+
+    washer = ApplianceRuntime(
+        hass, entry, {CONF_APPLIANCE_TYPE: "washer"}
+    )
+    refrigerator = ApplianceRuntime(
+        hass, entry, {CONF_APPLIANCE_TYPE: "refrigerator"}
+    )
+
+    assert washer.group_actions[CONF_PENDING_ACTIONS] == group_actions[CONF_PENDING_ACTIONS]
+    assert washer.group_actions[CONF_EMPTIED_ACTIONS] == group_actions[CONF_EMPTIED_ACTIONS]
+    assert CONF_PENDING_ACTIONS not in refrigerator.group_actions
+    assert CONF_EMPTIED_ACTIONS not in refrigerator.group_actions
+    assert not refrigerator._has_actions(CONF_PENDING_ACTIONS)
+    assert not refrigerator._has_actions(CONF_EMPTIED_ACTIONS)
+
+
 @pytest.mark.parametrize("appliance_type", ["refrigerator", "refrigerator_switch"])
 @pytest.mark.asyncio
 async def test_refrigerator_profiles_run_cycle_start_and_finish_actions(
@@ -1031,9 +1058,9 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
 @pytest.mark.parametrize(
     ("language", "localized_group_name", "localized_class_name"),
     (
-        ("ca", "Rentat i assecat", "Washer"),
-        ("es", "Lavado y secado", "Washer"),
-        ("en", "Laundry and drying", "Washer"),
+        ("ca", "Grans electrodomèstics", "Washer"),
+        ("es", "Grandes electrodomésticos", "Washer"),
+        ("en", "Large appliances", "Washer"),
     ),
 )
 async def test_setup_localizes_legacy_category_defaults_without_changing_custom_names(
@@ -1146,18 +1173,18 @@ async def test_category_entry_groups_appliances_without_parent_device(
         )
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="Washer",
-        data={"category": "laundry", "appliances": appliance_records},
+        title="Large appliances",
+        data={"category": "large_appliances", "appliances": appliance_records},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
     device_registry = dr.async_get(hass)
-    assert entry.title == "Laundry and drying"
+    assert entry.title == "Large appliances"
     assert _find_device(
         device_registry,
-        identifiers={(DOMAIN, "category:laundry")}
+        identifiers={(DOMAIN, "category:large_appliances")}
     ) is None
     assert _find_device(
         device_registry,
@@ -1173,10 +1200,10 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.40" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.41" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
-        "Laundry and drying · Washer · Power sensor",
-        "Laundry and drying · Dishwasher · Power sensor",
+        "Large appliances · Washer · Power sensor",
+        "Large appliances · Dishwasher · Power sensor",
     ]
     assert len(entry.runtime_data) == 2
 
@@ -1828,6 +1855,8 @@ async def test_window_and_shutter_durations_are_independent_and_persisted(
     assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:window-shutter"
     assert registry.async_get(window_duration_id).translation_key == "window_open_duration"
     assert registry.async_get(shutter_duration_id).translation_key == "shutter_open_duration"
+    assert hass.states.get(window_duration_id).state == "unknown"
+    assert hass.states.get(shutter_duration_id).state == "unknown"
 
     hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
     await hass.async_block_till_done()
@@ -1843,6 +1872,15 @@ async def test_window_and_shutter_durations_are_independent_and_persisted(
     await hass.async_block_till_done()
     assert hass.states.get(window_duration_id).state == "00:00:45"
 
+    current_time[0] += timedelta(seconds=10)
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
+    await hass.async_block_till_done()
+    assert hass.states.get(window_duration_id).state == "00:00:45"
+    current_time[0] += timedelta(seconds=5)
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    await hass.async_block_till_done()
+    assert hass.states.get(window_duration_id).state == "00:00:05"
+
     assert await hass.config_entries.async_unload(entry.entry_id)
     current_time[0] += timedelta(seconds=15)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -1853,8 +1891,8 @@ async def test_window_and_shutter_durations_are_independent_and_persisted(
     hass.states.async_set(config[CONF_SHUTTER_COVER_ENTITY], "closed")
     await hass.async_block_till_done()
 
-    assert hass.states.get(window_duration_id).state == "00:00:45"
-    assert hass.states.get(shutter_duration_id).state == "00:00:55"
+    assert hass.states.get(window_duration_id).state == "00:00:05"
+    assert hass.states.get(shutter_duration_id).state == "00:01:10"
     assert hass.states.get(shutter_state_id).attributes["icon"] == "mdi:window-shutter"
     assert await hass.config_entries.async_unload(entry.entry_id)
 
@@ -3422,7 +3460,13 @@ def test_input_and_runtime_binary_sensor_states_and_attributes(hass):
             "mdi:window-closed",
             "window_state",
         ),
-        ("access", "access_contact", "mdi:parking", "mdi:parking", "access_state"),
+        (
+            "access",
+            "access_contact",
+            "mdi:garage-open",
+            "mdi:garage",
+            "access_state",
+        ),
         (
             "awning",
             "sun_protection_contact",
@@ -3619,6 +3663,57 @@ async def test_unassigned_cover_and_lock_sources_are_attached_directly(
     )
     assert await hass.config_entries.async_unload(appliance_entry.entry_id)
     assert er.async_get(hass).async_get(source_entity.entity_id).device_id is None
+
+
+@pytest.mark.asyncio
+async def test_lock_source_with_existing_parent_uses_named_visible_proxy(
+    hass, enable_custom_integrations
+):
+    source_config_entry = MockConfigEntry(domain="lock_source")
+    source_config_entry.add_to_hass(hass)
+    source_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=source_config_entry.entry_id,
+        identifiers={(source_config_entry.domain, "front_door")},
+        name="Physical front door",
+    )
+    source_entity = er.async_get(hass).async_get_or_create(
+        "lock",
+        source_config_entry.domain,
+        "front_door",
+        config_entry=source_config_entry,
+        device_id=source_device.id,
+        original_name="Pany porta",
+    )
+    hass.states.async_set(source_entity.entity_id, "locked")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_APPLIANCE_TYPE: "opening",
+            CONF_LOCK_ENTITY: source_entity.entity_id,
+            "name": "Porta",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+
+    source = er.async_get(hass).async_get(source_entity.entity_id)
+    assert source.device_id == source_device.id
+    proxy_id = er.async_get(hass).async_get_entity_id(
+        "lock", DOMAIN, f"{entry.entry_id}_lock_proxy"
+    )
+    assert proxy_id is not None
+    proxy = er.async_get(hass).async_get(proxy_id)
+    assert proxy.device_id == _async_appliance_device_id(hass, entry)
+    assert proxy.original_name == "Pany porta (HAM Proxy)"
+    assert proxy.hidden_by is None
+    assert hass.states.get(proxy_id).attributes["friendly_name"] == (
+        "Pany porta (HAM Proxy)"
+    )
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert er.async_get(hass).async_get(source_entity.entity_id).device_id == (
+        source_device.id
+    )
 
 
 @pytest.mark.asyncio

@@ -179,6 +179,7 @@ class ApplianceRuntime:
         self.group_actions = {
             ACTION_GROUP_CONFIG_KEYS[action_group]: actions
             for action_group in common_action_groups
+            if action_group in self.profile.action_groups
             if isinstance(
                 actions := configured_group_actions.get(
                     ACTION_GROUP_CONFIG_KEYS[action_group]

@@ -36,6 +36,7 @@ from custom_components.home_activity_manager.const import (
     CONF_DOOR_OPEN_DELAY_SECONDS,
     CONF_EMPTIED_ACTIONS,
     CONF_FINISH_ACTIONS,
+    CONF_GROUP_ACTIONS,
     CONF_MAIL_ARRIVAL_ACTIONS,
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
@@ -115,14 +116,14 @@ async def test_add_appliance_through_four_config_flow_steps(
         flow_id,
         {
             "name": "Washer",
-            CONF_APPLIANCE_GROUP: "laundry",
+            CONF_APPLIANCE_GROUP: "large_appliances",
         },
     )
     assert result["step_id"] == "appliance_class"
     result = await hass.config_entries.flow.async_configure(
         flow_id, {CONF_APPLIANCE_CLASS: "washer"}
     )
-    assert result["step_id"] == "activity_mode_laundry"
+    assert result["step_id"] == "activity_mode_large_appliances"
     result = await hass.config_entries.flow.async_configure(
         flow_id, {"activity_mode": "power"}
     )
@@ -180,8 +181,8 @@ async def test_add_appliance_through_four_config_flow_steps(
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Rentat i assecat"
-    assert result["data"]["category"] == "laundry"
+    assert result["title"] == "Grans electrodomèstics"
+    assert result["data"]["category"] == "large_appliances"
     appliance = result["data"]["appliances"][0]
     assert appliance["data"][CONF_POWER_ENTITY] == "sensor.washer_power"
     assert appliance["data"][CONF_APPLIANCE_TYPE] == "laundry"
@@ -365,9 +366,9 @@ async def test_setup_adds_appliance_to_existing_group(
     )
     existing_entry = MockConfigEntry(
         domain=DOMAIN,
-        title="Laundry",
+        title="Large appliances",
         data={
-            "category": "laundry",
+            "category": "large_appliances",
             "appliances": [
                 {
                     "id": "existing-washer",
@@ -390,7 +391,7 @@ async def test_setup_adds_appliance_to_existing_group(
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {"name": "Another washer", CONF_APPLIANCE_GROUP: "laundry"},
+        {"name": "Another washer", CONF_APPLIANCE_GROUP: "large_appliances"},
     )
     assert result["step_id"] == "appliance_class"
     flow_id = result["flow_id"]
@@ -767,7 +768,7 @@ async def test_options_flow_shows_immutable_category_and_mode(
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
     fields = {marker.schema: field for marker, field in result["data_schema"].schema.items()}
-    assert fields[CONF_APPLIANCE_GROUP].config["options"] == ["laundry"]
+    assert fields[CONF_APPLIANCE_GROUP].config["options"] == ["large_appliances"]
     assert fields[CONF_APPLIANCE_CLASS].config["options"] == ["washer"]
     assert fields["activity_mode"].config["options"] == ["power"]
     assert fields[CONF_APPLIANCE_GROUP].config["read_only"] is True
@@ -788,7 +789,7 @@ async def test_options_flow_shows_immutable_category_and_mode(
         flow_id,
         {
             "name": "Washer",
-            CONF_APPLIANCE_GROUP: "laundry",
+            CONF_APPLIANCE_GROUP: "large_appliances",
             CONF_APPLIANCE_CLASS: "washer",
             "activity_mode": "climate",
         },
@@ -819,7 +820,7 @@ async def test_migrate_saved_duration_options_from_minutes_to_seconds(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 11
+    assert entry.version == 12
     assert entry.options == {
         "start_duration_seconds": 15,
         "finish_duration_seconds": 60,
@@ -862,7 +863,7 @@ async def test_migrate_cover_door_to_access_class(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 11
+    assert entry.version == 12
     access, door = entry.data["appliances"]
     assert access["data"][CONF_APPLIANCE_CLASS] == "access"
     assert door["data"][CONF_APPLIANCE_CLASS] == "door"
@@ -871,11 +872,84 @@ async def test_migrate_cover_door_to_access_class(hass):
 
 @pytest.mark.asyncio
 async def test_migrate_future_config_entry_version_is_rejected(hass):
-    entry = MockConfigEntry(domain=DOMAIN, version=12)
+    entry = MockConfigEntry(domain=DOMAIN, version=13)
     entry.add_to_hass(hass)
 
     assert not await async_migrate_entry(hass, entry)
-    assert entry.version == 12
+    assert entry.version == 13
+
+
+@pytest.mark.asyncio
+async def test_migrate_laundry_and_refrigeration_preserves_group_actions(hass):
+    entries = [
+        MockConfigEntry(
+            domain=DOMAIN,
+            version=8,
+            title="Washer",
+            data={
+                "category": "laundry",
+                "appliances": [
+                    {
+                        "id": "washer-1",
+                        "data": {
+                            "name": "Washer",
+                            CONF_APPLIANCE_TYPE: "washer",
+                            CONF_POWER_ENTITY: "sensor.washer_power",
+                        },
+                        "options": {},
+                    }
+                ],
+            },
+            options={
+                CONF_GROUP_ACTIONS: {
+                    CONF_PENDING_ACTIONS: [{"action": "test.pending"}],
+                    CONF_EMPTIED_ACTIONS: [{"action": "test.emptied"}],
+                }
+            },
+        ),
+        MockConfigEntry(
+            domain=DOMAIN,
+            version=8,
+            title="Refrigerator",
+            data={
+                "category": "refrigeration",
+                "appliances": [
+                    {
+                        "id": "refrigerator-1",
+                        "data": {
+                            "name": "Refrigerator",
+                            CONF_APPLIANCE_TYPE: "refrigerator",
+                            CONF_POWER_ENTITY: "sensor.refrigerator_power",
+                        },
+                        "options": {},
+                    }
+                ],
+            },
+            options={
+                CONF_GROUP_ACTIONS: {
+                    CONF_PENDING_ACTIONS: [{"action": "test.pending"}],
+                    CONF_DOOR_OPEN_ACTIONS: [{"action": "test.door_open"}],
+                }
+            },
+        ),
+    ]
+    for entry in entries:
+        entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entries[0])
+    survivor = next(
+        entry
+        for entry in entries
+        if entry in hass.config_entries.async_entries(DOMAIN)
+    )
+    actions = survivor.options[CONF_GROUP_ACTIONS]
+
+    assert survivor.version == 12
+    assert survivor.data["category"] == "large_appliances"
+    assert len(survivor.data["appliances"]) == 2
+    assert actions[CONF_PENDING_ACTIONS] == [{"action": "test.pending"}]
+    assert actions[CONF_EMPTIED_ACTIONS] == [{"action": "test.emptied"}]
+    assert actions[CONF_DOOR_OPEN_ACTIONS] == [{"action": "test.door_open"}]
 
 
 @pytest.mark.asyncio
@@ -963,8 +1037,8 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
     )
     merged = next(entry for entry in entries if entry is not survivor)
 
-    assert survivor.version == 11
-    assert survivor.data["category"] == "laundry"
+    assert survivor.version == 12
+    assert survivor.data["category"] == "large_appliances"
     assert all(
         record["data"][CONF_APPLIANCE_TYPE] == "laundry"
         and record["data"]["appliance_class"] == "washer"
@@ -1039,7 +1113,7 @@ async def test_migrate_shows_existing_proxies_without_overriding_user_choice(
         registry.async_get(proxy_entry.entity_id).hidden_by == expected_hidden_by
         for proxy_entry in proxies
     )
-    assert entry.version == 11
+    assert entry.version == 12
 
 
 @pytest.mark.asyncio
@@ -1073,7 +1147,7 @@ async def test_migrate_releases_legacy_climate_device_assignment(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 11
+    assert entry.version == 12
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
 
 
@@ -1101,7 +1175,7 @@ async def test_migrate_removes_unsupported_ac_contact_sensor(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 11
+    assert entry.version == 12
     assert entry.data["category"] == "climate"
     expected_type = (
         "thermostat_climate"
@@ -1142,7 +1216,7 @@ async def test_migrate_removes_refrigerator_compressor_and_plug_alarms(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 11
+    assert entry.version == 12
     assert entry.data["appliances"][0]["data"][CONF_APPLIANCE_CLASS] == "refrigerator"
     assert entry.options == {}
     assert entry.data["appliances"][0]["options"] == {
@@ -1204,6 +1278,8 @@ async def test_every_profile_supports_config_entry_crud(
                     config_entry=climate_source,
                 )
                 entity_id = entity_entry.entity_id
+            elif sensor_input.domain == "sensor":
+                entity_id = f"sensor.{revision}_{sensor_input.output_entity or 'input'}"
             elif sensor_input.config_key == CONF_COVER_ENTITY:
                 entity_id = f"cover.{revision}_cover"
             elif sensor_input.config_key == CONF_LOCK_ENTITY:
@@ -1441,9 +1517,9 @@ async def test_options_flow_removes_one_appliance_and_preserves_group_members(
     retained_id = "washer_to_keep"
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="Laundry and drying",
+        title="Large appliances",
         data={
-            "category": "laundry",
+            "category": "large_appliances",
             "appliances": [
                 {
                     "id": appliance_id,

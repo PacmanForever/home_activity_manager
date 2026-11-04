@@ -91,7 +91,14 @@ class ConfigFlowSchemaTests(unittest.TestCase):
     def test_groups_map_classes_to_compatible_profiles(self) -> None:
         self.assertEqual(
             set(APPLIANCE_GROUPS),
-            {"climate", "laundry", "openings", "sun_protection", "deliveries", "refrigeration"},
+            {
+                "climate",
+                "large_appliances",
+                "animal_care",
+                "openings",
+                "sun_protection",
+                "deliveries",
+            },
         )
         mapped_classes = {
             appliance_class
@@ -117,7 +124,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             ("cycle_start", "cycle_finish", "plug_off_alarm"),
         )
         self.assertEqual(
-            get_group_action_groups("laundry"),
+            get_group_action_groups("large_appliances"),
             (
                 "cycle_start",
                 "cycle_finish",
@@ -125,12 +132,10 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 "pending_unload",
                 "emptied",
                 "plug_off_alarm",
+                "door_open_alarm",
             ),
         )
-        self.assertEqual(
-            get_group_action_groups("refrigeration"),
-            ("cycle_start", "cycle_finish", "door_open_alarm"),
-        )
+        self.assertEqual(get_group_action_groups("animal_care"), ("cycle_start", "cycle_finish"))
         self.assertEqual(
             get_group_action_groups("deliveries"),
             ("cycle_start", "cycle_finish", "pending_unload", "emptied"),
@@ -181,7 +186,10 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             for profile in modes.values()
         ]
         self.assertEqual(len(mapped), len(set(mapped)))
-        self.assertEqual(set(mapped), set(APPLIANCE_PROFILES) - {"laundry"})
+        self.assertEqual(
+            set(mapped),
+            set(APPLIANCE_PROFILES) - {"laundry", "aquarium_plug", "aquarium_power"},
+        )
         for modes in APPLIANCE_CATEGORIES.values():
             for mode, profile in modes.items():
                 self.assertEqual(APPLIANCE_PROFILES[profile].detection_sources, (mode,))
@@ -214,7 +222,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         )
         self.assertEqual(
             get_appliance_model("laundry", language="ca"),
-            "Rentat i assecat · Dispositiu de rentat i assecat · Sensor de potència",
+            "Grans electrodomèstics · Dispositiu de rentat i assecat · Sensor de potència",
         )
         self.assertEqual(
             get_appliance_model("air_conditioner_power"),
@@ -350,16 +358,21 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             get_appliance_model("thermostat_climate", "unknown_class"),
             "Thermostat (climate entity)",
         )
-        self.assertEqual(get_appliance_group_for_profile("laundry", "washer"), "laundry")
+        self.assertEqual(
+            get_appliance_group_for_profile("laundry", "washer"),
+            "large_appliances",
+        )
 
     def test_identity_schema_requires_name_and_group(self) -> None:
         schema = _identity_schema({})
         with self.assertRaises(vol.Invalid):
             schema({"name": "Washer"})
 
-        values = schema({"name": "Washer", CONF_APPLIANCE_GROUP: "laundry"})
+        values = schema(
+            {"name": "Washer", CONF_APPLIANCE_GROUP: "large_appliances"}
+        )
 
-        self.assertEqual(values[CONF_APPLIANCE_GROUP], "laundry")
+        self.assertEqual(values[CONF_APPLIANCE_GROUP], "large_appliances")
         self.assertNotIn(CONF_POWER_ENTITY, values)
 
         catalan_schema = _identity_schema({}, language="ca")
@@ -372,10 +385,10 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             group_selector.config["options"],
             [
                 "climate",
+                "animal_care",
+                "large_appliances",
                 "deliveries",
                 "sun_protection",
-                "refrigeration",
-                "laundry",
                 "openings",
             ],
         )
@@ -1153,35 +1166,35 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         expected_duration_names = (
             (
                 "Last cycle duration",
-                "Time the door was open",
-                "Time the window was open",
-                "Time the access was open",
-                "Time the awning was open",
-                "Time the shutter was open",
+                "Duration of the last period the door was open",
+                "Duration of the last period the window was open",
+                "Duration of the last period the access was open",
+                "Duration of the last period the awning was open",
+                "Duration of the last period the shutter was open",
             ),
             (
                 "Last cycle duration",
-                "Time the door was open",
-                "Time the window was open",
-                "Time the access was open",
-                "Time the awning was open",
-                "Time the shutter was open",
+                "Duration of the last period the door was open",
+                "Duration of the last period the window was open",
+                "Duration of the last period the access was open",
+                "Duration of the last period the awning was open",
+                "Duration of the last period the shutter was open",
             ),
             (
                 "Duración del último ciclo",
-                "Tiempo que la puerta ha estado abierta",
-                "Tiempo que la ventana ha estado abierta",
-                "Tiempo que el acceso ha estado abierto",
-                "Tiempo que el toldo ha estado abierto",
-                "Tiempo que la persiana ha estado abierta",
+                "Duración del último periodo con la puerta abierta",
+                "Duración del último periodo con la ventana abierta",
+                "Duración del último periodo con el acceso abierto",
+                "Duración del último periodo con el toldo abierto",
+                "Duración del último periodo con la persiana abierta",
             ),
             (
                 "Durada de l’últim cicle",
-                "Temps que la porta ha estat oberta",
-                "Temps que la finestra ha estat oberta",
-                "Temps que l’accés ha estat obert",
-                "Temps que el tendal ha estat obert",
-                "Temps que la persiana ha estat oberta",
+                "Durada de l’últim període amb la porta oberta",
+                "Durada de l’últim període amb la finestra oberta",
+                "Durada de l’últim període amb l’accés obert",
+                "Durada de l’últim període amb el tendal obert",
+                "Durada de l’últim període amb la persiana oberta",
             ),
         )
         for translation, expected_names in zip(translations, expected_duration_names):
@@ -1400,14 +1413,14 @@ async def test_config_flow_has_six_forward_steps_and_separates_options():
     class_result = await flow.async_step_user(
         {
             "name": "Washer",
-            CONF_APPLIANCE_GROUP: "laundry",
+            CONF_APPLIANCE_GROUP: "large_appliances",
         }
     )
     assert class_result["step_id"] == "appliance_class"
     mode_result = await flow.async_step_appliance_class(
         {CONF_APPLIANCE_CLASS: "washer"}
     )
-    assert mode_result["step_id"] == "activity_mode_laundry"
+    assert mode_result["step_id"] == "activity_mode_large_appliances"
     sensors_result = await flow.async_step_activity_mode({"activity_mode": "power"})
     assert sensors_result["step_id"] == "sensors_laundry"
 
@@ -1434,8 +1447,8 @@ async def test_config_flow_has_six_forward_steps_and_separates_options():
             "max_runtime_actions": [],
         }
     )
-    assert created["title"] == "Laundry and drying"
-    assert created["data"]["category"] == "laundry"
+    assert created["title"] == "Large appliances"
+    assert created["data"]["category"] == "large_appliances"
     appliance = created["data"]["appliances"][0]
     assert appliance["data"]["power_entity"] == "sensor.washer_power"
     assert appliance["data"][CONF_APPLIANCE_TYPE] == "laundry"
@@ -1445,7 +1458,7 @@ async def test_config_flow_has_six_forward_steps_and_separates_options():
     assert [result["step_id"] for result in shown_steps] == [
         "user",
         "appliance_class",
-        "activity_mode_laundry",
+        "activity_mode_large_appliances",
         "sensors_laundry",
         "parameters_laundry",
         "actions_laundry",
@@ -1461,7 +1474,7 @@ async def test_pending_settings_are_validated_on_parameters_step():
     await flow.async_step_user(
         {
             "name": "Washer",
-            CONF_APPLIANCE_GROUP: "laundry",
+            CONF_APPLIANCE_GROUP: "large_appliances",
         }
     )
     await flow.async_step_appliance_class({CONF_APPLIANCE_CLASS: "washer"})

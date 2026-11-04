@@ -11,7 +11,7 @@
 [![Home Assistant](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FPacmanForever%2Fhome_activity_manager%2Fmain%2Fdocs%2Fhome_assistant_compatibility.json&query=%24.tested_version&suffix=%20tested&label=home%20assistant&color=blue)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 [![Daily HA compatibility](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml/badge.svg?branch=main)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 
-Home Activity Manager makes compatible household devices smarter by bringing their Home Assistant entities together under a dedicated device. It adds activity tracking, actions, reminders, and alarms, and is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles cover laundry appliances, thermostats (including air conditioners), refrigerators, mailboxes, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
+Home Activity Manager makes compatible household devices smarter by bringing their Home Assistant entities together under a dedicated device. It adds activity tracking, actions, reminders, and alarms, and is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles are organized into climate control, large appliances (laundry and refrigeration), animal care, deliveries, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
 
 ## Installation
 
@@ -46,12 +46,23 @@ Deliveries
     |-- Activity detection with a mail-slot contact sensor
     `-- Activity detection with an interior motion sensor
 
-Laundry and drying
+Large appliances
 |-- Washer
 |   `-- Activity detection with a power sensor
 |-- Dryer
 |   `-- Activity detection with a power sensor
-`-- Dishwasher
+|-- Dishwasher
+|   `-- Activity detection with a power sensor
+|-- Refrigerator
+|   |-- Activity detection with a power sensor
+|   `-- Activity detection with a smart plug
+`-- Freezer
+    |-- Activity detection with a power sensor
+    `-- Activity detection with a smart plug
+
+Animal care
+`-- Aquarium
+    |-- Activity detection with a smart plug
     `-- Activity detection with a power sensor
 
 Openings
@@ -63,19 +74,13 @@ Openings
 `-- Window
     `-- Activity detection with a contact sensor
 
-Refrigeration
-|-- Refrigerator
-|   |-- Activity detection with a power sensor
-|   `-- Activity detection with a smart switch
-`-- Freezer
-    |-- Activity detection with a power sensor
-    `-- Activity detection with a smart switch
-
 Sun protection
 `-- Awning
     |-- Activity detection with a contact sensor
     `-- Activity detection with a cover entity
 ```
+
+Small appliances are not selectable until a concrete appliance class is defined.
 
 ### Activity detection examples
 
@@ -88,17 +93,19 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 | Climate control | Thermostat | `climate.living_room` | Any climate state other than `off` is active, including when the thermostat is idle; `off` ends activity. |
 | Deliveries | Mailbox: interior motion | `binary_sensor.mailbox_motion` plus `binary_sensor.front_door` | A new motion `on` transition records an arrival. Opening the main-door contact ends the pending collection. |
 | Deliveries | Mailbox: mail-slot contact | `binary_sensor.mail_slot` plus `binary_sensor.front_door` | A new slot-contact `on` transition records an arrival. Opening the main-door contact ends the pending collection. |
-| Laundry and drying | Washer | `sensor.washer_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
-| Laundry and drying | Dryer | `sensor.dryer_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
-| Laundry and drying | Dishwasher | `sensor.dishwasher_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
+| Large appliances | Washer | `sensor.washer_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
+| Large appliances | Dryer | `sensor.dryer_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
+| Large appliances | Dishwasher | `sensor.dishwasher_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
 | Openings | Door: contact | `binary_sensor.front_door_contact` | `on` means open and starts activity; `off` means closed and ends it. |
 | Openings | Access: contact | `binary_sensor.garage_contact` | `on` means open and starts activity; `off` means closed and ends it. |
 | Openings | Access: cover | `cover.garage_door` | A settled `open` state starts activity and `closed` ends it. `opening` and `closing` keep the last settled state and do not trigger actions. |
 | Openings | Window: contact | `binary_sensor.bedroom_window_contact` | `on` means open and starts activity; `off` means closed and ends it. |
-| Refrigeration | Refrigerator: power | `sensor.refrigerator_power` plus `binary_sensor.refrigerator_door` | Power detects compressor activity; the required door contact supports the door-open alarm. |
-| Refrigeration | Refrigerator: smart switch | `switch.refrigerator_plug` plus `binary_sensor.refrigerator_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
-| Refrigeration | Freezer: power | `sensor.freezer_power` plus `binary_sensor.freezer_door` | Power detects compressor activity; the required door contact supports the door-open alarm. |
-| Refrigeration | Freezer: smart switch | `switch.freezer_plug` plus `binary_sensor.freezer_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
+| Large appliances | Refrigerator: power | `sensor.refrigerator_power` plus `binary_sensor.refrigerator_door` | Power detects compressor activity; the required door contact supports the door-open alarm. |
+| Large appliances | Refrigerator: smart plug | `switch.refrigerator_plug` plus `binary_sensor.refrigerator_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
+| Large appliances | Freezer: power | `sensor.freezer_power` plus `binary_sensor.freezer_door` | Power detects compressor activity; the required door contact supports the door-open alarm. |
+| Large appliances | Freezer: smart plug | `switch.freezer_plug` plus `binary_sensor.freezer_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
+| Animal care | Aquarium: smart plug | `switch.aquarium_plug` | The plug detects activity; optional sensors can report power, illuminance, water temperature, pH, and water level. |
+| Animal care | Aquarium: power | `sensor.aquarium_power` | Power thresholds detect activity; a smart plug and the same optional readings can also be configured. |
 | Sun protection | Awning: contact | `binary_sensor.awning_position` | Tracks open/closed position and cycle duration, not motor movement; it does not create a `running` entity. |
 | Sun protection | Awning: cover | `cover.awning` | A settled `open` state is active and `closed` is inactive. `opening` and `closing` keep the last settled state. |
 
@@ -111,21 +118,21 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 
 Mailbox profiles detect arrivals with either an interior motion sensor or a mail-slot contact. Mail-slot mode also exposes the contact's open/closed state as **Mail slot**. Pending mail is shown as **Occupied** until collection; this is separate from the flap and main-door positions. Both modes use a separate main-door contact and track the cycle until collection. Start actions run on arrival; finish actions run when the main door opens or pending collection is cleared. Reminders are separate.
 
-### Laundry and drying
+### Large appliances
 
-Washer, dryer, and dishwasher profiles detect cycles from power thresholds and configurable confirmation times. Each appliance can optionally monitor its door, control a smart plug, track pending unloading, and send reminders.
+Washer, dryer, and dishwasher profiles detect cycles from power thresholds and configurable confirmation times. Each appliance can optionally monitor its door, control a smart plug, track pending unloading, and send reminders. Refrigerator and freezer profiles detect compressor activity from power or use a smart plug as the activity source; both require a door contact and support the door-open alarm. A smart plug selected alongside power is an optional control and does not change activity detection.
+
+### Animal care
+
+Aquarium profiles use either a required smart plug or a required power sensor as the activity source. Optional readings include power, illuminance, water temperature, pH, and water level, depending on the selected profile. Illuminance is a sensor reading, not a light-control entity. The group exposes cycle-start and cycle-end shared actions.
 
 ### Openings
 
-The duration labels state how long the door, window, access, awning, or shutter was open. They measure the settled open interval, not how long a motor took to open it.
+The duration labels refer to the most recently completed period that the door, window, access, awning, or shutter was open. While it is open, the sensor retains the previous completed value; until the first open period ends, its value is unknown. The duration measures the settled open interval, not how long a motor took to open it.
 
 Windows use a required contact sensor, and conventional doors use contact detection with an optional associated shutter. The primary contact state is named for its class, such as **Window state** or **Door state**; an associated shutter is separately named **Shutter state**. Each has its own last-open duration sensor, so the window/door duration is independent of the shutter duration. Optional shutter sources can be cleared directly in their entity selectors; if both source types are selected, clear one of them to resolve the validation error. **Access** is for openings whose primary role is to let people or vehicles enter or leave a space, such as a garage, shop, or warehouse. This is a functional distinction, not a statement about size or motorization. Access can use a required contact sensor or a cover entity as its primary detector; it does not have a second associated cover. Its **Access state** binary sensor means open/closed, not motor movement. A lock is optional in either mode and reports its own state; it does not determine whether the access is open or closed. For a primary cover, `open` starts the duration interval and `closed` ends it; actions run only after the entity settles at one of those states, not while it is `opening` or `closing`. The duration is time open, not time the motor runs. A configured cover or lock with no device is reused directly on the managed device; one already assigned to a device keeps that association and is represented by a native proxy. An associated shutter on a contact-mode door also exposes its open/closed state.
 - **Durada d'obertura**: les etiquetes dels sensors indiquen explícitament el temps que la porta, la finestra, l'accés, el tendal o la persiana ha estat oberta. Mesuren l'interval en estat estable obert, no el temps que ha trigat el motor a obrir.
 - **Durada de l'últim període actiu**: sensor de sortida amb la durada del període d'activitat més recent detectat.
-
-### Refrigeration
-
-Refrigerator and freezer profiles offer the same two modes. Power mode requires a power sensor and door contact; start/end actions follow compressor activity. A controllable smart plug is optional and does not trigger an off alarm. Smart-switch mode requires a smart switch and separate door contact; start/end actions follow switch state, while optional power and energy sensors do not change activity. Both modes support the door-open alarm; neither switch mode nor the optional power-mode plug triggers a plug-off alarm.
 
 ### Sun protection
 
@@ -150,9 +157,9 @@ For example, the shared smart-plug-off action runs immediately for each applianc
 | --- | --- |
 | Climate control | Activity starts, activity ends, smart plug off |
 | Deliveries | Arrival, collection reminder, collected |
-| Laundry and drying | Activity starts, activity ends, maximum runtime, pending unload, emptied, smart plug off |
+| Large appliances | Activity starts, activity ends, maximum runtime, pending unload, emptied, smart plug off, door-open alarm |
+| Animal care | Activity starts, activity ends |
 | Openings | Activity starts, activity ends, lock locked, lock unlocked, shutter open, shutter closed |
-| Refrigeration | Activity starts, activity ends, door-open alarm |
 | Sun protection | Activity starts, activity ends |
 
 Group action templates receive `ham_device_name` (the managed Home Assistant device's name) and `ham_device_area_name` (its assigned area, or `None`). These refer to the appliance whose group action is running, not the entity that triggered it. When a configured input entity triggers the action, `ham_source_entity_id` contains that original entity ID, not this integration's proxy entity. Timer-triggered actions do not define `ham_source_entity_id`.
@@ -169,7 +176,7 @@ For example, add a notification action to the shared activity-start hook. Replac
 
 To include the source entity in a message, use `{{ ham_source_entity_id | default('timer', true) }}` so timer-triggered actions have a fallback value. The previous names `ham_appliance_name` and `ham_area_name` remain available as aliases for existing templates.
 
-Each group has one config entry. Add, edit, or remove appliances from that group's options. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Existing per-appliance entries are consolidated automatically during migration, preserving appliance IDs, entity IDs, registry customizations, and runtime state. Setup asks for:
+Each group has one config entry. Add, edit, or remove appliances from that group's options. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Existing per-appliance entries are consolidated automatically during migration. Legacy laundry and refrigeration entries become one Large appliances group; their shared action lists are combined, duplicate actions are removed, and appliance IDs, entity IDs, registry customizations, local options, and runtime state are preserved. Setup asks for:
 
 Each group entry groups its appliances on the integration page. Only configured appliances are registered as devices; the group itself is not added as an empty device.
 
@@ -189,7 +196,7 @@ Power-cycle defaults are 4 W for 15 seconds to start and 1 W for 60 seconds to f
 
 Outputs depend on the selected profile and configured inputs. A selected power sensor provides a power entity; an energy sensor or power sensor provides an energy entity. Cycle-based profiles provide activity state and last-activity duration; estimated remaining time is limited to laundry profiles. Both refrigerator modes expose activity and a door-open alarm; neither has a compressor-inactivity or plug-off alarm. Mailboxes expose their main-door and pending-collection states, plus a button to clear pending status. Detecting mail starts the mailbox cycle and runs its start actions; opening the main door or pressing the clear button ends the cycle, runs its end actions, and cancels reminders. A selected smart plug is exposed as a switch on the managed device. Climate, cover, and optional opening-lock sources with no device are associated directly with the managed device; sources already assigned to a device are represented by native-domain proxies. Contact-based doors with an associated shutter expose its open/closed state.
 
-Configured inputs are represented by their corresponding integration output when one exists. The air conditioner's louver sensor is represented by its running state, without a separate input entity. Mailbox sensors likewise do not create standalone input wrappers; the main-door, pending-collection, and mail-slot outputs remain available. Climate, cover, and lock proxies mirror standard state and supported features and forward standard actions to their configured source entities. A proxy keeps the source's user-defined name when present, or its original integration name otherwise, and adds the suffix `(HAM Proxy)`; when the source has no name, the translated proxy name also includes that suffix. Direct association does not change either source name. Proxies are visible and active by default, and can be hidden from the entity registry if desired. When a source has no device, its entity is directly associated with the managed device; otherwise, the source association is preserved and the proxy is used. The source entity remains owned by its original integration and is never deleted. HAM releases a direct association on unload or removal only while the entity still points to the managed device. Entries created by older versions that assigned the original climate entity are migrated to use a proxy and release that legacy device association.
+Configured inputs are represented by their corresponding integration output when one exists. The air conditioner's louver sensor is represented by its running state, without a separate input entity. Mailbox sensors likewise do not create standalone input wrappers; the main-door, pending-collection, and mail-slot outputs remain available. Climate, cover, and lock proxies mirror standard state and supported features and forward standard actions to their configured source entities. A proxy keeps the source's user-defined name when present, or its original integration name otherwise, and adds the suffix `(HAM Proxy)`; when the source has no name, the translated proxy name also includes that suffix. Direct association does not change either source name. Proxies are visible and active by default, and can be hidden from the entity registry if desired. When a source has no device, its entity is directly associated with the managed device; otherwise, its association is preserved and the proxy is used. The source entity remains owned by its original integration and is never deleted. HAM releases a direct association on unload or removal only while the entity still points to the managed device. Entries created by older versions that assigned the original climate entity are migrated to use a proxy and release that legacy device association.
 
 Contact-based doors with an associated shutter expose a separate last-open duration sensor for each layer. The shutter duration sensor is present only while a shutter source is configured.
 

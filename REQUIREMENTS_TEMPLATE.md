@@ -6,7 +6,7 @@ Crear una integració local de Home Assistant per centralitzar en un únic dispo
 
 L'usuari no ha de necessitar crear automatitzacions o blueprints externs per detectar l'inici o el final del cicle ni per executar les accions configurades.
 
-Les agrupacions de primer nivell inicials són `climate`, `laundry`, `openings`, `sun_protection`, `deliveries` i `refrigeration`. Cada agrupació conté classes d'aparell i, sota cada classe, les modalitats de detecció amb el seu perfil concret. Per exemple, climatització inclou aire condicionat i termòstat; refrigeració inclou nevera i congelador. Les entrades auxiliars i les accions disponibles es declaren explícitament a cada perfil; no totes estan disponibles en totes les modalitats. L'estructura ha de permetre afegir perfils futurs sense repartir condicions específiques per perfil entre els fluxos, el runtime i les plataformes d'entitats.
+Les agrupacions de primer nivell són `climate`, `large_appliances`, `animal_care`, `openings`, `sun_protection` i `deliveries`. `large_appliances` reuneix rentadores, assecadores, rentaplats, neveres i congeladors; `animal_care` conté l'aquari. Cada agrupació conté classes d'aparell i, sota cada classe, les modalitats de detecció amb el seu perfil concret. Les entrades auxiliars i les accions disponibles es declaren explícitament a cada perfil; no totes estan disponibles en totes les modalitats. L'estructura ha de permetre afegir perfils futurs sense repartir condicions específiques per perfil entre els fluxos, el runtime i les plataformes d'entitats. Els petits electrodomèstics no s'ofereixen fins que tinguin una classe concreta.
 
 ## 2. Identitat del projecte
 
@@ -15,7 +15,7 @@ Les agrupacions de primer nivell inicials són `climate`, `laundry`, `openings`,
 - **Tipus**: integració personalitzada de Home Assistant, distribuïble amb HACS
 - **Funcionament**: local; sense API externa ni credencials
 - **Font d'activitat**: una entitat de Home Assistant determinada per la modalitat seleccionada
-- **Agrupacions inicials**: `climate`, `laundry`, `openings`, `sun_protection`, `deliveries`, `refrigeration`
+- **Agrupacions inicials**: `climate`, `large_appliances`, `animal_care`, `openings`, `sun_protection`, `deliveries`
 - **Idioma font**: anglès
 - **Idiomes de la interfície**: anglès, castellà i català
 
@@ -50,10 +50,21 @@ Climatització (climate)
 `-- Termòstat
 	`-- Entitat climate (thermostat_climate)
 
-Rentat i assecat (laundry)
+Grans electrodomèstics (large_appliances)
 |-- Rentadora -- Sensor de potència (laundry)
-|-- Assecadora -- Sensor de potència (laundry)
-`-- Rentaplats -- Sensor de potència (laundry)
+|-- Assecadora -- Sensor de potència (dryer)
+|-- Rentaplats -- Sensor de potència (dishwasher)
+|-- Nevera
+|   |-- Sensor de potència (refrigerator)
+|   `-- Endoll intel·ligent (refrigerator_switch)
+`-- Congelador
+	|-- Sensor de potència (refrigerator)
+	`-- Endoll intel·ligent (refrigerator_switch)
+
+Cura d'animals (animal_care)
+`-- Aquari
+	|-- Endoll intel·ligent (aquarium_plug)
+	`-- Sensor de potència (aquarium_power)
 
 Obertures (openings)
 |-- Porta
@@ -75,16 +86,9 @@ Lliuraments (deliveries)
 	|-- Contacte de portella (mailbox_slot)
 	`-- Moviment interior (mailbox_motion)
 
-Refrigeració (refrigeration)
-|-- Nevera
-|   |-- Sensor de potència (refrigerator)
-|   `-- Interruptor intel·ligent (refrigerator_switch)
-`-- Congelador
-	|-- Sensor de potència (refrigerator)
-	`-- Interruptor intel·ligent (refrigerator_switch)
 ```
 
-Els noms entre parèntesis són identificadors de perfil, no nivells addicionals. Rentadora, assecadora i rentaplats comparteixen el perfil `laundry`; les modalitats de nevera i congelador comparteixen els perfils de refrigeració indicats. Porta i finestra comparteixen el perfil de contacte `opening`; només la porta convencional ofereix també `opening_cover`, on el cover representa la mateixa porta. La classe Access ofereix el contacte `access_contact` o un cover principal `opening_cover`, amb pany opcional i sense una segona persiana associada. La persiana associada és una capacitat opcional del perfil de porta per contacte, no una classe de protecció solar. Blind deixa d'estar disponible en les noves configuracions de protecció solar, però les entrades legacy amb classe `blind` han de continuar sent editables.
+Els noms entre parèntesis són identificadors de perfil, no nivells addicionals. Els perfils de rentat i refrigeració comparteixen ara `large_appliances` sense canviar els identificadors ni la configuració de cada aparell. `aquarium_plug` requereix un endoll com a font d'activitat; `aquarium_power` requereix un sensor de potència i pot tenir un endoll de control opcional. Tots dos poden exposar lectures opcionals de lluminositat, temperatura de l'aigua, pH i nivell d'aigua; la lluminositat és una lectura, no un control d'entitat `light`. Porta i finestra comparteixen el perfil de contacte `opening`; només la porta convencional ofereix també `opening_cover`, on el cover representa la mateixa porta. La classe Access ofereix el contacte `access_contact` o un cover principal `opening_cover`, amb pany opcional i sense una segona persiana associada. La persiana associada és una capacitat opcional del perfil de porta per contacte, no una classe de protecció solar. Blind deixa d'estar disponible en les noves configuracions de protecció solar, però les entrades legacy amb classe `blind` han de continuar sent editables.
 
 ### 4.1 Flux de configuració
 
@@ -116,6 +120,7 @@ Aquest flux és el lloc central per configurar tot el comportament propi de l'el
 - **Pany i persiana associada**: els hooks de pany bloquejat/desbloquejat i persiana oberta/tancada només s'executen en canvis d'estat estables de la font configurada. Un cover que es mou no es considera encara obert o tancat.
 - **Obertura de porta per a bugaderia**: selector opcional per a rentadora, rentaplats i assecadora; activa estat de porta i «pendent de buidar».
 - **Switch intel·ligent de l'endoll**: selector opcional en aparells endollats. La integració n'exposa el control; només determina l'activitat si és la font seleccionada.
+- **Aquari**: `aquarium_plug` requereix un switch/endoll com a font d'activitat; `aquarium_power` requereix un sensor de potència i admet un endoll de control opcional. Ambdós perfils admeten sensors opcionals d'il·luminància, temperatura de l'aigua, pH i nivell d'aigua.
 
 Les fonts obligatòries depenen de la modalitat seleccionada. La categoria termòstat ofereix contacte/obertura, potència i `climate`; el contacte és obligatori només en la modalitat de contacte. Només la font seleccionada determina l'activitat. No es requereixen helpers externs: la integració proporciona les entitats de sortida de la secció 5. Les entitats seleccionades són fonts externes i no s'han d'esborrar quan s'elimina el dispositiu. Per a les fonts natives `climate`, `cover` i `lock`, si l'entitat no està associada a cap dispositiu, s'associa al dispositiu HAM i es reutilitza directament; si ja té dispositiu, es conserva aquesta associació i es crea un proxy nadiu. L'entitat continua pertanyent a la seva integració d'origen. En descarregar o retirar la configuració, es desfà l'associació directa només si l'entitat encara és al dispositiu HAM. Els inputs de pala de l'AC i els sensors d'entrada de la bústia no s'han de duplicar com a wrappers visibles.
 
@@ -144,6 +149,7 @@ Els tipus s'han de definir en un registre de perfils extensible. Cada perfil dec
 - **Termòstat per entitat `climate`** (`thermostat_climate`): requereix una entitat `climate` existent. Si l'entitat no té dispositiu, s'associa directament al dispositiu gestionat i no es crea una segona entitat. Si ja té dispositiu, aquest no es modifica i es crea un proxy nadiu al dispositiu gestionat que reflecteix l'estat i els controls estàndard i els reenvia a l'entitat original. En tots dos casos, l'entitat continua pertanyent a la integració d'origen. L'activitat segueix el mode de la climate (`off` versus qualsevol mode actiu), també quan `hvac_action` és inactiu.
 - **Nevera per potència** (`refrigerator`): requereix sensor de potència i contacte de porta. La potència detecta activitat del compressor i el contacte detecta l'obertura. Pot incloure opcionalment un switch intel·ligent controlable, que no canvia la detecció per potència ni genera alarmes si s'apaga. Les accions d'inici/final segueixen l'activitat del compressor. No s'hi creen «pendent de buidar» ni temps restant estimat. Només s'ofereix l'alarma configurable de porta oberta.
 - **Nevera per interruptor** (`refrigerator_switch`): requereix un interruptor intel·ligent que controla l'alimentació i és la font binària d'activitat; també requereix un contacte separat de porta. `on` inicia i `off` finalitza el període actiu i executa les accions corresponents. La potència i l'energia són opcionals; no es creen temps restant ni alarmes d'endoll apagat o compressor inactiu. Manté l'alarma configurable de porta oberta.
+- **Aquari** (`aquarium_plug`, `aquarium_power`): l'endoll o el sensor de potència seleccionat determina l'activitat. Els sensors opcionals de lluminositat, temperatura de l'aigua, pH i nivell d'aigua només proporcionen lectures i no alteren la detecció.
 - **Bústia amb moviment** (`mailbox_motion`): el moviment interior detecta l'arribada de correu. La porta principal és independent del sensor d'arribada i neteja l'estat pendent quan s'obre.
 - **Bústia amb portella** (`mailbox_slot`): un sensor de contacte/obertura de la portella d'entrada detecta l'arribada de correu. La porta principal és independent d'aquest sensor i neteja l'estat pendent quan s'obre.
 - En tots dos perfils de bústia, una arribada posa «pendent de recollir» a `on`, reinicia el recompte i activa les accions d'arribada. Els recordatoris configurats només s'inicien quan la porta principal consta tancada; si el correu arriba amb la porta oberta, es programen quan aquesta es tanca. El sensor d'arribada no s'interpreta com un inici o final de cicle.
@@ -155,6 +161,8 @@ Els tipus s'han de definir en un registre de perfils extensible. Cada perfil dec
 Cada dispositiu pot tenir llistes locals d'accions de Home Assistant configurables i editables, compatibles amb les accions estàndard de Home Assistant. L'usuari ha de poder afegir, eliminar i reordenar diverses accions. Les llistes poden quedar buides sense impedir que el dispositiu detecti i mostri els cicles. A més, cada entrada agrupada pot tenir llistes d'accions compartides pels seus dispositius.
 
 Les accions configurables al nivell d'agrupació són la unió ordenada dels grups d'acció (`action_groups`) dels perfils descendents de `APPLIANCE_GROUPS`. Un hook s'ofereix si almenys un perfil del grup el suporta. En runtime, cada appliance només l'executa si el seu perfil el declara, la capacitat corresponent està configurada i la seva pròpia entitat emet el canvi pertinent; no es tracta d'una difusió de l'acció a tots els membres. Això permet oferir pany bloquejat/desbloquejat i persiana oberta/tancada al grup `openings` sense executar-los als perfils que no tenen aquests inputs. Els hooks particulars continuen configurant-se localment a l'appliance, amb camps condicionats a la capacitat configurada. Les opcions globals obsoletes o no suportades no s'han d'executar.
+
+En migrar les antigues agrupacions `laundry` i `refrigeration` a `large_appliances`, les llistes de `group_actions` es combinen per clau i es dedupliquen sense canviar l'ordre. Així es conserven, per exemple, `pending_actions` i `emptied_actions` de bugaderia encara que el grup nou també contingui neveres. Les accions es mantenen a nivell de grup; cada runtime les filtra segons `action_groups` del perfil, de manera que una nevera no executa accions de buidatge i una rentadora no executa l'alarma de porta de nevera.
 
 Quan es produeix un hook per a un appliance, s'executen primer les accions compartides del grup i després les accions locals d'aquell appliance. Les accions compartides s'executen per cada appliance i el seu propi esdeveniment, no una única vegada coordinada per a tot el grup. Una llista local buida no desactiva les accions globals. Les opcions globals s'han de conservar en editar o eliminar un dispositiu membre mentre l'entrada de grup continuï existint.
 
@@ -183,6 +191,7 @@ Les accions locals són configuració de cada dispositiu i les globals són conf
 - **Reinici de l'energia exposada**: si hi ha un sensor de potència, es crea un botó per posar a zero el total visible de la integració. Amb energia local, reinicia l'acumulació calculada. Amb un sensor extern seleccionat, fixa una base a la lectura actual i mostra els increments posteriors; no modifica ni escriu a l'entitat externa. La base es conserva després de reiniciar Home Assistant i s'aplica només a la mateixa entitat font.
 - **Durada de l'últim període actiu**: sensor de sortida amb la durada del període d'activitat més recent detectat.
 - **Durada d'obertura**: les etiquetes dels sensors indiquen explícitament el temps durant el qual cada element ha romàs obert. Mesuren l'interval en estat estable obert, no el temps que ha trigat el motor a obrir.
+- **Durada d'obertura**: les etiquetes dels sensors indiquen explícitament que mesuren l'últim període complet en què cada element ha estat obert. Mentre l'element continua obert, es conserva el valor del període completat anterior; abans del primer tancament, el valor és desconegut. Mesuren l'interval en estat estable obert, no el temps que ha trigat el motor a obrir.
 - **Temps restant estimat**: només es crea per perfils de cicle que en poden oferir una estimació útil. No es crea per AC ni nevera.
 - **Estat (funcionament)**: cada aparell elèctric té una entitat binària pròpia que indica si hi ha activitat segons l'estratègia declarada pel perfil, separada dels wrappers d'entrada i amb identificador estable.
 - **Estat i durada (obert/tancat)**: les entitats binàries de porta, finestra, Access i tendal han d'identificar la classe: «Estat de la porta», «Estat de la finestra», «Estat de l'accés» i «Estat del tendal», respectivament. Una persiana associada s'ha d'anomenar «Estat de la persiana», separada de l'estat principal. Aquests noms han d'estar traduïts a tots els idiomes de la interfície. Cada capa té la seva durada d'obertura independent, mesurada entre estats estables `open` i `closed`; `opening` i `closing` conserven l'estat anterior. La durada d'Access amb cover és el temps que l'obertura roman oberta, no el temps de funcionament del motor. La durada de persiana només s'exposa si hi ha una font de persiana associada i es restaura després de reiniciar Home Assistant.
@@ -205,6 +214,7 @@ Les accions locals són configuració de cada dispositiu i les globals són conf
 ## 6. Persistència i actualitzacions
 
 - La configuració de dispositius, entitats vinculades, llindars, histèresis i accions s'ha de desar a les entrades de configuració de Home Assistant.
+- La migració de configuracions antigues ha de fusionar les entrades de rentat i refrigeració en `large_appliances` sense perdre accions compartides, opcions locals, identificadors d'aparell, entitats, personalitzacions del registre ni estat runtime. Les llistes d'accions compartides amb contingut duplicat es desen una sola vegada.
 - La integració ha de persistir l'estat actiu del cicle, les marques temporals d'inici i dels temporitzadors d'histèresi, l'energia acumulada, la durada de l'últim cicle completat, l'estat «pendent de buidar», el nombre de repeticions ja executades i la data/hora prevista del proper avís.
 - En reiniciar Home Assistant, s'ha de restaurar aquest estat i calcular els temps transcorreguts a partir de les marques temporals guardades; no s'han de reiniciar el cicle, el temps màxim, l'estimació de temps restant ni els intervals d'avís. Les accions d'inici del cicle ja executades no s'han de repetir.
 - Després de restaurar, la integració ha de tornar a subscriure's a les entitats d'entrada i comprovar-ne l'estat actual. Si la porta és oberta, ha de netejar «pendent de buidar» i cancel·lar els avisos pendents. Si una entitat encara no està disponible, ha de conservar l'estat restaurat i esperar que torni a estar disponible, sense inferir una finalització.
@@ -272,6 +282,8 @@ Les accions locals són configuració de cada dispositiu i les globals són conf
 47. La jerarquia d'agrupació → classe d'aparell → modalitat/perfil és la mateixa al flux, a `APPLIANCE_GROUPS`, al README i a aquest document; no hi ha arbres contradictoris.
 48. Les opcions d'accions de grup mostren la unió ordenada dels hooks suportats per almenys un perfil descendent. Cada appliance només executa hooks del seu perfil quan la capacitat i la font corresponents estan configurades; els hooks globals obsolets o incompatibles no s'executen.
 49. Per a cada esdeveniment d'un appliance, les accions globals s'executen abans que les accions locals. La mateixa configuració global executada per dos appliances rep variables pròpies de cadascun; `ham_device_area_name` pot ser `None`, i `ham_source_entity_id` només es passa quan hi ha una entitat d'origen.
+50. La unió d'accions de `large_appliances` inclou els hooks de bugaderia i refrigeració, inclosos «pendent de buidar» i «buidat»; cada perfil només executa els hooks que declara. La migració fusiona les llistes de les antigues agrupacions sense perdre cap acció i elimina duplicats.
+51. L'aquari es configura a `animal_care` amb `aquarium_plug` o `aquarium_power`, pot exposar les lectures opcionals de lluminositat, temperatura de l'aigua, pH i nivell d'aigua, i no ofereix classes de petits electrodomèstics sense classe definida.
 50. La configuració de grup es pot editar sense esborrar-la en editar o retirar un membre. El flux explica visualment, amb ajudes natives localitzades, la jerarquia, la unió de hooks, l'ordre i les variables de plantilla en anglès, castellà i català.
 
 51. Per a fonts natives `climate`, `cover` i `lock`, si l'entitat font no té dispositiu, s'associa al dispositiu HAM i no es crea proxy; si ja té dispositiu, la font no es reassigna i es crea proxy. La pertinença a la integració d'origen es conserva, el pare del dispositiu no afecta la decisió i HAM desfà l'associació directa en descarregar o retirar la configuració, sempre que l'entitat continuï associada al dispositiu HAM.
@@ -354,7 +366,8 @@ La creació segueix cinc passos:
 
 | Tipus general | Modalitats actuals que es poden agrupar | Funcions i límits a conservar |
 | --- | --- | --- |
-| Rentadora, rentaplats i assecadora | Potència, actualment una per cada tipus | Cicle, temps màxim i estimació; porta i pendent de buidar opcionals. Altres modalitats són una extensió a definir, no una capacitat actual. |
+| Grans electrodomèstics | Rentadora, assecadora i rentaplats per potència; nevera i congelador per potència o endoll | Cicle i funcions segons cada perfil: bugaderia pot admetre temps màxim, estimació i pendent de buidar; refrigeració admet contacte i alarma de porta. Les accions compartides són la unió dels perfils i es filtren per capacitat. |
+| Cura d'animals | Aquari per endoll o potència | Cicle amb lectures opcionals de lluminositat, temperatura de l'aigua, pH i nivell d'aigua; sense pendent de buidar. |
 | Aire condicionat | Sensor de contacte/obertura, potència o `climate` | Una sola font d'activitat; el contacte/obertura només existeix en el perfil de contacte. Potència, energia i interruptor es declaren segons cada perfil. La `climate` original conserva associació i controls, sense wrapper. |
 | Nevera | Potència o interruptor | Accions d'inici/final d'activitat en totes dues modalitats; contacte i alarma de porta; potència i energia auxiliars són compatibles amb la modalitat d'interruptor. No hi ha alarmes de compressor inactiu o endoll apagat. |
 | Bústia | Moviment interior o sensor de contacte/obertura de portella | La modalitat detecta una arribada com a esdeveniment, no un estat de funcionament continu. Cal mantenir la porta principal separada, el pendent de recollir, les accions i els recordatoris. |
@@ -367,7 +380,7 @@ Els detectors i les sortides no són intercanviables: cal conservar la semàntic
 
 - La potència es mesura independentment de l'activitat. L'energia externa mostra el total original; el total calculat es manté separat. Canviar de font pot canviar el total visible i un sensor extern indisponible no provoca una substitució automàtica.
 - Cada tipus declara les modalitats permeses, les entrades obligatòries i opcionals, les capacitats, les alarmes i les accions. En modalitat d'interruptor, aquest determina l'activitat; no hi ha cap alarma separada d'inactivitat del compressor.
-- El projecte està en proves: s'accepten canvis incompatibles i començar de zero; no és obligatòria una migració automàtica de les configuracions existents.
+- Les configuracions antigues es migren automàticament. Les entrades de rentat i refrigeració es consoliden a `large_appliances` i conserven els identificadors, les opcions locals, les personalitzacions del registre, l'estat runtime i les accions compartides fusionades i deduplicades.
 - En substituir la font durant un cicle, se'n conserva l'inici i es finalitza quan la nova font confirma que està aturada; la potència respecta la histèresi i una font indisponible no força una transició. En substituir una `climate`, s'allibera l'anterior sense modificar altres associacions.
 
 ### Altres decisions pendents
