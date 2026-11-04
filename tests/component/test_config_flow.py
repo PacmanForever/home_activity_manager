@@ -202,7 +202,7 @@ async def test_add_appliance_through_four_config_flow_steps(
         for marker, value in options_result["data_schema"].schema.items()
         if marker.schema == "appliance_action"
     )
-    assert actions.config["options"] == ["edit", "remove", "group_actions"]
+    assert actions.config["options"] == ["edit", "group_actions", "remove"]
 
 
 @pytest.mark.asyncio

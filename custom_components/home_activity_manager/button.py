@@ -35,7 +35,7 @@ class ClearPendingButton(ButtonEntity):
 
 
 class ResetEnergyButton(ButtonEntity):
-    """Reset the locally calculated energy total."""
+    """Reset the integration's displayed energy total."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "reset_energy"
@@ -51,7 +51,7 @@ class ResetEnergyButton(ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Reset only the integration's locally calculated energy total."""
+        """Reset the total without changing an external energy source."""
         self._runtime.reset_local_energy()
 
 
@@ -72,7 +72,10 @@ async def async_setup_entry(
         if has_pending_button:
             buttons.append(ClearPendingButton(runtime, entry))
 
-        has_reset_button = bool(runtime.config.get(CONF_POWER_ENTITY))
+        has_reset_button = bool(runtime.config.get(CONF_POWER_ENTITY)) and (
+            bool(runtime.config.get(CONF_ENERGY_ENTITY))
+            or "total_energy" in runtime.profile.output_entities
+        )
         if has_reset_button:
             buttons.append(ResetEnergyButton(runtime, entry))
 

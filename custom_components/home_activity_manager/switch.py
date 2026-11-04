@@ -12,22 +12,30 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_PLUG_ENTITY, DOMAIN
 from .device import appliance_device_info
-from .entity_proxy import _suggested_proxy_object_id
+from .entity_proxy import (
+    _ham_proxy_name,
+    _source_entity_name,
+    _suggested_proxy_object_id,
+)
 from .runtime import ApplianceRuntime, entry_runtimes
 
 
 class AppliancePlugSwitch(SwitchEntity):
     """Expose control of the selected external smart plug."""
 
-    _attr_has_entity_name = True
+    _attr_has_entity_name = False
     _attr_should_poll = False
     _attr_translation_key = "plug"
 
     def __init__(self, runtime: ApplianceRuntime, entry: ConfigEntry) -> None:
         self._runtime = runtime
+        self._appliance_name = runtime.config.get("name", entry.title)
         self._entity_id = runtime.config[CONF_PLUG_ENTITY]
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_plug"
+        )
+        self._attr_name = _ham_proxy_name(
+            _source_entity_name(runtime.hass, self._entity_id)
         )
         self._attr_device_info = appliance_device_info(
             entry, runtime.config, getattr(runtime, "hass", None)
@@ -36,7 +44,9 @@ class AppliancePlugSwitch(SwitchEntity):
     @property
     def suggested_object_id(self) -> str:
         """Suggest a switch entity ID derived from the wrapped plug."""
-        return _suggested_proxy_object_id(self._entity_id)
+        return _suggested_proxy_object_id(
+            self._entity_id, self._appliance_name
+        )
 
     @property
     def is_on(self) -> bool | None:

@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.42 - 2026-11-04
+
+### Fixed
+
+- Expose Aquarium total energy from power or an optional cumulative energy sensor, and show its reset button only when the total is available.
+
+### Changed
+
+- Use source names with the `(HAM Proxy)` suffix for source-backed proxy entities.
+- Clarify last-opening duration labels in all supported languages.
+
 ## v0.9.41 - 2026-11-04
 
 ### Added

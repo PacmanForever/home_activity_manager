@@ -15,8 +15,10 @@ from homeassistant.helpers.storage import Store
 
 from .appliance_types import (
     APPLIANCE_CATEGORIES,
+    APPLIANCE_DETECTION_MODEL_NAMES,
     APPLIANCE_GROUPS,
     ApplianceTypeProfile,
+    get_appliance_class_name,
     get_appliance_group_for_profile,
     get_appliance_group_name,
     get_group_action_groups,
@@ -271,14 +273,23 @@ def _identity_schema(
 
 
 def _appliance_class_schema(
-    group: str, values: dict[str, Any] | None = None
+    group: str,
+    values: dict[str, Any] | None = None,
+    *,
+    language: str = "en",
 ) -> vol.Schema:
     values = values or {}
+    appliance_classes = sorted(
+        APPLIANCE_GROUPS[group],
+        key=lambda appliance_class: get_appliance_class_name(
+            appliance_class, language
+        ).casefold(),
+    )
     return vol.Schema(
         {
             _required(CONF_APPLIANCE_CLASS, values): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=list(APPLIANCE_GROUPS[group]),
+                    options=appliance_classes,
                     mode=selector.SelectSelectorMode.DROPDOWN,
                     translation_key="appliance_class",
                 )
@@ -287,12 +298,21 @@ def _appliance_class_schema(
     )
 
 
-def _activity_mode_schema(group: str, appliance_class: str) -> vol.Schema:
+def _activity_mode_schema(
+    group: str, appliance_class: str, *, language: str = "en"
+) -> vol.Schema:
+    language = language.split("-")[0]
+    modes = sorted(
+        APPLIANCE_GROUPS[group][appliance_class],
+        key=lambda mode: APPLIANCE_DETECTION_MODEL_NAMES[mode]
+        .get(language, APPLIANCE_DETECTION_MODEL_NAMES[mode]["en"])
+        .casefold(),
+    )
     return vol.Schema(
         {
             vol.Required("activity_mode"): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=list(APPLIANCE_GROUPS[group][appliance_class]),
+                    options=modes,
                     mode=selector.SelectSelectorMode.DROPDOWN,
                     translation_key=f"activity_mode_{group}",
                 )
@@ -920,7 +940,11 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_activity_mode()
         return self.async_show_form(
             step_id="appliance_class",
-            data_schema=_appliance_class_schema(self._category, self._draft),
+            data_schema=_appliance_class_schema(
+                self._category,
+                self._draft,
+                language=self.hass.config.language if self.hass is not None else "en",
+            ),
             last_step=False,
         )
 
@@ -936,7 +960,11 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_sensors()
         return self.async_show_form(
             step_id=f"activity_mode_{self._category}",
-            data_schema=_activity_mode_schema(self._category, appliance_class),
+            data_schema=_activity_mode_schema(
+                self._category,
+                appliance_class,
+                language=self.hass.config.language if self.hass is not None else "en",
+            ),
             last_step=False,
         )
 
@@ -1187,7 +1215,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     {
                         vol.Required("appliance_action"): selector.SelectSelector(
                             selector.SelectSelectorConfig(
-                                options=["edit", "remove", "group_actions"],
+                                options=["edit", "group_actions", "remove"],
                                 mode=selector.SelectSelectorMode.DROPDOWN,
                                 translation_key="appliance_action",
                             )
@@ -1285,7 +1313,13 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             {
                 vol.Required("appliance_id"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=options,
+                        options=sorted(
+                            options,
+                            key=lambda option: (
+                                option["label"].casefold(),
+                                option["value"].casefold(),
+                            ),
+                        ),
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 )

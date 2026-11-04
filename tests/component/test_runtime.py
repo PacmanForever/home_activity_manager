@@ -158,7 +158,9 @@ async def test_auxiliary_switch_off_does_not_end_power_cycle(hass, config, monke
     hass.states.async_set(
         config[CONF_POWER_ENTITY], "5", {ATTR_UNIT_OF_MEASUREMENT: "W"}
     )
-    hass.states.async_set(config[CONF_PLUG_ENTITY], "on")
+    hass.states.async_set(
+        config[CONF_PLUG_ENTITY], "on", {"friendly_name": "Kitchen outlet"}
+    )
     entry = MockConfigEntry(domain=DOMAIN, data=config)
     entry.add_to_hass(hass)
     dr.async_get(hass).async_get_or_create(
@@ -1018,6 +1020,7 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     unique_ids = {entity.unique_id for entity in entry_entities}
     assert unique_ids == {
         f"{entry.entry_id}_power",
+        f"{entry.entry_id}_total_energy",
         f"{entry.entry_id}_last_cycle_duration",
         f"{entry.entry_id}_estimated_remaining",
         f"{entry.entry_id}_running",
@@ -1025,7 +1028,7 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
     }
     assert registry.async_get_entity_id(
         "sensor", DOMAIN, f"{entry.entry_id}_total_energy"
-    ) is None
+    ) is not None
     created_entity_ids = [entity.entity_id for entity in entry_entities]
     assert all(hass.states.get(entity_id) is not None for entity_id in created_entity_ids)
     for key, icon in {
@@ -1200,7 +1203,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.41" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.42" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -1348,7 +1351,9 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
         hass.states.async_set(config[CONF_POWER_ENTITY], "100", {ATTR_UNIT_OF_MEASUREMENT: "W"})
     hass.states.async_set(config[CONF_CLIMATE_ENTITY], "off")
     hass.states.async_set(config[CONF_ENERGY_ENTITY], "2500", {ATTR_UNIT_OF_MEASUREMENT: "Wh"})
-    hass.states.async_set(config[CONF_PLUG_ENTITY], "on")
+    hass.states.async_set(
+        config[CONF_PLUG_ENTITY], "on", {"friendly_name": "Kitchen outlet"}
+    )
     entry = MockConfigEntry(domain=DOMAIN, data=config)
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -1372,6 +1377,9 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
     assert plug_id == (
         "switch.air_conditioner_"
         f"{config[CONF_PLUG_ENTITY].split('.', maxsplit=1)[1]}_ham_proxy"
+    )
+    assert hass.states.get(plug_id).attributes["friendly_name"] == (
+        "Kitchen outlet (HAM Proxy)"
     )
     if reset_button_id is not None:
         entry.runtime_data.energy_kwh = 1.25
@@ -1563,7 +1571,7 @@ async def test_optional_plug_and_pending_button_controls(
     assert hass.states.get(config[CONF_POWER_ENTITY]).state == "100"
     assert er.async_get(hass).async_get_entity_id(
         "sensor", DOMAIN, f"{entry.entry_id}_total_energy"
-    ) is None
+    ) is not None
 
     runtime.pending_unload = True
     runtime.pending_reminder_count = 2
@@ -1598,6 +1606,8 @@ async def test_optional_plug_and_pending_button_controls(
             "dryer",
             "refrigerator",
             "refrigerator_switch",
+            "aquarium_plug",
+            "aquarium_power",
         )
         for with_external_energy in (False, True)
     ),
@@ -1620,8 +1630,45 @@ async def test_local_energy_reset_button_is_available_for_power_profiles(
     buttons = []
     await setup_button_entry(hass, entry, buttons.extend)
 
-    assert len(buttons) == 1
-    assert isinstance(buttons[0], ResetEnergyButton)
+    has_energy_output = with_external_energy or (
+        "total_energy" in APPLIANCE_PROFILES[appliance_type].output_entities
+        and bool(config.get(CONF_POWER_ENTITY))
+    )
+    assert len(buttons) == int(has_energy_output)
+    if has_energy_output:
+        assert isinstance(buttons[0], ResetEnergyButton)
+
+
+@pytest.mark.asyncio
+async def test_aquarium_smart_plug_exposes_local_energy_and_reset(
+    hass, enable_custom_integrations
+):
+    config = {
+        CONF_APPLIANCE_TYPE: "aquarium_plug",
+        CONF_PLUG_ENTITY: "switch.aquarium_plug",
+        CONF_POWER_ENTITY: "sensor.aquarium_power",
+        "name": "Aquarium",
+    }
+    hass.states.async_set(config[CONF_PLUG_ENTITY], "on")
+    hass.states.async_set(
+        config[CONF_POWER_ENTITY],
+        "86",
+        {ATTR_UNIT_OF_MEASUREMENT: "W"},
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_total_energy"
+    ) is not None
+    assert registry.async_get_entity_id(
+        "button", DOMAIN, f"{entry.entry_id}_energy_reset"
+    ) is not None
+    assert await hass.config_entries.async_unload(entry.entry_id)
 
 
 @pytest.mark.parametrize(
@@ -2282,6 +2329,7 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             source_entry.domain,
             f"{appliance_type}_{index}",
             config_entry=source_entry,
+            original_name=f"Source {input_config.config_key}",
             device_id=(
                 source_device.id
                 if input_config.domain != "climate" and index % 2 == 0
@@ -2356,6 +2404,10 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             wrapper = integration_registry.async_get(wrapper_id)
             assert wrapper is not None
             assert wrapper.device_id == device_id
+            source_name = source.name or source.original_name
+            assert hass.states.get(wrapper_id).attributes["friendly_name"] == (
+                f"{source_name} (HAM Proxy)"
+            )
             assert wrapper_id.endswith(
                 f"{source_entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
             )
@@ -2400,6 +2452,9 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
         ):
             assert wrapper.entity_id.endswith(
                 f"{source_entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
+            )
+            assert wrapper_state.attributes["friendly_name"] == (
+                f"{source.original_name} (HAM Proxy)"
             )
         assert wrapper_state.attributes["source_entity"] == source_entity_id
         if appliance_type in ("opening", "sun_protection_contact"):
@@ -2735,6 +2790,7 @@ async def test_refrigerator_creates_only_its_declared_entities(
     }
     assert unique_ids == {
         f"{entry.entry_id}_power",
+        f"{entry.entry_id}_total_energy",
         f"{entry.entry_id}_last_cycle_duration",
         f"{entry.entry_id}_running",
         f"{entry.entry_id}_door",
@@ -3213,9 +3269,9 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     lock = ApplianceLockProxy(lock_runtime, lock_entry)
     climate.hass = cover.hass = lock.hass = hass
 
-    assert climate.suggested_object_id == "original_ac_ham_proxy"
-    assert cover.suggested_object_id == "original_blind_ham_proxy"
-    assert lock.suggested_object_id == "original_door_ham_proxy"
+    assert climate.suggested_object_id == "AC original_ac_ham_proxy"
+    assert cover.suggested_object_id == "Blind original_blind_ham_proxy"
+    assert lock.suggested_object_id == "Door original_door_ham_proxy"
     assert climate.hvac_mode is HVACMode.COOL
     assert [mode.value for mode in climate.hvac_modes] == ["off", "cool"]
     assert climate.hvac_action.value == "cooling"
@@ -3703,6 +3759,7 @@ async def test_lock_source_with_existing_parent_uses_named_visible_proxy(
         "lock", DOMAIN, f"{entry.entry_id}_lock_proxy"
     )
     assert proxy_id is not None
+    assert proxy_id == "lock.porta_lock_source_front_door_ham_proxy"
     proxy = er.async_get(hass).async_get(proxy_id)
     assert proxy.device_id == _async_appliance_device_id(hass, entry)
     assert proxy.original_name == "Pany porta (HAM Proxy)"
@@ -4146,6 +4203,12 @@ async def test_unconfigured_optional_outputs_are_not_exposed_for_every_profile(
     for input_config in profile.sensor_inputs:
         if input_config.required:
             continue
+        if (
+            input_config.output_entity == "total_energy"
+            and "total_energy" in profile.output_entities
+            and config.get(CONF_POWER_ENTITY)
+        ):
+            continue
         if input_config.output_entity is not None:
             platform = input_config.domain
             unique_id = f"{entry.entry_id}_{input_config.output_entity}"
@@ -4177,11 +4240,17 @@ async def test_unconfigured_optional_outputs_are_not_exposed_for_every_profile(
     }
     for key in ("power", "total_energy", "last_cycle_duration", "estimated_remaining"):
         config_key = input_outputs.get(key)
-        expected = (
-            bool(config.get(config_key))
-            if config_key is not None
-            else key in profile.output_entities
-        )
+        if key == "total_energy":
+            expected = bool(config.get(CONF_ENERGY_ENTITY)) or (
+                key in profile.output_entities
+                and bool(config.get(CONF_POWER_ENTITY))
+            )
+        else:
+            expected = (
+                bool(config.get(config_key))
+                if config_key is not None
+                else key in profile.output_entities
+            )
         entity_id = registry.async_get_entity_id(
             "sensor", DOMAIN, f"{entry.entry_id}_{key}"
         )

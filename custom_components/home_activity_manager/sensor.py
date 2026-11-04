@@ -301,6 +301,13 @@ async def async_setup_entry(
                 ):
                     expected_keys.add(key)
                 continue
+            if key == "total_energy":
+                if runtime.config.get(CONF_ENERGY_ENTITY) or (
+                    key in runtime.profile.output_entities
+                    and runtime.config.get(CONF_POWER_ENTITY)
+                ):
+                    expected_keys.add(key)
+                continue
             config_key = input_outputs.get(key)
             if (
                 config_key is not None

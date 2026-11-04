@@ -24,7 +24,11 @@ from .const import (
     DOMAIN,
 )
 from .device import appliance_device_info
-from .entity_proxy import _suggested_proxy_object_id
+from .entity_proxy import (
+    _ham_proxy_name,
+    _source_entity_name,
+    _suggested_proxy_object_id,
+)
 from .runtime import ApplianceRuntime, entry_runtimes
 
 
@@ -227,7 +231,7 @@ class ApplianceBinarySensor(BinarySensorEntity):
 class ApplianceInputBinarySensor(BinarySensorEntity):
     """Expose a configured binary input that has no equivalent output."""
 
-    _attr_has_entity_name = True
+    _attr_has_entity_name = False
     _attr_should_poll = False
 
     def __init__(
@@ -238,6 +242,7 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = runtime.config[input_config.config_key]
+        self._appliance_name = runtime.config.get("name", entry.title)
         input_name = input_config.config_key.removesuffix("_entity")
         self._input_name = input_name
         self._attr_unique_id = (
@@ -252,6 +257,9 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
         self._attr_device_info = appliance_device_info(
             entry, runtime.config, getattr(runtime, "hass", None)
         )
+        self._attr_name = _ham_proxy_name(
+            _source_entity_name(runtime.hass, self._source_entity_id)
+        )
         if input_config.device_classes:
             self._attr_device_class = BinarySensorDeviceClass(
                 input_config.device_classes[0]
@@ -260,7 +268,9 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
     @property
     def suggested_object_id(self) -> str:
         """Suggest a binary sensor ID derived from the wrapped input."""
-        return _suggested_proxy_object_id(self._source_entity_id)
+        return _suggested_proxy_object_id(
+            self._source_entity_id, self._appliance_name
+        )
 
     @property
     def is_on(self) -> bool | None:

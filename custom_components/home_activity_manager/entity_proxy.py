@@ -13,12 +13,36 @@ from .device import appliance_device_info
 from .runtime import ApplianceRuntime
 
 
-def _suggested_proxy_object_id(source_entity_id: str) -> str:
+def _suggested_proxy_object_id(
+    source_entity_id: str, appliance_name: str | None = None
+) -> str:
     """Return an object ID that identifies this source-backed proxy."""
     _, separator, object_id = source_entity_id.partition(".")
     if not separator:
         object_id = source_entity_id
+    if appliance_name:
+        object_id = f"{appliance_name} {object_id}"
     return f"{object_id}_ham_proxy"
+
+
+def _source_entity_name(hass: HomeAssistant, source_entity_id: str) -> str | None:
+    """Return the best available display name for a source entity."""
+    source_entry = er.async_get(hass).async_get(source_entity_id)
+    if source_entry is not None:
+        source_name = source_entry.name or source_entry.original_name
+        if source_name:
+            return source_name
+    source_state = hass.states.get(source_entity_id)
+    friendly_name = source_state.attributes.get("friendly_name") if source_state else None
+    return friendly_name if isinstance(friendly_name, str) and friendly_name else None
+
+
+def _ham_proxy_name(source_name: str | None) -> str | None:
+    """Append the proxy marker to a source display name."""
+    if not source_name:
+        return None
+    suffix = " (HAM Proxy)"
+    return source_name if source_name.endswith(suffix) else f"{source_name}{suffix}"
 
 
 def use_source_entity_on_appliance(
@@ -78,7 +102,9 @@ class EntityProxyMixin:
     @property
     def suggested_object_id(self) -> str:
         """Suggest an entity ID derived from the source entity."""
-        return _suggested_proxy_object_id(self._source_entity_id)
+        return _suggested_proxy_object_id(
+            self._source_entity_id, self._appliance_name
+        )
 
     def _init_proxy(
         self,
@@ -90,20 +116,13 @@ class EntityProxyMixin:
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = source_entity_id
+        self._appliance_name = runtime.config.get("name", entry.title)
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
         self._attr_unique_id = f"{appliance_id}_{domain}_proxy"
         self._attr_has_entity_name = False
-        source_entry = er.async_get(runtime.hass).async_get(source_entity_id)
-        source_name = (
-            source_entry.name or source_entry.original_name
-            if source_entry is not None
-            else None
+        self._attr_name = _ham_proxy_name(
+            _source_entity_name(runtime.hass, source_entity_id)
         )
-        if source_name is None:
-            source_state = runtime.hass.states.get(source_entity_id)
-            if source_state is not None:
-                source_name = source_state.attributes.get("friendly_name")
-        self._attr_name = f"{source_name} (HAM Proxy)" if source_name else None
         self._attr_should_poll = False
         self._attr_translation_key = translation_key
         self._attr_device_info = appliance_device_info(

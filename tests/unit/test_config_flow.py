@@ -649,10 +649,15 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                     profile.door_sensor_input is not None
                     and profile.door_sensor_input.form_key in sensor_schema.schema,
                 )
-                self.assertEqual(
-                    "total_energy" in profile.output_entities,
-                    "power" in profile.detection_sources,
-                )
+                if "power" in profile.detection_sources:
+                    self.assertIn("total_energy", profile.output_entities)
+                if "total_energy" in profile.output_entities:
+                    self.assertTrue(
+                        any(
+                            item.config_key == CONF_POWER_ENTITY
+                            for item in profile.sensor_inputs
+                        )
+                    )
                 self.assertEqual(
                     "estimated_remaining" in profile.output_entities,
                     profile.estimates_remaining,
@@ -1139,12 +1144,17 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             ):
                 self.assertEqual(binary_sensor_names[key]["name"], expected_name)
         expected_input_names = (
-            ("Motion sensor", "Main-door contact/opening sensor", "Mail-slot contact/opening sensor"),
-            ("Motion sensor", "Main-door contact/opening sensor", "Mail-slot contact/opening sensor"),
-            ("Sensor de movimiento", "Sensor de contacto/apertura de la puerta principal", "Sensor de contacto/apertura de la trampilla"),
-            ("Sensor de moviment", "Sensor de contacte/obertura de la porta principal", "Sensor de contacte/obertura de la portella"),
+            ("Motion sensor (HAM Proxy)", "Main-door contact/opening sensor (HAM Proxy)", "Mail-slot contact/opening sensor (HAM Proxy)"),
+            ("Motion sensor (HAM Proxy)", "Main-door contact/opening sensor (HAM Proxy)", "Mail-slot contact/opening sensor (HAM Proxy)"),
+            ("Sensor de movimiento (HAM Proxy)", "Sensor de contacto/apertura de la puerta principal (HAM Proxy)", "Sensor de contacto/apertura de la trampilla (HAM Proxy)"),
+            ("Sensor de moviment (HAM Proxy)", "Sensor de contacte/obertura de la porta principal (HAM Proxy)", "Sensor de contacte/obertura de la portella (HAM Proxy)"),
         )
-        expected_running_names = ("State", "State", "Estado", "Estat")
+        expected_running_names = (
+            "State (HAM Proxy)",
+            "State (HAM Proxy)",
+            "Estado (HAM Proxy)",
+            "Estat (HAM Proxy)",
+        )
         for translation, expected_name in zip(translations, expected_running_names):
             self.assertEqual(
                 translation["entity"]["binary_sensor"]["input_running"]["name"],
@@ -1166,35 +1176,35 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         expected_duration_names = (
             (
                 "Last cycle duration",
-                "Duration of the last period the door was open",
-                "Duration of the last period the window was open",
-                "Duration of the last period the access was open",
-                "Duration of the last period the awning was open",
-                "Duration of the last period the shutter was open",
+                "Duration of the last door opening",
+                "Duration of the last window opening",
+                "Duration of the last access opening",
+                "Duration of the last awning opening",
+                "Duration of the last shutter opening",
             ),
             (
                 "Last cycle duration",
-                "Duration of the last period the door was open",
-                "Duration of the last period the window was open",
-                "Duration of the last period the access was open",
-                "Duration of the last period the awning was open",
-                "Duration of the last period the shutter was open",
+                "Duration of the last door opening",
+                "Duration of the last window opening",
+                "Duration of the last access opening",
+                "Duration of the last awning opening",
+                "Duration of the last shutter opening",
             ),
             (
                 "Duración del último ciclo",
-                "Duración del último periodo con la puerta abierta",
-                "Duración del último periodo con la ventana abierta",
-                "Duración del último periodo con el acceso abierto",
-                "Duración del último periodo con el toldo abierto",
-                "Duración del último periodo con la persiana abierta",
+                "Duración de la última apertura de la puerta",
+                "Duración de la última apertura de la ventana",
+                "Duración de la última apertura del acceso",
+                "Duración de la última apertura del toldo",
+                "Duración de la última apertura de la persiana",
             ),
             (
                 "Durada de l’últim cicle",
-                "Durada de l’últim període amb la porta oberta",
-                "Durada de l’últim període amb la finestra oberta",
-                "Durada de l’últim període amb l’accés obert",
-                "Durada de l’últim període amb el tendal obert",
-                "Durada de l’últim període amb la persiana oberta",
+                "Durada de l’última obertura de la porta",
+                "Durada de l’última obertura de la finestra",
+                "Durada de l’última obertura de l’accés",
+                "Durada de l’última obertura del tendal",
+                "Durada de l’última obertura de la persiana",
             ),
         )
         for translation, expected_names in zip(translations, expected_duration_names):
