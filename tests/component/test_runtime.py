@@ -1254,7 +1254,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.54" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.55" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -1600,6 +1600,62 @@ async def test_switch_activity_ignores_conflicting_auxiliary_power(hass):
     await hass.async_block_till_done()
     assert not runtime.detector.is_running
     assert runtime.display_power_w == 500
+    await runtime.async_unload()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("appliance_type", ("fan_power", "fan_switch"))
+async def test_fan_activity_uses_only_the_selected_source(hass, appliance_type):
+    if appliance_type == "fan_power":
+        config = {
+            CONF_APPLIANCE_TYPE: appliance_type,
+            CONF_POWER_ENTITY: "sensor.fan_power",
+            "start_duration_seconds": 0,
+            "finish_duration_seconds": 0,
+            "name": "Fan",
+        }
+        hass.states.async_set(
+            config[CONF_POWER_ENTITY], "0", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+        )
+    else:
+        config = {
+            CONF_APPLIANCE_TYPE: appliance_type,
+            CONF_PLUG_ENTITY: "switch.fan",
+            CONF_POWER_ENTITY: "sensor.fan_power",
+            "name": "Fan",
+        }
+        hass.states.async_set(config[CONF_PLUG_ENTITY], "on")
+        hass.states.async_set(
+            config[CONF_POWER_ENTITY], "0", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+        )
+
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    await runtime.async_setup()
+
+    if appliance_type == "fan_power":
+        hass.states.async_set(
+            config[CONF_POWER_ENTITY], "20", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+        )
+        await hass.async_block_till_done()
+        assert runtime.detector.is_running
+        hass.states.async_set(
+            config[CONF_POWER_ENTITY], "0", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+        )
+        await hass.async_block_till_done()
+        assert not runtime.detector.is_running
+    else:
+        assert runtime.detector.is_running
+        hass.states.async_set(
+            config[CONF_POWER_ENTITY], "500", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+        )
+        await hass.async_block_till_done()
+        assert runtime.detector.is_running
+        hass.states.async_set(config[CONF_PLUG_ENTITY], "off")
+        await hass.async_block_till_done()
+        assert not runtime.detector.is_running
+
     await runtime.async_unload()
 
 
@@ -3359,8 +3415,11 @@ async def test_plug_off_alarm_repeats_pauses_persists_and_rearms(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "appliance_type", ("thermostat_climate", "air_conditioner_climate")
+)
 async def test_unassigned_climate_source_is_attached_and_tracked(
-    hass, enable_custom_integrations
+    hass, enable_custom_integrations, appliance_type
 ):
     climate_entry = MockConfigEntry(domain="climate_source")
     climate_entry.add_to_hass(hass)
@@ -3378,7 +3437,7 @@ async def test_unassigned_climate_source_is_attached_and_tracked(
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
-            CONF_APPLIANCE_TYPE: "thermostat_climate",
+            CONF_APPLIANCE_TYPE: appliance_type,
             CONF_CLIMATE_ENTITY: climate_entity.entity_id,
             "name": "Air conditioner",
         },
@@ -3892,8 +3951,11 @@ async def test_climate_mode_transitions_run_start_and_finish_actions(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "appliance_type", ("thermostat_climate", "air_conditioner_climate")
+)
 async def test_climate_entity_with_existing_parent_is_not_reassigned(
-    hass, enable_custom_integrations
+    hass, enable_custom_integrations, appliance_type
 ):
     climate_entry = MockConfigEntry(domain="climate_source")
     climate_entry.add_to_hass(hass)
@@ -3916,7 +3978,7 @@ async def test_climate_entity_with_existing_parent_is_not_reassigned(
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
-            CONF_APPLIANCE_TYPE: "thermostat_climate",
+            CONF_APPLIANCE_TYPE: appliance_type,
             CONF_CLIMATE_ENTITY: climate_entity.entity_id,
             "name": "Air conditioner",
         },

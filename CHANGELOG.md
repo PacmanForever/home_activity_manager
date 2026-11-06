@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.55 - 2026-11-06
+
+### Added
+
+- Add Fan to Climate control with power-sensor and smart-switch activity detection.
+- Expose fan running state, last active duration, optional power/energy readings, and cycle start/end actions.
+
 ## v0.9.54 - 2026-11-06
 
 ### Changed

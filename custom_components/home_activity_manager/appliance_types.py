@@ -325,6 +325,104 @@ APPLIANCE_PROFILES = {
         estimates_remaining=False,
         supports_max_runtime=False,
     ),
+    "air_conditioner_climate": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="air_conditioner_climate_climate_entity",
+                config_key=CONF_CLIMATE_ENTITY,
+                domain="climate",
+                required=True,
+                detection_source="climate",
+            ),
+            SensorInput(
+                form_key="air_conditioner_climate_power_entity",
+                config_key=CONF_POWER_ENTITY,
+                domain="sensor",
+                device_classes=("power",),
+                output_entity="power",
+            ),
+            SensorInput(
+                form_key="air_conditioner_climate_plug_entity",
+                config_key=CONF_PLUG_ENTITY,
+                domain="switch",
+                output_entity="plug",
+            ),
+            SensorInput(
+                form_key="air_conditioner_climate_energy_entity",
+                config_key=CONF_ENERGY_ENTITY,
+                domain="sensor",
+                device_classes=("energy",),
+                output_entity="total_energy",
+                proxy_always=True,
+            ),
+        ),
+        parameter_groups=("plug_off_alarm",),
+        action_groups=("cycle_start", "cycle_finish", "plug_off_alarm"),
+        output_entities=("last_cycle_duration", "running", "plug"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
+    "fan_power": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="fan_power_power_entity",
+                config_key=CONF_POWER_ENTITY,
+                domain="sensor",
+                device_classes=("power",),
+                required=True,
+                detection_source="power",
+                output_entity="power",
+            ),
+            SensorInput(
+                form_key="fan_power_energy_entity",
+                config_key=CONF_ENERGY_ENTITY,
+                domain="sensor",
+                device_classes=("energy",),
+                output_entity="total_energy",
+                proxy_always=True,
+            ),
+        ),
+        parameter_groups=("power_cycle",),
+        action_groups=("cycle_start", "cycle_finish"),
+        output_entities=("power", "total_energy", "last_cycle_duration", "running"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
+    "fan_switch": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="fan_switch_plug_entity",
+                config_key=CONF_PLUG_ENTITY,
+                domain="switch",
+                required=True,
+                detection_source="smart_plug",
+                output_entity="plug",
+            ),
+            SensorInput(
+                form_key="fan_switch_power_entity",
+                config_key=CONF_POWER_ENTITY,
+                domain="sensor",
+                device_classes=("power",),
+                output_entity="power",
+            ),
+            SensorInput(
+                form_key="fan_switch_energy_entity",
+                config_key=CONF_ENERGY_ENTITY,
+                domain="sensor",
+                device_classes=("energy",),
+                output_entity="total_energy",
+                proxy_always=True,
+            ),
+        ),
+        parameter_groups=(),
+        action_groups=("cycle_start", "cycle_finish"),
+        output_entities=("power", "total_energy", "last_cycle_duration", "running", "plug"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
     "refrigerator": ApplianceTypeProfile(
         sensor_inputs=(
             SensorInput(
@@ -613,6 +711,9 @@ APPLIANCE_CATEGORIES = {
         "power": "air_conditioner_power",
         "climate": "thermostat_climate",
     },
+    "air_conditioner": {
+        "climate": "air_conditioner_climate",
+    },
     "dryer": {"power": "dryer"},
     "mailbox": {"mail_slot": "mailbox_slot", "mail_motion": "mailbox_motion"},
     "opening": {"running_sensor": "opening"},
@@ -631,7 +732,9 @@ APPLIANCE_GROUPS = {
         "air_conditioner": {
             "running_sensor": "air_conditioner_contact",
             "power": "air_conditioner_power",
+            "climate": "air_conditioner_climate",
         },
+        "fan": {"power": "fan_power", "smart_plug": "fan_switch"},
         "thermostat": {"climate": "thermostat_climate"},
     },
     "large_appliances": {
@@ -826,6 +929,7 @@ APPLIANCE_GROUP_TRANSLATIONS = {
 
 APPLIANCE_CLASS_NAMES = {
     "air_conditioner": "Air conditioner",
+    "fan": "Fan",
     "thermostat": "Thermostat",
     "washer": "Washer",
     "dryer": "Dryer",
@@ -846,6 +950,7 @@ APPLIANCE_CLASS_NAMES = {
 APPLIANCE_CLASS_TRANSLATIONS = {
     "ca": {
         "air_conditioner": "Aire condicionat",
+        "fan": "Ventilador",
         "thermostat": "Termòstat",
         "washer": "Rentadora",
         "dryer": "Assecadora",
@@ -863,6 +968,7 @@ APPLIANCE_CLASS_TRANSLATIONS = {
     },
     "es": {
         "air_conditioner": "Aire acondicionado",
+        "fan": "Ventilador",
         "thermostat": "Termostato",
         "washer": "Lavadora",
         "dryer": "Secadora",
@@ -948,6 +1054,7 @@ def get_appliance_class_name(appliance_class: str, language: str = "en") -> str:
 # Keep the selector alphabetized by its Catalan display labels.
 APPLIANCE_TYPES = (
     "access_contact",
+    "air_conditioner_climate",
     "air_conditioner_contact",
     "air_conditioner_power",
     "aquarium_plug",
@@ -965,6 +1072,8 @@ APPLIANCE_TYPES = (
     "washer",
     "dishwasher",
     "thermostat_climate",
+    "fan_switch",
+    "fan_power",
 )
 
 
@@ -973,10 +1082,13 @@ APPLIANCE_MODEL_NAMES = {
         "aquarium_power": "Aquarium (power sensor)",
     "laundry": "Laundry appliance",
     "thermostat_climate": "Thermostat (climate entity)",
+    "fan_power": "Fan (power sensor)",
+    "fan_switch": "Fan (smart switch)",
     "washer": "Washer",
     "dishwasher": "Dishwasher",
     "dryer": "Dryer",
     "air_conditioner_contact": "Air conditioner (contact/opening sensor)",
+    "air_conditioner_climate": "Air conditioner (climate entity)",
     "air_conditioner_power": "Air conditioner (power sensor)",
     "refrigerator": "Refrigerator (power sensor)",
     "refrigerator_switch": "Refrigerator (smart switch)",
@@ -1041,7 +1153,10 @@ LEGACY_APPLIANCE_CLASSES = {
     "dishwasher": "dishwasher",
     "dryer": "dryer",
     "air_conditioner_contact": "air_conditioner",
+    "air_conditioner_climate": "air_conditioner",
     "air_conditioner_power": "air_conditioner",
+    "fan_power": "fan",
+    "fan_switch": "fan",
     "refrigerator": "refrigerator",
     "refrigerator_switch": "refrigerator",
         "aquarium_plug": "aquarium",
@@ -1059,7 +1174,10 @@ LEGACY_APPLIANCE_GROUPS = {
     "laundry": "large_appliances",
     "thermostat_climate": "climate",
     "air_conditioner_contact": "climate",
+    "air_conditioner_climate": "climate",
     "air_conditioner_power": "climate",
+    "fan_power": "climate",
+    "fan_switch": "climate",
     "washer": "large_appliances",
     "dishwasher": "large_appliances",
     "dryer": "large_appliances",

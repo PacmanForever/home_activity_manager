@@ -590,19 +590,91 @@ async def test_activity_modes_follow_the_selected_category(
     )
     assert result["step_id"] == "appliance_class"
     assert set(next(iter(result["data_schema"].schema.values())).config["options"]) == {
-        "air_conditioner", "thermostat"
+        "air_conditioner", "fan", "thermostat"
     }
     result = await hass.config_entries.flow.async_configure(
         flow_id, {CONF_APPLIANCE_CLASS: "air_conditioner"}
     )
     assert result["step_id"] == "activity_mode_climate"
     mode_selector = next(iter(result["data_schema"].schema.values()))
-    assert set(mode_selector.config["options"]) == {"running_sensor", "power"}
+    assert set(mode_selector.config["options"]) == {"running_sensor", "power", "climate"}
     result = await hass.config_entries.flow.async_configure(
         flow_id, {"activity_mode": "running_sensor"}
     )
     assert result["step_id"] == "sensors_air_conditioner_contact"
     assert "air_conditioner_contact_running_entity" in result["data_schema"].schema
+
+
+@pytest.mark.asyncio
+async def test_fan_activity_modes_offer_power_and_smart_switch(
+    hass, enable_custom_integrations
+):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {"name": "Fan", CONF_APPLIANCE_GROUP: "climate"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_APPLIANCE_CLASS: "fan"}
+    )
+
+    assert result["step_id"] == "activity_mode_climate"
+    mode_selector = next(iter(result["data_schema"].schema.values()))
+    assert set(mode_selector.config["options"]) == {"power", "smart_plug"}
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {"activity_mode": "smart_plug"}
+    )
+    assert result["step_id"] == "sensors_fan_switch"
+    assert "fan_switch_plug_entity" in result["data_schema"].schema
+
+
+@pytest.mark.asyncio
+async def test_air_conditioner_climate_mode_requires_climate_entity(
+    hass, enable_custom_integrations
+):
+    climate_entry = MockConfigEntry(domain="climate_source")
+    climate_entry.add_to_hass(hass)
+    climate_entity = er.async_get(hass).async_get_or_create(
+        "climate",
+        climate_entry.domain,
+        "air_conditioner",
+        config_entry=climate_entry,
+    )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {"name": "Air conditioner", CONF_APPLIANCE_GROUP: "climate"},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_APPLIANCE_CLASS: "air_conditioner"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {"activity_mode": "climate"}
+    )
+
+    assert result["step_id"] == "sensors_air_conditioner_climate"
+    schema_keys = {marker.schema for marker in result["data_schema"].schema}
+    assert "air_conditioner_climate_climate_entity" in schema_keys
+    assert "air_conditioner_climate_power_entity" in schema_keys
+    assert "air_conditioner_climate_running_entity" not in schema_keys
+
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {"air_conditioner_climate_climate_entity": climate_entity.entity_id},
+    )
+    assert result["step_id"] == "actions_air_conditioner_climate"
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_START_ACTIONS: [], CONF_FINISH_ACTIONS: []}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"]["appliances"][0]["data"][CONF_CLIMATE_ENTITY] == (
+        climate_entity.entity_id
+    )
 
 
 @pytest.mark.asyncio

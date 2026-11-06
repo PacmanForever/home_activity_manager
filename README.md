@@ -13,6 +13,8 @@
 
 Home Activity Manager makes compatible household devices smarter by bringing their Home Assistant entities together under a dedicated device. It adds activity tracking, actions, reminders, and alarms, and is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles are organized into climate control, large appliances (laundry and refrigeration), animal care, deliveries, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
 
+**Last updated:** 2026-11-06
+
 ## Installation
 
 ### Marketplace (formerly HACS)
@@ -40,7 +42,11 @@ Appliances are organized in three levels: **group**, **appliance class**, and **
 Climate control
 |-- Air conditioner
 |   |-- Activity detection with a contact sensor
-|   `-- Activity detection with a power sensor
+|   |-- Activity detection with a power sensor
+|   `-- Activity detection with a climate entity
+|-- Fan
+|   |-- Activity detection with a power sensor
+|   `-- Activity detection with a smart switch
 `-- Thermostat
     `-- Activity detection with a climate entity
 
@@ -93,7 +99,10 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 | --- | --- | --- | --- |
 | Climate control | Air conditioner: contact | `binary_sensor.air_conditioner_running` | `on` starts activity; `off` ends it. The sensor should represent the air conditioner's active state. |
 | Climate control | Air conditioner: power | `sensor.air_conditioner_power` | Power must stay above the configured start threshold for its confirmation time. Activity ends after it stays below the finish threshold for its confirmation time. |
+| Climate control | Air conditioner: climate entity | `climate.living_room` | The climate mode is the activity source: `off` is stopped and any other mode is active, including when `hvac_action` is idle. The original climate controls remain available. |
 | Climate control | Thermostat | `climate.living_room` | Any climate state other than `off` is active, including when the thermostat is idle; `off` ends activity. |
+| Climate control | Fan: power | `sensor.fan_power` | Power must stay above the configured start threshold for its confirmation time; it ends after staying below the finish threshold for its confirmation time. |
+| Climate control | Fan: smart switch | `switch.fan` | `on` starts activity and `off` ends it. Optional power and energy sensors are measurements only. |
 | Deliveries | Mailbox: interior motion | `binary_sensor.mailbox_motion` plus `binary_sensor.front_door` | A new motion `on` transition records an arrival. Opening the main-door contact ends the pending collection. |
 | Deliveries | Mailbox: mail-slot contact | `binary_sensor.mail_slot` plus `binary_sensor.front_door` | A new slot-contact `on` transition records an arrival. Opening the main-door contact ends the pending collection. |
 | Large appliances | Washer | `sensor.washer_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
@@ -114,8 +123,9 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 
 ### Climate control
 
-- **Air conditioner:** choose contact-sensor or power-based activity detection. Contact mode requires its binary sensor; power mode uses configurable thresholds and confirmation times.
+- **Air conditioner:** choose contact-sensor, power-based, or climate-entity activity detection. Contact mode requires its binary sensor; power mode uses configurable thresholds and confirmation times. Climate mode requires an existing climate entity, keeps its original controls, and follows `off` versus any active mode regardless of `hvac_action`.
 - **Thermostat:** use an existing climate entity as the activity source. If it has no device, the original entity is associated directly with the managed device and no proxy is created. If it already belongs to a device, that association is preserved and a native climate proxy is added to the managed device. In both cases the source remains owned by its original integration. Proxies mirror standard climate state and controls and forward standard climate actions; vendor-specific services are not proxied. Activity follows climate mode (`off` versus any active mode), including periods when `hvac_action` is idle.
+- **Fan:** choose a required power sensor with configurable thresholds, or a required smart switch where `on` starts and `off` ends activity. In switch mode, optional power and cumulative energy sensors add measurements only; they do not change activity detection. Both modes expose running state, last active duration, and configurable start/end actions.
 
 ### Deliveries
 

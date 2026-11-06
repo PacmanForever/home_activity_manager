@@ -191,7 +191,8 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertEqual(len(mapped), len(set(mapped)))
         self.assertEqual(
             set(mapped),
-            set(APPLIANCE_PROFILES) - {"laundry", "aquarium_plug", "aquarium_power"},
+            set(APPLIANCE_PROFILES)
+            - {"laundry", "aquarium_plug", "aquarium_power", "fan_power", "fan_switch"},
         )
         for modes in APPLIANCE_CATEGORIES.values():
             for mode, profile in modes.items():
@@ -552,14 +553,19 @@ class ConfigFlowSchemaTests(unittest.TestCase):
 
     def test_ac_profiles_offer_auxiliary_sources(self) -> None:
         contact_profile = get_appliance_profile("air_conditioner_contact")
+        ac_climate_profile = get_appliance_profile("air_conditioner_climate")
         climate_profile = get_appliance_profile("thermostat_climate")
         power_profile = get_appliance_profile("air_conditioner_power")
         contact_schema = _sensor_schema({}, contact_profile)
+        ac_climate_schema = _sensor_schema({}, ac_climate_profile)
         climate_schema = _sensor_schema({}, climate_profile)
         power_schema = _sensor_schema({}, power_profile)
 
         self.assertIn("air_conditioner_contact_running_entity", contact_schema.schema)
         self.assertIn("air_conditioner_contact_power_entity", contact_schema.schema)
+        self.assertIn("air_conditioner_climate_climate_entity", ac_climate_schema.schema)
+        self.assertIn("air_conditioner_climate_power_entity", ac_climate_schema.schema)
+        self.assertNotIn("air_conditioner_climate_running_entity", ac_climate_schema.schema)
         self.assertIn("thermostat_climate_climate_entity", climate_schema.schema)
         self.assertNotIn("thermostat_climate_running_entity", climate_schema.schema)
         self.assertIn("air_conditioner_power_power_entity", power_schema.schema)
@@ -570,6 +576,20 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertFalse(contact_profile.estimates_remaining)
         self.assertFalse(power_profile.supports_pending_unload)
         self.assertFalse(power_profile.estimates_remaining)
+
+    def test_fan_profiles_use_power_or_smart_switch_detection(self) -> None:
+        power_profile = get_appliance_profile("fan_power")
+        switch_profile = get_appliance_profile("fan_switch")
+
+        self.assertEqual(power_profile.detection_sources, ("power",))
+        self.assertEqual(switch_profile.detection_sources, ("smart_plug",))
+        self.assertTrue(power_profile.sensor_inputs[0].required)
+        self.assertTrue(switch_profile.sensor_inputs[0].required)
+        self.assertEqual(power_profile.action_groups, ("cycle_start", "cycle_finish"))
+        self.assertEqual(switch_profile.action_groups, ("cycle_start", "cycle_finish"))
+        self.assertNotIn("pending_unload", power_profile.output_entities)
+        self.assertNotIn("estimated_remaining", power_profile.output_entities)
+        self.assertIn("plug", switch_profile.output_entities)
 
     def test_each_profile_schema_matches_its_declared_contract(self) -> None:
         parameter_keys = {
