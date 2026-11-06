@@ -1254,7 +1254,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.55" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.56" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -3918,20 +3918,54 @@ async def test_climate_mode_transitions_run_start_and_finish_actions(
     climate_entry = MockConfigEntry(domain="climate_source")
     climate_entry.add_to_hass(hass)
     climate_entity = er.async_get(hass).async_get_or_create(
-        "climate", climate_entry.domain, "air_conditioner", config_entry=climate_entry
+        "climate",
+        climate_entry.domain,
+        "air_conditioner",
+        config_entry=climate_entry,
     )
     hass.states.async_set(climate_entity.entity_id, "off", {"hvac_action": "off"})
+    appliance_id = "attic_air_conditioner"
     config = {
-        CONF_APPLIANCE_TYPE: "thermostat_climate",
+        CONF_APPLIANCE_TYPE: "air_conditioner_climate",
         CONF_CLIMATE_ENTITY: climate_entity.entity_id,
         CONF_START_ACTIONS: [{"action": "climate.turn_on"}],
         CONF_FINISH_ACTIONS: [{"action": "climate.turn_off"}],
         "name": "Air conditioner",
     }
-    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=8,
+        data={
+            "category": "climate",
+            "appliances": [
+                {"id": appliance_id, "data": config, "options": {}}
+            ],
+        },
+    )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+
+    entity_registry = er.async_get(hass)
+    running_entity_id = entity_registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{appliance_id}_running"
+    )
+    duration_entity_id = entity_registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{appliance_id}_last_cycle_duration"
+    )
+    assert running_entity_id is not None
+    assert duration_entity_id is not None
+    appliance_device = _find_device(
+        dr.async_get(hass), identifiers={(DOMAIN, appliance_id)}
+    )
+    assert appliance_device is not None
+    assert er.async_get(hass).async_get(climate_entity.entity_id).device_id == (
+        appliance_device.id
+    )
+    assert entity_registry.async_get_entity_id(
+        "climate", DOMAIN, f"{appliance_id}_climate_proxy"
+    ) is None
+    assert hass.states.get(running_entity_id).state == "off"
 
     transitions: list[str] = []
     monkeypatch.setattr(
@@ -3941,11 +3975,14 @@ async def test_climate_mode_transitions_run_start_and_finish_actions(
         climate_entity.entity_id, "cool", {"hvac_action": "idle"}
     )
     await hass.async_block_till_done()
+    assert hass.states.get(running_entity_id).state == "on"
     hass.states.async_set(
         climate_entity.entity_id, "off", {"hvac_action": "idle"}
     )
     await hass.async_block_till_done()
 
+    assert hass.states.get(running_entity_id).state == "off"
+    assert hass.states.get(duration_entity_id).state not in ("unknown", "unavailable")
     assert transitions == [CONF_START_ACTIONS, CONF_FINISH_ACTIONS]
     assert await hass.config_entries.async_unload(entry.entry_id)
 

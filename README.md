@@ -90,6 +90,7 @@ Sun protection
 ```
 
 Small appliances are not selectable until a concrete appliance class is defined.
+Group, appliance-class, and activity-mode choices are sorted alphabetically by their translated labels in the active Home Assistant language.
 
 ### Activity detection examples
 

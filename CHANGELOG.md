@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.9.56 - 2026-11-06
+
+### Fixed
+
+- Sort appliance classes and activity modes in the add-appliance options flow using the active language.
+
+### Tests
+
+- Cover grouped air-conditioner climate transitions, direct source association, running state, and last-cycle duration.
+
 ## v0.9.55 - 2026-11-06
 
 ### Added

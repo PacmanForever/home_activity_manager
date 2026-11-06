@@ -1493,7 +1493,11 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             return await self.async_step_sensors()
         return self.async_show_form(
             step_id=f"activity_mode_{category}",
-            data_schema=_activity_mode_schema(category, appliance_class),
+            data_schema=_activity_mode_schema(
+                category,
+                appliance_class,
+                language=self.hass.config.language if self.hass is not None else "en",
+            ),
             last_step=False,
         )
 
@@ -1510,7 +1514,11 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             return await self.async_step_activity_mode()
         return self.async_show_form(
             step_id="appliance_class",
-            data_schema=_appliance_class_schema(category, self._draft),
+            data_schema=_appliance_class_schema(
+                category,
+                self._draft,
+                language=self.hass.config.language if self.hass is not None else "en",
+            ),
             last_step=False,
         )
 

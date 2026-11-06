@@ -40,7 +40,7 @@ Cada dispositiu ha de tenir una configuració pròpia amb els camps següents.
 
 ### Jerarquia d'agrupacions
 
-La jerarquia canònica de configuració és **agrupació de primer nivell → classe d'aparell → modalitat/perfil**. Aquest arbre s'ha de mantenir coherent amb `APPLIANCE_GROUPS` i els perfils registrats, i s'ha de documentar igualment al README. Els selectors del flux mostren aquests nivells en passos successius. En afegir un dispositiu des de les opcions d'una agrupació, el formulari demana el nom i mostra l'agrupació corresponent com a valor de només lectura; les accions de gestió de dispositius s'ordenen alfabèticament segons les etiquetes de l'idioma actiu.
+La jerarquia canònica de configuració és **agrupació de primer nivell → classe d'aparell → modalitat/perfil**. Aquest arbre s'ha de mantenir coherent amb `APPLIANCE_GROUPS` i els perfils registrats, i s'ha de documentar igualment al README. Els selectors del flux mostren aquests nivells en passos successius i ordenen alfabèticament les agrupacions, les classes i les modalitats segons les etiquetes traduïdes a l'idioma actiu. En afegir un dispositiu des de les opcions d'una agrupació, el formulari demana el nom i mostra l'agrupació corresponent com a valor de només lectura; les accions de gestió de dispositius també s'ordenen alfabèticament segons les etiquetes de l'idioma actiu.
 
 ```text
 Climatització (climate)

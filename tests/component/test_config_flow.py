@@ -489,6 +489,47 @@ async def test_options_flow_adds_appliance_with_registered_mode_step(
 
 
 @pytest.mark.asyncio
+async def test_options_flow_sorts_add_appliance_choices_in_active_language(
+    hass, enable_custom_integrations
+):
+    hass.config.language = "ca"
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Climate",
+        data={"category": "climate", "appliances": []},
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_action": "add"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"name": "New appliance"}
+    )
+    fields = {
+        marker.schema: field
+        for marker, field in result["data_schema"].schema.items()
+    }
+    assert fields[CONF_APPLIANCE_CLASS].config["options"] == [
+        "air_conditioner",
+        "thermostat",
+        "fan",
+    ]
+
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {CONF_APPLIANCE_CLASS: "fan"}
+    )
+    mode_field = next(
+        field
+        for marker, field in result["data_schema"].schema.items()
+        if marker.schema == "activity_mode"
+    )
+    assert mode_field.config["options"] == ["smart_plug", "power"]
+
+
+@pytest.mark.asyncio
 async def test_options_flow_adds_mailbox_to_loaded_group_device_registry(
     hass, enable_custom_integrations
 ):

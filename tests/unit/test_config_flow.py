@@ -1768,6 +1768,7 @@ async def test_options_flow_adds_appliance_to_current_group(monkeypatch):
     flow = ApplianceCycleMonitorOptionsFlow()
     async_reload = AsyncMock()
     flow.hass = SimpleNamespace(
+        config=SimpleNamespace(language="en"),
         config_entries=SimpleNamespace(
             async_update_entry=lambda _entry, **kwargs: updated.append(kwargs),
             async_reload=async_reload,
