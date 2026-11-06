@@ -15,13 +15,16 @@ Home Activity Manager makes compatible household devices smarter by bringing the
 
 ## Installation
 
-### HACS
+### Marketplace (formerly HACS)
 
-This integration is not yet in the default HACS store. Add it as a custom repository:
+This integration is not listed in the Marketplace yet. Add it as a custom repository:
 
-1. In HACS, open **Integrations** and select **Custom repositories** from the menu.
-2. Add `https://github.com/PacmanForever/home_activity_manager` with the category **Integration**.
-3. Find **Home Activity Manager**, install it, and restart Home Assistant.
+1. In Home Assistant 2026.11 or newer, go to **Settings** > **Marketplace**.
+2. Select **Add from link**, enter `https://github.com/PacmanForever/home_activity_manager`, and select **Add**. If prompted, choose **Integration**.
+3. Open **Home Activity Manager** and select **Install**.
+4. Complete the setup flow that opens. If you close it, go to **Settings** > **Devices & services** > **Add integration** and search for **Home Activity Manager**.
+
+On Home Assistant 2026.10 and older, add `https://github.com/PacmanForever/home_activity_manager` as a custom integration repository in HACS.
 
 ### Manual
 

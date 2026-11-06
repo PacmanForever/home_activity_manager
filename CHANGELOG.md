@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.54 - 2026-11-06
+
+### Changed
+
+- Update installation instructions for the Home Assistant Marketplace and custom repository setup.
+
 ## v0.9.53 - 2026-11-06
 
 ### Fixed
