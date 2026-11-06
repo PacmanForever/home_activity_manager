@@ -807,9 +807,9 @@ APPLIANCE_GROUP_TRANSLATIONS = {
         "climate": "Climatització",
         "large_appliances": "Grans electrodomèstics",
         "animal_care": "Cura d'animals",
-        "openings": "Tancament",
+        "openings": "Tancaments",
         "sun_protection": "Protecció solar",
-        "deliveries": "Lliurament",
+        "deliveries": "Lliuraments",
     },
     "es": {
         "climate": "Climatización",

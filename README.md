@@ -176,7 +176,7 @@ For example, add a notification action to the shared activity-start hook. Replac
 
 To include the source entity in a message, use `{{ ham_source_entity_id | default('timer', true) }}` so timer-triggered actions have a fallback value. The previous names `ham_appliance_name` and `ham_area_name` remain available as aliases for existing templates.
 
-Each group has one config entry. Add, edit, or remove appliances from that group's options. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Existing per-appliance entries are consolidated automatically during migration. Legacy laundry and refrigeration entries become one Large appliances group; their shared action lists are combined, duplicate actions are removed, and appliance IDs, entity IDs, registry customizations, local options, and runtime state are preserved. Setup asks for:
+Each group has one config entry. From a group's options, choose **Add a device** to add an appliance directly to that group, or edit and remove existing appliances. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Existing per-appliance entries are consolidated automatically during migration. Legacy laundry and refrigeration entries become one Large appliances group; their shared action lists are combined, duplicate actions are removed, and appliance IDs, entity IDs, registry customizations, local options, and runtime state are preserved. Setup asks for:
 
 Each group entry groups its appliances on the integration page. Only configured appliances are registered as devices; the group itself is not added as an empty device.
 

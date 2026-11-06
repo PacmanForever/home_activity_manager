@@ -110,7 +110,7 @@
     "step": {
       "init": {
         "title": "Gestionar dispositivos",
-        "description": "Edita o elimina un aparato, o configura acciones compartidas para esta agrupación.",
+        "description": "Añade, edita o elimina un aparato, o configura acciones compartidas para esta agrupación.",
         "data": {
           "appliance_action": "Acción",
           "name": "Nombre que se mostrará para este dispositivo",
@@ -213,7 +213,7 @@
     }
   },
   "selector": {
-    "appliance_action": {"options": {"edit": "Editar dispositivo", "remove": "Eliminar dispositivo", "group_actions": "Configurar acciones de la agrupación"}},
+    "appliance_action": {"options": {"edit": "Editar dispositivo", "remove": "Eliminar dispositivo", "group_actions": "Configurar acciones de la agrupación", "add": "Añadir un dispositivo"}},
     "appliance_group": {"options": {"climate": "Climatización", "large_appliances": "Grandes electrodomésticos", "animal_care": "Cuidado de animales", "openings": "Aberturas", "sun_protection": "Protección solar", "deliveries": "Entregas"}},
     "appliance_class": {"options": {"air_conditioner": "Aire acondicionado", "thermostat": "Termostato", "washer": "Lavadora", "dryer": "Secadora", "dishwasher": "Lavavajillas", "door": "Puerta", "window": "Ventana", "access": "Acceso (garaje, tienda, almacén, etc.)", "blind": "Persiana", "awning": "Toldo", "mailbox": "Buzón", "refrigerator": "Frigorífico", "freezer": "Congelador", "aquarium": "Acuario", "opening": "Apertura", "sun_protection": "Protección solar"}},
     "appliance_category": {

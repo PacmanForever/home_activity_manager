@@ -33,6 +33,8 @@ from custom_components.home_activity_manager.config_flow import (
 from custom_components.home_activity_manager.appliance_types import (
     APPLIANCE_CLASS_NAMES,
     APPLIANCE_CATEGORIES,
+    APPLIANCE_GROUP_NAMES,
+    APPLIANCE_GROUP_TRANSLATIONS,
     APPLIANCE_GROUPS,
     APPLIANCE_MODEL_NAMES,
     APPLIANCE_PROFILES,
@@ -211,7 +213,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         )
         self.assertEqual(
             get_appliance_model("opening", "opening", "ca"),
-            "Tancament · Desconegut · Sensor de contacte/obertura",
+            "Tancaments · Desconegut · Sensor de contacte/obertura",
         )
         self.assertEqual(
             get_appliance_model("opening", "opening", "en"),
@@ -303,6 +305,41 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             self.assertEqual(
                 translation["selector"]["appliance_class"]["options"]["access"],
                 expected[name],
+            )
+
+    def test_group_labels_are_plural_in_all_languages(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        expected = {
+            "en": {"openings": "Openings", "deliveries": "Deliveries"},
+            "ca": {"openings": "Tancaments", "deliveries": "Lliuraments"},
+            "es": {"openings": "Aberturas", "deliveries": "Entregas"},
+        }
+        self.assertEqual(
+            {key: APPLIANCE_GROUP_NAMES[key] for key in expected["en"]},
+            expected["en"],
+        )
+        for language in ("ca", "es"):
+            self.assertEqual(
+                {key: APPLIANCE_GROUP_TRANSLATIONS[language][key] for key in expected[language]},
+                expected[language],
+            )
+
+        for filename, language in (
+            ("strings.json", "en"),
+            ("en.json", "en"),
+            ("ca.json", "ca"),
+            ("es.json", "es"),
+        ):
+            path = (
+                root / filename
+                if filename == "strings.json"
+                else root / "translations" / filename
+            )
+            translation = json.loads(path.read_text(encoding="utf-8"))
+            options = translation["selector"]["appliance_group"]["options"]
+            self.assertEqual(
+                {key: options[key] for key in expected[language]},
+                expected[language],
             )
 
     def test_translation_strings_do_not_contain_jinja_delimiters(self) -> None:
@@ -1375,6 +1412,9 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 "group_actions",
                 translation["selector"]["appliance_action"]["options"],
             )
+            self.assertIn(
+                "add", translation["selector"]["appliance_action"]["options"]
+            )
             hierarchy_help = translation["config"]["step"]["user"]["description"]
             self.assertTrue(
                 any(
@@ -1663,6 +1703,53 @@ async def test_options_flow_edits_four_steps_and_clears_removed_door_settings(
     assert CONF_PENDING_DELAY_SECONDS not in created["data"]
     assert CONF_PENDING_INTERVAL_SECONDS not in created["data"]
     assert CONF_PENDING_REPEATS not in created["data"]
+
+
+@pytest.mark.asyncio
+async def test_options_flow_adds_appliance_to_current_group(monkeypatch):
+    existing_appliance = {
+        "id": "existing-washer",
+        "data": {"name": "Washer", "appliance_type": "washer"},
+        "options": {},
+    }
+    entry = SimpleNamespace(
+        entry_id="large-appliances-entry",
+        data={"category": "large_appliances", "appliances": [existing_appliance]},
+        options={},
+        title="Large appliances",
+    )
+    updated: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        ApplianceCycleMonitorOptionsFlow,
+        "config_entry",
+        property(lambda _self: entry),
+    )
+    flow = ApplianceCycleMonitorOptionsFlow()
+    flow.hass = SimpleNamespace(
+        config_entries=SimpleNamespace(
+            async_update_entry=lambda _entry, **kwargs: updated.append(kwargs)
+        )
+    )
+    flow.async_show_form = lambda **result: result
+    flow.async_create_entry = lambda **result: result
+
+    result = await flow.async_step_init({"appliance_action": "add"})
+    assert result["step_id"] == "appliance_class"
+    mode_result = await flow.async_step_appliance_class(
+        {CONF_APPLIANCE_CLASS: "washer"}
+    )
+    assert mode_result["step_id"] == "activity_mode_large_appliances"
+    sensors_result = await flow.async_step_activity_mode({"activity_mode": "power"})
+    assert sensors_result["step_id"] == "sensors_laundry"
+    flow._draft["name"] = "Second washer"
+    created = await flow.async_step_actions({})
+
+    appliances = updated[0]["data"]["appliances"]
+    assert appliances[0] == existing_appliance
+    assert appliances[1]["id"] != existing_appliance["id"]
+    assert appliances[1]["data"]["name"] == "Second washer"
+    assert updated[0]["data"]["category"] == "large_appliances"
+    assert created == {"title": "", "data": {}}
 
 
 @pytest.mark.asyncio

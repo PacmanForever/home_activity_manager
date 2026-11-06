@@ -1207,6 +1207,11 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                 self._appliance_action = user_input["appliance_action"]
                 if self._appliance_action == "group_actions":
                     return await self.async_step_group_actions()
+                if self._appliance_action == "add":
+                    self._draft = {}
+                    self._saved = {}
+                    self._appliance_id = uuid4().hex
+                    return await self.async_step_appliance_class()
                 return await self.async_step_select_appliance()
 
             return self.async_show_form(
@@ -1215,7 +1220,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     {
                         vol.Required("appliance_action"): selector.SelectSelector(
                             selector.SelectSelectorConfig(
-                                options=["edit", "group_actions", "remove"],
+                                options=["edit", "group_actions", "remove", "add"],
                                 mode=selector.SelectSelectorMode.DROPDOWN,
                                 translation_key="appliance_action",
                             )
@@ -1574,10 +1579,13 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     "data": _entry_data(values),
                     "options": _entry_options(values),
                 }
-                records = [
-                    record if item.get("id") == self._appliance_id else item
-                    for item in records
-                ]
+                if self._appliance_action == "add":
+                    records.append(record)
+                else:
+                    records = [
+                        record if item.get("id") == self._appliance_id else item
+                        for item in records
+                    ]
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
                     data={**self.config_entry.data, "appliances": records},

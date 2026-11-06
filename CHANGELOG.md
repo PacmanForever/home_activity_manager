@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.9.45 - 2026-11-06
+
+### Added
+
+- Add appliances directly from each group's options.
+
+### Changed
+
+- Use plural Catalan labels for Openings and Deliveries.
+
 ## v0.9.44 - 2026-11-04
 
 ### Fixed
