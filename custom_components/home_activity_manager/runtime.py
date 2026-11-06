@@ -11,7 +11,11 @@ from typing import Any, Callable
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, UnitOfEnergy
 from homeassistant.core import Context, Event, HomeAssistant
-from homeassistant.helpers import area_registry as ar, device_registry as dr
+from homeassistant.helpers import (
+    area_registry as ar,
+    config_validation as cv,
+    device_registry as dr,
+)
 from homeassistant.helpers.event import (
     async_track_point_in_time,
     async_track_state_change_event,
@@ -1150,9 +1154,10 @@ class ApplianceRuntime:
             if not isinstance(action, dict):
                 continue
             try:
+                sequence = cv.SCRIPT_SCHEMA([action])
                 script = Script(
                     self.hass,
-                    [action],
+                    sequence,
                     f"{DOMAIN} {key} {index + 1}",
                     DOMAIN,
                     logger=_LOGGER,

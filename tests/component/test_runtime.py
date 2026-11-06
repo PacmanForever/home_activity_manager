@@ -722,6 +722,54 @@ async def test_group_actions_run_before_local_with_appliance_context(hass, monke
     ]
 
 
+@pytest.mark.asyncio
+async def test_group_action_renders_templates_in_service_data(hass):
+    area = ar.async_get(hass).async_create("Tancaments")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"category": "openings"},
+        options={
+            CONF_GROUP_ACTIONS: {
+                CONF_START_ACTIONS: [
+                    {
+                        "action": "notify.send_message",
+                        "data": {
+                            "message": "Finestra oberta {{ area_name(ham_source_entity_id) }}"
+                        },
+                    }
+                ]
+            }
+        },
+    )
+    entry.add_to_hass(hass)
+    source = er.async_get(hass).async_get_or_create(
+        "binary_sensor", "test", "window_contact"
+    )
+    er.async_get(hass).async_update_entity(source.entity_id, area_id=area.id)
+    messages = []
+
+    async def capture_message(call):
+        messages.append(call.data["message"])
+
+    hass.services.async_register("notify", "send_message", capture_message)
+    runtime = ApplianceRuntime(
+        hass,
+        entry,
+        {
+            CONF_APPLIANCE_TYPE: "opening",
+            CONF_APPLIANCE_CLASS: "door",
+            "_appliance_id": "window",
+            "name": "Finestra",
+        },
+    )
+
+    await runtime._run_actions(
+        CONF_START_ACTIONS, source_entity_id=source.entity_id
+    )
+
+    assert messages == ["Finestra oberta Tancaments"]
+
+
 def test_group_actions_are_limited_to_supported_profile_hooks(hass):
     group_actions = {
         CONF_START_ACTIONS: [{"action": "test.start"}],
@@ -1203,7 +1251,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.49" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.50" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",

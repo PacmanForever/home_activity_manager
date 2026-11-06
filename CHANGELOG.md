@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.50 - 2026-11-06
+
+### Fixed
+
+- Render Jinja templates in shared Home Assistant actions, including source-entity area references.
+
 ## v0.9.49 - 2026-11-06
 
 ### Tests
