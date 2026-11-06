@@ -16,6 +16,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .appliance_types import SensorInput
 from .const import (
     CONF_APPLIANCE_CLASS,
+    CONF_APPLIANCE_TYPE,
     CONF_DOOR_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
     CONF_RUNNING_ENTITY,
@@ -402,7 +403,12 @@ async def async_setup_entry(
             )
         if (
             "pending_unload" in runtime.profile.output_entities
-            and runtime.config.get(CONF_DOOR_ENTITY)
+            and (
+                runtime.config.get(CONF_DOOR_ENTITY)
+                or runtime.config.get(CONF_APPLIANCE_CLASS) == "mailbox"
+                or runtime.config.get(CONF_APPLIANCE_TYPE)
+                in {"mailbox_motion", "mailbox_slot"}
+            )
         ):
             appliance_type = runtime.config.get("appliance_type")
             appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)

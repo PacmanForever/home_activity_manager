@@ -60,14 +60,19 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the manual-clear button when a door sensor is configured."""
+    """Set up the manual-clear button when pending status is available."""
     registry = er.async_get(hass)
     for runtime in entry_runtimes(entry):
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
         buttons: list[ButtonEntity] = []
         has_pending_button = (
             "clear_pending" in runtime.profile.output_entities
-            and runtime.config.get(CONF_DOOR_ENTITY)
+            and (
+                runtime.config.get(CONF_DOOR_ENTITY)
+                or runtime.config.get("appliance_class") == "mailbox"
+                or runtime.config.get("appliance_type")
+                in {"mailbox_motion", "mailbox_slot"}
+            )
         )
         if has_pending_button:
             buttons.append(ClearPendingButton(runtime, entry))

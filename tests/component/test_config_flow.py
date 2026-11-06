@@ -614,14 +614,22 @@ async def test_climate_entity_must_be_replaced_in_options(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("activity_mode", "arrival_key", "profile"),
+    ("arrival_key", "door_key", "profile"),
     [
-        ("mail_motion", "mailbox_motion_arrival_entity", "mailbox_motion"),
-        ("mail_slot", "mailbox_slot_arrival_entity", "mailbox_slot"),
+        (
+            "mailbox_motion_arrival_entity",
+            "mailbox_motion_door_entity",
+            "mailbox_motion",
+        ),
+        (
+            "mailbox_slot_arrival_entity",
+            "mailbox_slot_door_entity",
+            "mailbox_slot",
+        ),
     ],
 )
-async def test_mailbox_door_sensor_is_optional(
-    hass, enable_custom_integrations, activity_mode, arrival_key, profile
+async def test_mailbox_door_sensor_is_required(
+    hass, enable_custom_integrations, arrival_key, door_key, profile
 ):
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -631,14 +639,19 @@ async def test_mailbox_door_sensor_is_optional(
         hass, flow_id, "Mailbox", profile
     )
 
-    result = await hass.config_entries.flow.async_configure(
-        flow_id, {arrival_key: "binary_sensor.mail_arrival"}
-    )
-    assert result["step_id"] == f"actions_{profile}"
+    with pytest.raises(InvalidData):
+        await hass.config_entries.flow.async_configure(
+            flow_id, {arrival_key: "binary_sensor.mail_arrival"}
+        )
 
-    result = await hass.config_entries.flow.async_configure(flow_id, {})
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert CONF_DOOR_ENTITY not in result["data"]
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {
+            arrival_key: "binary_sensor.mail_arrival",
+            door_key: "binary_sensor.mailbox_door",
+        },
+    )
+    assert result["step_id"] == f"parameters_{profile}"
 
 
 @pytest.mark.asyncio

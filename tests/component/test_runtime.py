@@ -1203,7 +1203,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.47" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.48" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -1733,8 +1733,6 @@ async def test_aquarium_smart_plug_exposes_local_energy_and_reset(
         ("washer", "clear_pending"),
         ("dishwasher", "clear_pending"),
         ("dryer", "clear_pending"),
-        ("mailbox_motion", "clear_pending"),
-        ("mailbox_slot", "clear_pending"),
         ("thermostat_climate", "energy_reset"),
         ("air_conditioner_contact", "energy_reset"),
         ("air_conditioner_power", "energy_reset"),
@@ -2648,6 +2646,49 @@ async def test_mailbox_slot_exposes_flap_open_and_closed_state(
     hass.states.async_set(config[CONF_DOOR_ENTITY], "off")
     await hass.async_block_till_done()
     assert entry.runtime_data.door_open is False
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_mailbox_without_main_door_still_registers_device_and_clear_button(
+    hass, enable_custom_integrations
+):
+    config = {
+        CONF_APPLIANCE_TYPE: "mailbox_motion",
+        CONF_MAIL_MOTION_ENTITY: "binary_sensor.mailbox_motion",
+        "name": "Mailbox",
+    }
+    hass.states.async_set(config[CONF_MAIL_MOTION_ENTITY], "off")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    entity_registry = er.async_get(hass)
+    occupied_entity_id = entity_registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_pending_unload"
+    )
+    clear_button_entity_id = entity_registry.async_get_entity_id(
+        "button", DOMAIN, f"{entry.entry_id}_clear_pending"
+    )
+    device = _find_device(
+        dr.async_get(hass), identifiers={(DOMAIN, entry.entry_id)}
+    )
+
+    assert occupied_entity_id is not None
+    assert clear_button_entity_id is not None
+    assert device is not None
+    assert hass.states.get(occupied_entity_id).state == "off"
+
+    hass.states.async_set(config[CONF_MAIL_MOTION_ENTITY], "on")
+    await hass.async_block_till_done()
+    assert hass.states.get(occupied_entity_id).state == "on"
+
+    await hass.services.async_call(
+        "button", "press", {"entity_id": clear_button_entity_id}, blocking=True
+    )
+    assert hass.states.get(occupied_entity_id).state == "off"
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

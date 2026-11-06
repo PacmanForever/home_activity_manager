@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.48 - 2026-11-06
+
+### Fixed
+
+- Keep mailbox devices with legacy configurations lacking a main-door sensor visible, with occupancy status and a manual clear button.
+- Require a separate main-door contact when adding a mailbox.
+
 ## v0.9.47 - 2026-11-06
 
 ### Fixed
