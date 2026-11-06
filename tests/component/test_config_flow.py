@@ -437,6 +437,95 @@ async def test_setup_adds_appliance_to_existing_group(
 
 
 @pytest.mark.asyncio
+async def test_options_flow_adds_mailbox_to_loaded_group_device_registry(
+    hass, enable_custom_integrations
+):
+    existing_id = "existing-mailbox"
+    existing_arrival = "binary_sensor.existing_mail_arrival"
+    existing_door = "binary_sensor.existing_mail_door"
+    hass.states.async_set(existing_arrival, "off")
+    hass.states.async_set(existing_door, "off")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Deliveries",
+        data={
+            "category": "deliveries",
+            "appliances": [
+                {
+                    "id": existing_id,
+                    "data": {
+                        "name": "Existing mailbox",
+                        CONF_APPLIANCE_TYPE: "mailbox_motion",
+                        CONF_APPLIANCE_CLASS: "mailbox",
+                        "mail_motion_entity": existing_arrival,
+                        CONF_DOOR_ENTITY: existing_door,
+                    },
+                    "options": {},
+                }
+            ],
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_action": "add"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"name": "New mailbox"}
+    )
+    assert result["step_id"] == "activity_mode_deliveries"
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"activity_mode": "mail_motion"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        flow_id,
+        {
+            "mailbox_motion_arrival_entity": "binary_sensor.new_mail_arrival",
+            "mailbox_motion_door_entity": "binary_sensor.new_mail_door",
+        },
+    )
+    assert result["step_id"] == "parameters_mailbox_motion"
+    result = await hass.config_entries.options.async_configure(
+        flow_id,
+        {
+            "pending_delay_seconds": 900,
+            "pending_interval_seconds": 900,
+            "pending_repeats": 3,
+        },
+    )
+    assert result["step_id"] == "actions_mailbox_motion"
+    result = await hass.config_entries.options.async_configure(
+        flow_id,
+        {
+            "start_actions": [],
+            "finish_actions": [],
+            "pending_actions": [],
+            "emptied_actions": [],
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+
+    new_appliance_id = entry.data["appliances"][1]["id"]
+    entity_registry = er.async_get(hass)
+    pending_entity_id = entity_registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{new_appliance_id}_pending_unload"
+    )
+    device = device_module._get_device_by_identifier(
+        dr.async_get(hass), (DOMAIN, new_appliance_id), entry.entry_id
+    )
+
+    assert len(entry.runtime_data) == 2
+    assert pending_entity_id is not None
+    assert device is not None
+    assert entity_registry.async_get(pending_entity_id).device_id == device.id
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
 async def test_activity_modes_follow_the_selected_category(
     hass, enable_custom_integrations
 ):

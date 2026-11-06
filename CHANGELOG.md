@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.49 - 2026-11-06
+
+### Tests
+
+- Add component coverage for registering a mailbox device and its pending entity after adding it from group options.
+
 ## v0.9.48 - 2026-11-06
 
 ### Fixed
