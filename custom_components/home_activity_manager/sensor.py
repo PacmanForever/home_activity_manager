@@ -22,6 +22,7 @@ from .const import (
     CONF_APPLIANCE_CLASS,
     CONF_ENERGY_ENTITY,
     CONF_ILLUMINANCE_ENTITY,
+    CONF_LOCK_ENTITY,
     CONF_PH_ENTITY,
     CONF_POWER_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
@@ -94,11 +95,14 @@ class ApplianceSensor(SensorEntity):
             )
         elif key == "shutter_last_cycle_duration":
             self._attr_translation_key = "shutter_open_duration"
+        elif key == "lock_unlock_duration":
+            self._attr_translation_key = key
         self._attr_icon = {
             "power": "mdi:flash",
             "total_energy": "mdi:lightning-bolt",
             "last_cycle_duration": "mdi:timer-check-outline",
             "shutter_last_cycle_duration": "mdi:timer-check-outline",
+            "lock_unlock_duration": "mdi:lock-clock",
             "estimated_remaining": "mdi:timer-sand",
         }[key]
         self._attr_native_unit_of_measurement = unit
@@ -314,6 +318,19 @@ async def async_setup_entry(
                 None,
                 None,
             ),
+            "lock_unlock_duration": ApplianceSensor(
+                runtime,
+                entry,
+                "lock_unlock_duration",
+                lambda runtime=runtime: _format_duration(
+                    runtime.lock_detector.last_cycle_duration.total_seconds()
+                    if runtime.lock_detector.last_cycle_duration is not None
+                    else None
+                ),
+                None,
+                None,
+                None,
+            ),
             "estimated_remaining": ApplianceSensor(
                 runtime,
                 entry,
@@ -348,6 +365,13 @@ async def async_setup_entry(
                         runtime.config.get(CONF_SHUTTER_CONTACT_ENTITY)
                         or runtime.config.get(CONF_SHUTTER_COVER_ENTITY)
                     )
+                ):
+                    expected_keys.add(key)
+                continue
+            if key == "lock_unlock_duration":
+                if (
+                    key in runtime.profile.output_entities
+                    and runtime.config.get(CONF_LOCK_ENTITY)
                 ):
                     expected_keys.add(key)
                 continue

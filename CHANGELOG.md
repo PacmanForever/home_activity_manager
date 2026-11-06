@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.52 - 2026-11-06
+
+### Added
+
+- Add a persistent duration sensor for the last completed unlocked period when an optional lock is configured.
+
 ## v0.9.51 - 2026-11-06
 
 ### Added

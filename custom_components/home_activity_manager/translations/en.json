@@ -284,6 +284,7 @@
       "door_open_duration": {"name": "Duration of the last door opening"},
       "window_open_duration": {"name": "Duration of the last window opening"},
       "access_open_duration": {"name": "Duration of the last access opening"},
+      "lock_unlock_duration": {"name": "Duration of the last unlocked period"},
       "awning_open_duration": {"name": "Duration of the last awning opening"},
       "shutter_open_duration": {"name": "Duration of the last shutter opening"},
       "estimated_remaining": {"name": "Estimated remaining time"}

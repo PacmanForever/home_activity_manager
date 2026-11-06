@@ -230,6 +230,7 @@ class ApplianceRuntime:
         self._mail_sensor_ready = False
         self.mail_slot_open: bool | None = None
         self.lock_state: str | None = None
+        self.lock_detector = BinaryActivityDetector()
         self.shutter_open: bool | None = None
         self.shutter_detector = BinaryActivityDetector()
         self.energy_kwh = 0.0
@@ -678,6 +679,17 @@ class ApplianceRuntime:
             if value in (None, "unknown", "unavailable"):
                 self.lock_state = None
             return
+        detector_events = (
+            self.lock_detector.reconcile_state(
+                "on" if value == "unlocked" else "off", dt_util.utcnow()
+            )
+            if initialize
+            else self.lock_detector.observe_state(
+                "on" if value == "unlocked" else "off", dt_util.utcnow()
+            )
+        )
+        if detector_events:
+            self._schedule_save()
         previous = self.lock_state
         self.lock_state = value
         if initialize or previous is None or previous == value:
@@ -1352,6 +1364,8 @@ class ApplianceRuntime:
                 or self.config.get(CONF_SHUTTER_COVER_ENTITY)
             ),
             "shutter_detector": self.shutter_detector.export_state(),
+            "lock_entity": self.config.get(CONF_LOCK_ENTITY),
+            "lock_detector": self.lock_detector.export_state(),
             "energy_kwh": self.energy_kwh,
             "energy_entity": self.config.get(CONF_ENERGY_ENTITY),
             "external_energy_reset_baseline_kwh": (
@@ -1427,6 +1441,10 @@ class ApplianceRuntime:
                 shutter_detector_state = stored.get("shutter_detector")
                 if isinstance(shutter_detector_state, dict):
                     self.shutter_detector.restore_state(shutter_detector_state)
+            if stored.get("lock_entity") == self.config.get(CONF_LOCK_ENTITY):
+                lock_detector_state = stored.get("lock_detector")
+                if isinstance(lock_detector_state, dict):
+                    self.lock_detector.restore_state(lock_detector_state)
             energy = float(stored.get("energy_kwh", 0))
             if not math.isfinite(energy) or energy < 0:
                 raise ValueError("Invalid stored energy")

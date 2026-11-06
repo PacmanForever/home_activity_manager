@@ -284,6 +284,7 @@
       "door_open_duration": {"name": "Durada de l’última obertura de la porta"},
       "window_open_duration": {"name": "Durada de l’última obertura de la finestra"},
       "access_open_duration": {"name": "Durada de l’última obertura de l’accés"},
+      "lock_unlock_duration": {"name": "Durada de l’últim desblocatge del pany"},
       "awning_open_duration": {"name": "Durada de l’última obertura del tendal"},
       "shutter_open_duration": {"name": "Durada de l’última obertura de la persiana"},
       "estimated_remaining": {"name": "Temps restant estimat"}
