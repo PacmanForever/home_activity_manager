@@ -162,7 +162,7 @@ For example, the shared smart-plug-off action runs immediately for each applianc
 | Openings | Activity starts, activity ends, lock locked, lock unlocked, shutter open, shutter closed |
 | Sun protection | Activity starts, activity ends |
 
-Group action templates receive `ham_device_name` (the managed Home Assistant device's name) and `ham_device_area_name` (its assigned area, or `None`). These refer to the appliance whose group action is running, not the entity that triggered it. When a configured input entity triggers the action, `ham_source_entity_id` contains that original entity ID, not this integration's proxy entity. Timer-triggered actions do not define `ham_source_entity_id`.
+Group action templates receive `ham_device_name` (the managed Home Assistant device's name), `ham_device_area_name` (its assigned area, or `None`), and `ham_source_class` (the configured appliance class, translated into Home Assistant's language). These describe the appliance whose group action is running, not the entity that triggered it. When a configured input entity triggers the action, `ham_source_entity_id` contains that original entity ID, not this integration's proxy entity. Timer-triggered actions still receive `ham_source_class`, but do not define `ham_source_entity_id`.
 
 For example, add a notification action to the shared activity-start hook. Replace the notify entity with one from your Home Assistant setup:
 
@@ -171,7 +171,7 @@ For example, add a notification action to the shared activity-start hook. Replac
     target:
         entity_id: notify.mobile_app_phone
     data:
-        message: "{{ ham_device_area_name or ham_device_name }}: activity started"
+        message: "{{ ham_source_class }}: {{ ham_device_area_name or ham_device_name }}: activity started"
 ```
 
 To include the source entity in a message, use `{{ ham_source_entity_id | default('timer', true) }}` so timer-triggered actions have a fallback value. The previous names `ham_appliance_name` and `ham_area_name` remain available as aliases for existing templates.

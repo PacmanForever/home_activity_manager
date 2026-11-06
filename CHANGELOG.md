@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.51 - 2026-11-06
+
+### Added
+
+- Expose the localized appliance class as `ham_source_class` in shared action templates.
+
 ## v0.9.50 - 2026-11-06
 
 ### Fixed

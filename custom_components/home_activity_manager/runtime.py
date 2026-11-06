@@ -39,14 +39,17 @@ from .appliance import (
 )
 from .appliance_types import (
     APPLIANCE_GROUPS,
+    get_appliance_class_name,
     get_appliance_group_for_profile,
     get_appliance_profile,
     get_group_action_groups,
+    get_legacy_appliance_class,
 )
 from .const import (
     ACTION_GROUP_CONFIG_KEYS,
     CONF_ALARM_REPEAT_COUNT,
     CONF_ALARM_REPEAT_INTERVAL_SECONDS,
+    CONF_APPLIANCE_CLASS,
     CONF_APPLIANCE_TYPE,
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
@@ -1121,9 +1124,20 @@ class ApplianceRuntime:
             area = ar.async_get(self.hass).async_get_area(device.area_id)
             if area is not None:
                 area_name = area.name
+        appliance_class = self.config.get(CONF_APPLIANCE_CLASS)
+        if not isinstance(appliance_class, str):
+            appliance_class = get_legacy_appliance_class(
+                self.config.get(CONF_APPLIANCE_TYPE)
+            )
+        source_class = (
+            get_appliance_class_name(appliance_class, self.hass.config.language)
+            if appliance_class is not None
+            else None
+        )
         variables = {
             "ham_device_name": appliance_name,
             "ham_device_area_name": area_name,
+            "ham_source_class": source_class,
             "ham_appliance_name": appliance_name,
             "ham_area_name": area_name,
         }

@@ -658,6 +658,7 @@ async def test_group_actions_run_before_local_with_appliance_context(hass, monke
             executed.append((self.action, kwargs.get("run_variables")))
 
     monkeypatch.setattr(runtime_module, "Script", FakeScript)
+    hass.config.language = "ca"
 
     for appliance_id, appliance_type, name, area_id, source_entity in (
         (
@@ -702,6 +703,7 @@ async def test_group_actions_run_before_local_with_appliance_context(hass, monke
             {
                 "ham_device_name": "Aire condicionat estudi",
                 "ham_device_area_name": "Suite",
+                "ham_source_class": "Aire condicionat",
                 "ham_appliance_name": "Aire condicionat estudi",
                 "ham_area_name": "Suite",
                 "ham_source_entity_id": "binary_sensor.ac_one",
@@ -713,6 +715,7 @@ async def test_group_actions_run_before_local_with_appliance_context(hass, monke
             {
                 "ham_device_name": "Clima menjador",
                 "ham_device_area_name": None,
+                "ham_source_class": "Termòstat",
                 "ham_appliance_name": "Clima menjador",
                 "ham_area_name": None,
                 "ham_source_entity_id": "climate.ac_two",
@@ -1251,7 +1254,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.50" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.51" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
