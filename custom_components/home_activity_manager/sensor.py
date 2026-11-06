@@ -83,11 +83,8 @@ class ApplianceSensor(SensorEntity):
             f"proxy_{key}" if source_entity_id else key
         )
         if source_entity_id:
-            self._appliance_name = runtime.config.get("name", entry.title)
             source_name = _source_entity_name(runtime.hass, source_entity_id)
-            self._attr_has_entity_name = source_name is None
-            if source_name is None:
-                self._appliance_name = None
+            self._attr_has_entity_name = True
             if source_name is not None:
                 self._attr_name = _ham_proxy_name(source_name)
         appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)
@@ -123,9 +120,7 @@ class ApplianceSensor(SensorEntity):
         """Suggest a source-derived ID for source-backed sensor proxies."""
         if self._source_entity_id is None:
             return super().suggested_object_id
-        return _suggested_proxy_object_id(
-            self._source_entity_id, self._appliance_name
-        )
+        return _suggested_proxy_object_id(self._source_entity_id)
 
     @property
     def available(self) -> bool:
@@ -181,16 +176,13 @@ class ApplianceInputSensor(SensorEntity):
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = runtime.config[input_config.config_key]
-        self._appliance_name = runtime.config.get("name", entry.title)
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_"
             f"{input_config.output_entity}"
         )
         self._attr_translation_key = f"proxy_{input_config.output_entity}"
         source_name = _source_entity_name(runtime.hass, self._source_entity_id)
-        self._attr_has_entity_name = source_name is None
-        if source_name is None:
-            self._appliance_name = None
+        self._attr_has_entity_name = True
         if source_name is not None:
             self._attr_name = _ham_proxy_name(source_name)
         self._attr_icon = {
@@ -230,9 +222,7 @@ class ApplianceInputSensor(SensorEntity):
     @property
     def suggested_object_id(self) -> str:
         """Suggest a source-derived ID for the wrapped sensor."""
-        return _suggested_proxy_object_id(
-            self._source_entity_id, self._appliance_name
-        )
+        return _suggested_proxy_object_id(self._source_entity_id)
 
     @property
     def available(self) -> bool:

@@ -30,15 +30,12 @@ class AppliancePlugSwitch(SwitchEntity):
 
     def __init__(self, runtime: ApplianceRuntime, entry: ConfigEntry) -> None:
         self._runtime = runtime
-        self._appliance_name = runtime.config.get("name", entry.title)
         self._entity_id = runtime.config[CONF_PLUG_ENTITY]
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_plug"
         )
         source_name = _source_entity_name(runtime.hass, self._entity_id)
-        self._attr_has_entity_name = source_name is None
-        if source_name is None:
-            self._appliance_name = None
+        self._attr_has_entity_name = True
         if source_name is not None:
             self._attr_name = _ham_proxy_name(source_name)
         self._attr_device_info = appliance_device_info(
@@ -48,9 +45,7 @@ class AppliancePlugSwitch(SwitchEntity):
     @property
     def suggested_object_id(self) -> str:
         """Suggest a switch entity ID derived from the wrapped plug."""
-        return _suggested_proxy_object_id(
-            self._entity_id, self._appliance_name
-        )
+        return _suggested_proxy_object_id(self._entity_id)
 
     @property
     def is_on(self) -> bool | None:

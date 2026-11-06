@@ -99,11 +99,8 @@ class ApplianceBinarySensor(BinarySensorEntity):
         self._attr_unique_id = f"{getattr(runtime, 'appliance_id', entry.entry_id)}_{key}"
         self._attr_translation_key = key
         if source_entity_id:
-            self._appliance_name = runtime.config.get("name", entry.title)
             source_name = _source_entity_name(runtime.hass, source_entity_id)
-            self._attr_has_entity_name = source_name is None
-            if source_name is None:
-                self._appliance_name = None
+            self._attr_has_entity_name = True
             if source_name is not None:
                 self._attr_name = _ham_proxy_name(source_name)
             self._attr_translation_key = f"proxy_{key}"
@@ -136,9 +133,7 @@ class ApplianceBinarySensor(BinarySensorEntity):
         """Suggest a source-derived ID for source-backed binary proxies."""
         if self._source_entity_id is None:
             return super().suggested_object_id
-        return _suggested_proxy_object_id(
-            self._source_entity_id, self._appliance_name
-        )
+        return _suggested_proxy_object_id(self._source_entity_id)
 
     @property
     def available(self) -> bool:
@@ -263,11 +258,8 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = runtime.config[input_config.config_key]
-        self._appliance_name = runtime.config.get("name", entry.title)
         source_name = _source_entity_name(runtime.hass, self._source_entity_id)
-        self._attr_has_entity_name = source_name is None
-        if source_name is None:
-            self._appliance_name = None
+        self._attr_has_entity_name = True
         input_name = input_config.config_key.removesuffix("_entity")
         self._input_name = input_name
         self._attr_unique_id = (
@@ -292,9 +284,7 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
     @property
     def suggested_object_id(self) -> str:
         """Suggest a binary sensor ID derived from the wrapped input."""
-        return _suggested_proxy_object_id(
-            self._source_entity_id, self._appliance_name
-        )
+        return _suggested_proxy_object_id(self._source_entity_id)
 
     @property
     def is_on(self) -> bool | None:

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.47 - 2026-11-06
+
+### Fixed
+
+- Refresh a category's devices and entities immediately after adding an appliance from its options.
+- Keep source-derived proxy entity IDs stable without adding the managed appliance name as a prefix.
+
 ## v0.9.46 - 2026-11-06
 
 ### Added

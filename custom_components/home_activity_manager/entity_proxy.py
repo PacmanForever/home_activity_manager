@@ -105,9 +105,7 @@ class EntityProxyMixin:
     @property
     def suggested_object_id(self) -> str:
         """Suggest an entity ID derived from the source entity."""
-        return _suggested_proxy_object_id(
-            self._source_entity_id, self._appliance_name
-        )
+        return _suggested_proxy_object_id(self._source_entity_id)
 
     def _init_proxy(
         self,
@@ -119,13 +117,10 @@ class EntityProxyMixin:
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = source_entity_id
-        self._appliance_name = runtime.config.get("name", entry.title)
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
         self._attr_unique_id = f"{appliance_id}_{domain}_proxy"
         source_name = _source_entity_name(runtime.hass, source_entity_id)
-        self._attr_has_entity_name = source_name is None
-        if source_name is None:
-            self._appliance_name = None
+        self._attr_has_entity_name = True
         if source_name is not None:
             self._attr_name = _ham_proxy_name(source_name)
         self._attr_should_poll = False

@@ -1203,7 +1203,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.46" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.47" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -1415,15 +1415,17 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
         "switch.air_conditioner_"
         f"{config[CONF_PLUG_ENTITY].split('.', maxsplit=1)[1]}_ham_proxy"
     )
-    assert hass.states.get(plug_id).attributes["friendly_name"].endswith(
-        "Kitchen outlet (HAM Proxy)"
+    assert hass.states.get(plug_id).attributes["friendly_name"] == (
+        "Air conditioner Kitchen outlet (HAM Proxy)"
     )
     plug_entry = registry.async_get(plug_id)
     assert plug_entry is not None
-    assert plug_entry.has_entity_name is False
+    assert plug_entry.has_entity_name is True
+    assert plug_entry.original_name == "Kitchen outlet (HAM Proxy)"
+    assert plug_entry.device_id is not None
     registry.async_update_entity(
         plug_id,
-        has_entity_name=True,
+        has_entity_name=False,
         name="Rentadora",
         original_name="Old outlet name",
     )
@@ -1431,12 +1433,10 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     plug_entry = registry.async_get(plug_id)
-    assert plug_entry.has_entity_name is False
-    assert plug_entry.name is None
+    assert plug_entry.has_entity_name is True
+    assert plug_entry.name == "Rentadora"
     assert plug_entry.original_name == "Kitchen outlet (HAM Proxy)"
-    assert hass.states.get(plug_id).attributes["friendly_name"].endswith(
-        "Kitchen outlet (HAM Proxy)"
-    )
+    assert hass.states.get(plug_id).attributes["friendly_name"] == "Rentadora"
     if reset_button_id is not None:
         entry.runtime_data.energy_kwh = 1.25
         await hass.services.async_call(

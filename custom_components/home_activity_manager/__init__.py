@@ -186,7 +186,6 @@ def _async_normalize_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> 
 			and suggested_object_id.endswith("_ham_proxy")
 		)
 		if is_proxy:
-			state = hass.states.get(entity.entity_id)
 			if (
 				suggested_entity_id is not None
 				and not entity.entity_id.endswith("_ham_proxy")
@@ -197,19 +196,6 @@ def _async_normalize_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> 
 						entity.entity_id,
 						new_entity_id=suggested_entity_id,
 					)
-					state = hass.states.get(entity.entity_id) or state
-			friendly_name = state.attributes.get("friendly_name") if state else None
-			if isinstance(friendly_name, str) and friendly_name and (
-				entity.name is not None
-				or entity.has_entity_name
-				or entity.original_name != friendly_name
-			):
-				entity_registry.async_update_entity(
-					entity.entity_id,
-					has_entity_name=False,
-					name=None,
-					original_name=friendly_name,
-				)
 		if (
 			entity.domain in ("climate", "cover", "lock")
 			and entity.unique_id.endswith(f"_{entity.domain}_proxy")

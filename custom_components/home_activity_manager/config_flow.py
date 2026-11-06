@@ -1106,6 +1106,7 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                         "appliances": [*entry.data.get("appliances", []), appliance],
                     },
                 )
+                await self.hass.config_entries.async_reload(entry.entry_id)
                 return self.async_abort(reason="appliance_added")
             return self.async_create_entry(
                 title=get_appliance_group_name(category, language),
@@ -1668,6 +1669,10 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     self.config_entry,
                     data={**self.config_entry.data, "appliances": records},
                 )
+                if self._appliance_action == "add":
+                    await self.hass.config_entries.async_reload(
+                        self.config_entry.entry_id
+                    )
                 return self.async_create_entry(
                     title="", data=self.config_entry.options
                 )

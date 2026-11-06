@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import voluptuous as vol
@@ -1731,9 +1731,11 @@ async def test_options_flow_adds_appliance_to_current_group(monkeypatch):
         property(lambda _self: entry),
     )
     flow = ApplianceCycleMonitorOptionsFlow()
+    async_reload = AsyncMock()
     flow.hass = SimpleNamespace(
         config_entries=SimpleNamespace(
-            async_update_entry=lambda _entry, **kwargs: updated.append(kwargs)
+            async_update_entry=lambda _entry, **kwargs: updated.append(kwargs),
+            async_reload=async_reload,
         )
     )
     flow.async_show_form = lambda **result: result
@@ -1765,6 +1767,7 @@ async def test_options_flow_adds_appliance_to_current_group(monkeypatch):
     assert appliances[1]["id"] != existing_appliance["id"]
     assert appliances[1]["data"]["name"] == "Second washer"
     assert updated[0]["data"]["category"] == "large_appliances"
+    async_reload.assert_awaited_once_with(entry.entry_id)
     assert created == {"title": "", "data": {}}
 
 
