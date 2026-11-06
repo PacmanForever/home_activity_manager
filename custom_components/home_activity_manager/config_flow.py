@@ -1716,7 +1716,6 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_activity_mode_dishwasher = async_step_activity_mode
     async_step_activity_mode_opening = async_step_activity_mode
     async_step_activity_mode_access = async_step_activity_mode
-    async_step_activity_mode_sun_protection = async_step_activity_mode
     async_step_sensors_air_conditioner_contact = async_step_sensors
     async_step_parameters_air_conditioner_contact = async_step_parameters
     async_step_actions_air_conditioner_contact = async_step_actions
@@ -1738,10 +1737,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_sensors_refrigerator_switch = async_step_sensors
     async_step_parameters_refrigerator_switch = async_step_parameters
     async_step_actions_refrigerator_switch = async_step_actions
-    async_step_activity_mode_climate = async_step_activity_mode
     async_step_activity_mode_laundry = async_step_activity_mode
-    async_step_activity_mode_openings = async_step_activity_mode
-    async_step_activity_mode_deliveries = async_step_activity_mode
     async_step_activity_mode_refrigeration = async_step_activity_mode
     async_step_sensors_laundry = async_step_sensors
     async_step_parameters_laundry = async_step_parameters
@@ -1767,3 +1763,11 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_sensors_sun_protection_cover = async_step_sensors
     async_step_parameters_sun_protection_cover = async_step_parameters
     async_step_actions_sun_protection_cover = async_step_actions
+
+
+for _category in APPLIANCE_GROUPS:
+    setattr(
+        ApplianceCycleMonitorOptionsFlow,
+        f"async_step_activity_mode_{_category}",
+        ApplianceCycleMonitorOptionsFlow.async_step_activity_mode,
+    )

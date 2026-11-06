@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.53 - 2026-11-06
+
+### Fixed
+
+- Register activity-mode steps for every appliance group in the options flow, preventing invalid flows when adding appliances.
+- Use the consistent pending-to-unload state for mailbox arrivals instead of an occupancy state.
+
+### Changed
+
+- Clarify that the shared door-open alarm applies to refrigerators and freezers.
+
 ## v0.9.52 - 2026-11-06
 
 ### Added

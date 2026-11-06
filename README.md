@@ -116,7 +116,7 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 
 ### Deliveries
 
-Mailbox profiles detect arrivals with either an interior motion sensor or a mail-slot contact. Both modes require a separate main-door contact and track the cycle until collection. Mail-slot mode also exposes the contact's open/closed state as **Mail slot**. Pending mail is shown as **Occupied** until collection; this is separate from the flap and main-door positions. Start actions run on arrival; finish actions run when the main door opens or pending collection is cleared. Reminders are separate.
+Mailbox profiles detect arrivals with either an interior motion sensor or a mail-slot contact. Both modes require a separate main-door contact and track the cycle until collection. Mail-slot mode also exposes the contact's open/closed state as **Mail slot**. Pending mail is shown as **Pending to unload** until collection; this is separate from the flap and main-door positions. Start actions run on arrival; finish actions run when the main door opens or pending collection is cleared. Reminders are separate.
 
 ### Large appliances
 

@@ -105,7 +105,6 @@ class ApplianceBinarySensor(BinarySensorEntity):
             if source_name is not None:
                 self._attr_name = _ham_proxy_name(source_name)
             self._attr_translation_key = f"proxy_{key}"
-        appliance_type = runtime.config.get("appliance_type")
         appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)
         detection_sources = getattr(
             getattr(runtime, "profile", None), "detection_sources", ()
@@ -114,11 +113,6 @@ class ApplianceBinarySensor(BinarySensorEntity):
             self._attr_translation_key = _state_translation_key(appliance_class)
         elif key == "shutter":
             self._attr_translation_key = "shutter_state"
-        elif key == "pending_unload" and (
-            appliance_class == "mailbox"
-            or appliance_type in {"mailbox_motion", "mailbox_slot"}
-        ):
-            self._attr_translation_key = "occupied"
         self._attr_device_class = device_class
         self._attr_device_info = appliance_device_info(
             entry, runtime.config, getattr(runtime, "hass", None)
@@ -418,10 +412,6 @@ async def async_setup_entry(
                     entry,
                     "pending_unload",
                     lambda runtime=runtime: runtime.pending_unload,
-                    BinarySensorDeviceClass.OCCUPANCY
-                    if appliance_class == "mailbox"
-                    or appliance_type in {"mailbox_motion", "mailbox_slot"}
-                    else None,
                 )
             )
         if (

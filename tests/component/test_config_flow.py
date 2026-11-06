@@ -437,6 +437,58 @@ async def test_setup_adds_appliance_to_existing_group(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("category", "appliance_class", "activity_mode", "profile_name"),
+    (
+        (
+            category,
+            appliance_class,
+            activity_mode,
+            profile_name,
+        )
+        for category, classes in APPLIANCE_GROUPS.items()
+        for appliance_class, modes in [next(iter(classes.items()))]
+        for activity_mode, profile_name in [next(iter(modes.items()))]
+    ),
+)
+async def test_options_flow_adds_appliance_with_registered_mode_step(
+    hass,
+    enable_custom_integrations,
+    category,
+    appliance_class,
+    activity_mode,
+    profile_name,
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=category,
+        data={"category": category, "appliances": []},
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_action": "add"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"name": f"New {appliance_class}"}
+    )
+    if len(APPLIANCE_GROUPS[category]) > 1:
+        assert result["step_id"] == "appliance_class"
+        result = await hass.config_entries.options.async_configure(
+            flow_id, {CONF_APPLIANCE_CLASS: appliance_class}
+        )
+
+    assert result["step_id"] == f"activity_mode_{category}"
+
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"activity_mode": activity_mode}
+    )
+    assert result["step_id"] == f"sensors_{profile_name}"
+
+
+@pytest.mark.asyncio
 async def test_options_flow_adds_mailbox_to_loaded_group_device_registry(
     hass, enable_custom_integrations
 ):

@@ -1254,7 +1254,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.52" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.53" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -2723,15 +2723,15 @@ async def test_mailbox_slot_exposes_flap_open_and_closed_state(
     mail_slot_entity_id = registry.async_get_entity_id(
         "binary_sensor", DOMAIN, f"{entry.entry_id}_mail_slot"
     )
-    occupied_entity_id = registry.async_get_entity_id(
+    pending_unload_entity_id = registry.async_get_entity_id(
         "binary_sensor", DOMAIN, f"{entry.entry_id}_pending_unload"
     )
 
     assert mail_slot_entity_id is not None
-    assert occupied_entity_id is not None
-    assert registry.async_get(occupied_entity_id).translation_key == "occupied"
-    assert hass.states.get(occupied_entity_id).attributes["device_class"] == "occupancy"
-    assert hass.states.get(occupied_entity_id).state == "off"
+    assert pending_unload_entity_id is not None
+    assert registry.async_get(pending_unload_entity_id).translation_key == "pending_unload"
+    assert "device_class" not in hass.states.get(pending_unload_entity_id).attributes
+    assert hass.states.get(pending_unload_entity_id).state == "off"
     assert hass.states.get(mail_slot_entity_id).state == "off"
     assert hass.states.get(mail_slot_entity_id).attributes["device_class"] == "door"
     assert hass.states.get(mail_slot_entity_id).attributes["icon"] == "mdi:mailbox-up"
@@ -2745,13 +2745,13 @@ async def test_mailbox_slot_exposes_flap_open_and_closed_state(
     await hass.async_block_till_done()
     assert hass.states.get(mail_slot_entity_id).state == "on"
     assert hass.states.get(mail_slot_entity_id).attributes["icon"] == "mdi:mailbox-open-up"
-    assert hass.states.get(occupied_entity_id).state == "on"
+    assert hass.states.get(pending_unload_entity_id).state == "on"
     assert entry.runtime_data.door_open is False
 
     hass.states.async_set(config[CONF_MAIL_SLOT_ENTITY], "off")
     await hass.async_block_till_done()
     assert hass.states.get(mail_slot_entity_id).state == "off"
-    assert hass.states.get(occupied_entity_id).state == "on"
+    assert hass.states.get(pending_unload_entity_id).state == "on"
     hass.states.async_set(config[CONF_MAIL_SLOT_ENTITY], "unavailable")
     await hass.async_block_till_done()
     assert hass.states.get(mail_slot_entity_id).attributes["icon"] == "mdi:mailbox-outline"
@@ -2760,7 +2760,7 @@ async def test_mailbox_slot_exposes_flap_open_and_closed_state(
     hass.states.async_set(config[CONF_DOOR_ENTITY], "on")
     await hass.async_block_till_done()
     assert hass.states.get(door_entity_id).attributes["icon"] == "mdi:mailbox-open"
-    assert hass.states.get(occupied_entity_id).state == "off"
+    assert hass.states.get(pending_unload_entity_id).state == "off"
     hass.states.async_set(config[CONF_DOOR_ENTITY], "off")
     await hass.async_block_till_done()
     assert entry.runtime_data.door_open is False
@@ -2784,7 +2784,7 @@ async def test_mailbox_without_main_door_still_registers_device_and_clear_button
     await hass.async_block_till_done()
 
     entity_registry = er.async_get(hass)
-    occupied_entity_id = entity_registry.async_get_entity_id(
+    pending_unload_entity_id = entity_registry.async_get_entity_id(
         "binary_sensor", DOMAIN, f"{entry.entry_id}_pending_unload"
     )
     clear_button_entity_id = entity_registry.async_get_entity_id(
@@ -2794,19 +2794,21 @@ async def test_mailbox_without_main_door_still_registers_device_and_clear_button
         dr.async_get(hass), identifiers={(DOMAIN, entry.entry_id)}
     )
 
-    assert occupied_entity_id is not None
+    assert pending_unload_entity_id is not None
     assert clear_button_entity_id is not None
     assert device is not None
-    assert hass.states.get(occupied_entity_id).state == "off"
+    assert entity_registry.async_get(pending_unload_entity_id).translation_key == "pending_unload"
+    assert "device_class" not in hass.states.get(pending_unload_entity_id).attributes
+    assert hass.states.get(pending_unload_entity_id).state == "off"
 
     hass.states.async_set(config[CONF_MAIL_MOTION_ENTITY], "on")
     await hass.async_block_till_done()
-    assert hass.states.get(occupied_entity_id).state == "on"
+    assert hass.states.get(pending_unload_entity_id).state == "on"
 
     await hass.services.async_call(
         "button", "press", {"entity_id": clear_button_entity_id}, blocking=True
     )
-    assert hass.states.get(occupied_entity_id).state == "off"
+    assert hass.states.get(pending_unload_entity_id).state == "off"
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
