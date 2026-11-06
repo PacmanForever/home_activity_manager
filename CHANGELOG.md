@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add climate-entity activity detection for air conditioners, preserving original controls.
 - Add Fan to Climate control with power-sensor and smart-switch activity detection.
 - Expose fan running state, last active duration, optional power/energy readings, and cycle start/end actions.
 
