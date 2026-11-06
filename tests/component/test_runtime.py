@@ -1203,7 +1203,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.45" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.46" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -1235,6 +1235,10 @@ async def test_category_entry_groups_appliances_without_parent_device(
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"appliance_id": "washer_two"}
     )
+    assert result["step_id"] == "confirm_remove"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "confirm_remove_appliance"}
+    )
     assert result["type"] == "create_entry"
     await hass.async_block_till_done()
     assert [record["id"] for record in entry.data["appliances"]] == ["washer_one"]
@@ -1259,6 +1263,10 @@ async def test_category_entry_groups_appliances_without_parent_device(
     )
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"appliance_id": "washer_one"}
+    )
+    assert result["step_id"] == "confirm_remove"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "confirm_remove_appliance"}
     )
     assert result["type"] == "abort"
     assert result["reason"] == "last_appliance_removed"

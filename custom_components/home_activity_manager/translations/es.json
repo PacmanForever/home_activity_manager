@@ -120,7 +120,9 @@
         },
         "data_description": {"activity_mode": "Solo este sensor determina la actividad del dispositivo."}
       },
+      "add_appliance": {"title": "Añadir un dispositivo", "data": {"name": "Nombre que se mostrará para este dispositivo", "appliance_group": "Agrupación de dispositivos"}},
       "select_appliance": {"title": "Seleccionar dispositivo", "data": {"appliance_id": "Dispositivo"}},
+      "confirm_remove": {"title": "Confirmar eliminación", "description": "¿Seguro que quieres eliminar {name}?", "menu_options": {"confirm_remove_appliance": "Confirmar", "cancel_remove_appliance": "Cancelar"}},
       "group_actions": {
         "title": "Acciones de la agrupación",
         "description": "Las acciones compartidas se ejecutan por separado para cada dispositivo, antes que sus acciones locales. Consulta el README para ver cómo configurarlas y ejemplos.",

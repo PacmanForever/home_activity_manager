@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.46 - 2026-11-06
+
+### Added
+
+- Require explicit confirmation before removing a device; cancellation leaves it unchanged.
+- Add appliances from a group's options with the group preselected and a name field.
+
+### Changed
+
+- Alphabetize management actions and use translated appliance-class names when an existing device has no name.
+
 ## v0.9.45 - 2026-11-06
 
 ### Added

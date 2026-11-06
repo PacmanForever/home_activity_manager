@@ -11,7 +11,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.loader import IntegrationNotLoaded, async_get_loaded_integration
 
-from .appliance_types import get_appliance_model
+from .appliance_types import get_appliance_class_name, get_appliance_model
 from .const import CONF_APPLIANCE_CLASS, CONF_APPLIANCE_TYPE, DOMAIN
 
 
@@ -132,9 +132,16 @@ def appliance_device_info(
         else:
             if version is not None:
                 integration_version = str(version)
+    device_name = config.get("name")
+    if not isinstance(device_name, str) or not device_name.strip():
+        device_name = (
+            get_appliance_class_name(appliance_class, language)
+            if isinstance(appliance_class, str) and appliance_class
+            else entry.title
+        )
     return DeviceInfo(
         identifiers={(DOMAIN, appliance_id)},
-        name=config.get("name", entry.title),
+        name=device_name,
         manufacturer="@pacmanforever",
         model=get_appliance_model(appliance_type, appliance_class, language),
         sw_version=integration_version,

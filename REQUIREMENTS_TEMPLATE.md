@@ -40,7 +40,7 @@ Cada dispositiu ha de tenir una configuració pròpia amb els camps següents.
 
 ### Jerarquia d'agrupacions
 
-La jerarquia canònica de configuració és **agrupació de primer nivell → classe d'aparell → modalitat/perfil**. Aquest arbre s'ha de mantenir coherent amb `APPLIANCE_GROUPS` i els perfils registrats, i s'ha de documentar igualment al README. Els selectors del flux mostren aquests nivells en passos successius.
+La jerarquia canònica de configuració és **agrupació de primer nivell → classe d'aparell → modalitat/perfil**. Aquest arbre s'ha de mantenir coherent amb `APPLIANCE_GROUPS` i els perfils registrats, i s'ha de documentar igualment al README. Els selectors del flux mostren aquests nivells en passos successius. En afegir un dispositiu des de les opcions d'una agrupació, el formulari demana el nom i mostra l'agrupació corresponent com a valor de només lectura; les accions de gestió de dispositius s'ordenen alfabèticament segons les etiquetes de l'idioma actiu.
 
 ```text
 Climatització (climate)
@@ -92,7 +92,7 @@ Els noms entre parèntesis són identificadors de perfil, no nivells addicionals
 
 ### 4.1 Flux de configuració
 
-La creació segueix la jerarquia d'agrupació, classe i modalitat definida a «Jerarquia d'agrupacions» i després presenta els passos de sensors, paràmetres i accions. En editar, el tipus i la modalitat existents es mostren fixos juntament amb el nom, i se segueix amb sensors, paràmetres i accions. Les accions compartides del grup es configuren separadament a les opcions de l'entrada agrupada.
+La creació segueix la jerarquia d'agrupació, classe i modalitat definida a «Jerarquia d'agrupacions» i després presenta els passos de sensors, paràmetres i accions. En afegir des de les opcions d'una entrada agrupada, el formulari demana el nom i mostra l'agrupació corresponent preomplerta i de només lectura abans de seleccionar la classe i la modalitat. Els registres antics sense nom propi mostren la classe traduïda com a fallback. Abans d'eliminar un dispositiu, es demana confirmació explícita; cancel·lar no modifica la configuració ni retira les entitats. En editar, el tipus i la modalitat existents es mostren fixos juntament amb el nom, i se segueix amb sensors, paràmetres i accions. Les accions compartides del grup es configuren separadament a les opcions de l'entrada agrupada.
 
 1. **Tipus i nom**: seleccionar el tipus general i definir-ne el nom.
 2. **Modalitat d'activitat**: seleccionar la font d'activitat entre les disponibles per al tipus.

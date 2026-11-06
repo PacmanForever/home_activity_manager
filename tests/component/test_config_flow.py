@@ -202,7 +202,7 @@ async def test_add_appliance_through_four_config_flow_steps(
         for marker, value in options_result["data_schema"].schema.items()
         if marker.schema == "appliance_action"
     )
-    assert actions.config["options"] == ["edit", "group_actions", "remove", "add"]
+    assert actions.config["options"] == ["add", "group_actions", "edit", "remove"]
 
 
 @pytest.mark.asyncio
@@ -1579,6 +1579,30 @@ async def test_options_flow_removes_one_appliance_and_preserves_group_members(
     result = await hass.config_entries.options.async_configure(
         flow_id, {"appliance_id": removed_id}
     )
+    assert result["type"] is FlowResultType.MENU
+    assert result["step_id"] == "confirm_remove"
+    assert result["description_placeholders"] == {"name": "Washer to remove"}
+    assert len(entry.data["appliances"]) == 2
+    assert entity_registry.async_get(removed_entity.entity_id) is not None
+
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"next_step_id": "cancel_remove_appliance"}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert entity_registry.async_get(removed_entity.entity_id) is not None
+    assert await store.async_load() == {"last_cycle_duration_seconds": 60}
+
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_action": "remove"}
+    )
+    assert result["step_id"] == "select_appliance"
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_id": removed_id}
+    )
+    assert result["step_id"] == "confirm_remove"
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"next_step_id": "confirm_remove_appliance"}
+    )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert [record["id"] for record in entry.data["appliances"]] == [retained_id]
@@ -1588,4 +1612,50 @@ async def test_options_flow_removes_one_appliance_and_preserves_group_members(
         device_registry, (DOMAIN, removed_id), entry.entry_id
     ) is None
     assert device_registry.async_get(retained_device.id) is not None
-    assert await store.async_load() is None
+    assert await Store(hass, 1, f"{DOMAIN}_{removed_id}").async_load() is None
+
+
+@pytest.mark.asyncio
+async def test_removing_last_appliance_requires_confirmation(
+    hass, enable_custom_integrations
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Openings",
+        data={
+            "category": "openings",
+            "appliances": [
+                {
+                    "id": "only-window",
+                    "data": {
+                        "name": "Bedroom window",
+                        CONF_APPLIANCE_TYPE: "opening",
+                        CONF_APPLIANCE_CLASS: "window",
+                    },
+                    "options": {},
+                }
+            ],
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_action": "remove"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_id": "only-window"}
+    )
+
+    assert result["type"] is FlowResultType.MENU
+    assert entry in hass.config_entries.async_entries(DOMAIN)
+    assert len(entry.data["appliances"]) == 1
+
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"next_step_id": "confirm_remove_appliance"}
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "last_appliance_removed"
+    assert entry not in hass.config_entries.async_entries(DOMAIN)

@@ -1415,6 +1415,12 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             self.assertIn(
                 "add", translation["selector"]["appliance_action"]["options"]
             )
+            action_options = translation["selector"]["appliance_action"]["options"]
+            ordered_actions = [
+                action_options[key]
+                for key in ("add", "group_actions", "edit", "remove")
+            ]
+            self.assertEqual(ordered_actions, sorted(ordered_actions, key=str.casefold))
             hierarchy_help = translation["config"]["step"]["user"]["description"]
             self.assertTrue(
                 any(
@@ -1734,14 +1740,24 @@ async def test_options_flow_adds_appliance_to_current_group(monkeypatch):
     flow.async_create_entry = lambda **result: result
 
     result = await flow.async_step_init({"appliance_action": "add"})
-    assert result["step_id"] == "appliance_class"
+    assert result["step_id"] == "add_appliance"
+    group_form = next(
+        field
+        for marker, field in result["data_schema"].schema.items()
+        if marker.schema == CONF_APPLIANCE_GROUP
+    )
+    assert group_form.config["options"] == ["large_appliances"]
+    assert group_form.config["read_only"] is True
+    add_input = result["data_schema"]({"name": "Second washer"})
+    assert add_input[CONF_APPLIANCE_GROUP] == "large_appliances"
+    class_result = await flow.async_step_add_appliance(add_input)
+    assert class_result["step_id"] == "appliance_class"
     mode_result = await flow.async_step_appliance_class(
         {CONF_APPLIANCE_CLASS: "washer"}
     )
     assert mode_result["step_id"] == "activity_mode_large_appliances"
     sensors_result = await flow.async_step_activity_mode({"activity_mode": "power"})
     assert sensors_result["step_id"] == "sensors_laundry"
-    flow._draft["name"] = "Second washer"
     created = await flow.async_step_actions({})
 
     appliances = updated[0]["data"]["appliances"]
@@ -1750,6 +1766,23 @@ async def test_options_flow_adds_appliance_to_current_group(monkeypatch):
     assert appliances[1]["data"]["name"] == "Second washer"
     assert updated[0]["data"]["category"] == "large_appliances"
     assert created == {"title": "", "data": {}}
+
+
+def test_select_appliance_uses_localized_class_when_name_is_missing():
+    schema = ApplianceCycleMonitorOptionsFlow._category_appliance_schema(
+        [
+            {
+                "id": "window-id",
+                "data": {CONF_APPLIANCE_CLASS: "window", "name": ""},
+            }
+        ],
+        "ca",
+    )
+    selector_field = next(iter(schema.schema.values()))
+
+    assert selector_field.config["options"] == [
+        {"value": "window-id", "label": "Finestra"}
+    ]
 
 
 @pytest.mark.asyncio

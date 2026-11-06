@@ -27,6 +27,15 @@ def test_get_device_by_identifier_uses_async_get_devices():
     ]
 
 
+def test_appliance_device_info_uses_class_name_when_name_is_missing():
+    entry = SimpleNamespace(entry_id="entry", title="Openings")
+    config = {"appliance_type": "opening", "appliance_class": "window"}
+
+    device_info = device_module.appliance_device_info(entry, config)
+
+    assert device_info["name"] == "Window"
+
+
 def test_get_device_by_identifier_uses_legacy_registry_view():
     device = SimpleNamespace(
         identifiers={(DOMAIN, "appliance")}, config_entries={"entry"}

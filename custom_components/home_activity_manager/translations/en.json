@@ -120,7 +120,9 @@
         },
         "data_description": {"activity_mode": "Only this sensor determines device activity."}
       },
+      "add_appliance": {"title": "Add a device", "data": {"name": "Name shown for this device", "appliance_group": "Device group"}},
       "select_appliance": {"title": "Select device", "data": {"appliance_id": "Device"}},
+      "confirm_remove": {"title": "Confirm device removal", "description": "Are you sure you want to remove {name}?", "menu_options": {"confirm_remove_appliance": "Confirm", "cancel_remove_appliance": "Cancel"}},
       "group_actions": {
         "title": "Group actions",
         "description": "Shared actions run separately for each device, before its local actions. See the README for group-action setup and examples.",

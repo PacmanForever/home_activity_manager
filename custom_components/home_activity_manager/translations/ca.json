@@ -120,7 +120,9 @@
         },
         "data_description": {"activity_mode": "Només aquest sensor determina l'activitat de l'dispositiu."}
       },
+      "add_appliance": {"title": "Afegeix un dispositiu", "data": {"name": "Nom que es mostrarà per a aquest dispositiu", "appliance_group": "Agrupació de dispositius"}},
       "select_appliance": {"title": "Selecciona el dispositiu", "data": {"appliance_id": "Dispositiu"}},
+      "confirm_remove": {"title": "Confirma l’eliminació", "description": "Vols eliminar {name}?", "menu_options": {"confirm_remove_appliance": "Confirma", "cancel_remove_appliance": "Cancel·la"}},
       "group_actions": {
         "title": "Accions de l’agrupació",
         "description": "Les accions compartides s’executen per separat per a cada dispositiu, abans que les accions locals. Consulta el README per veure com configurar-les i exemples.",

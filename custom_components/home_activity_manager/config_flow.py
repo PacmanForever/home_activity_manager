@@ -358,6 +358,22 @@ def _options_identity_schema(values: dict[str, Any], group: str) -> vol.Schema:
     )
 
 
+def _add_appliance_identity_schema(group: str) -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required(CONF_NAME): selector.TextSelector(),
+            vol.Required(CONF_APPLIANCE_GROUP, default=group): _LockedSelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[group],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key="appliance_group",
+                    read_only=True,
+                )
+            ),
+        }
+    )
+
+
 def _profile_identity(
     profile_name: str, appliance_class: str | None = None
 ) -> tuple[str, str]:
@@ -1211,7 +1227,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     self._draft = {}
                     self._saved = {}
                     self._appliance_id = uuid4().hex
-                    return await self.async_step_appliance_class()
+                    return await self.async_step_add_appliance()
                 return await self.async_step_select_appliance()
 
             return self.async_show_form(
@@ -1220,7 +1236,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     {
                         vol.Required("appliance_action"): selector.SelectSelector(
                             selector.SelectSelectorConfig(
-                                options=["edit", "group_actions", "remove", "add"],
+                                options=["add", "group_actions", "edit", "remove"],
                                 mode=selector.SelectSelectorMode.DROPDOWN,
                                 translation_key="appliance_action",
                             )
@@ -1306,13 +1322,38 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             data_schema=_group_action_schema(appliance_group, current_actions),
         )
 
+    async def async_step_add_appliance(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        appliance_group = self.config_entry.data["category"]
+        if user_input is not None:
+            self._draft[CONF_NAME] = user_input[CONF_NAME].strip()
+            return await self.async_step_appliance_class()
+        return self.async_show_form(
+            step_id="add_appliance",
+            data_schema=_add_appliance_identity_schema(appliance_group),
+        )
+
     @staticmethod
-    def _category_appliance_schema(records: list[dict[str, Any]]) -> vol.Schema:
+    def _category_appliance_name(record: dict[str, Any], language: str) -> str:
+        data = record.get("data", {})
+        name = data.get(CONF_NAME)
+        if isinstance(name, str) and name.strip():
+            return name
+        appliance_class = data.get(CONF_APPLIANCE_CLASS)
+        if isinstance(appliance_class, str) and appliance_class:
+            return get_appliance_class_name(appliance_class, language)
+        return "Appliance"
+
+    @classmethod
+    def _category_appliance_schema(
+        cls, records: list[dict[str, Any]], language: str = "en"
+    ) -> vol.Schema:
         options = []
         for record in records:
             if not isinstance(record, dict) or not isinstance(record.get("id"), str):
                 continue
-            name = record.get("data", {}).get(CONF_NAME, "Appliance")
+            name = cls._category_appliance_name(record, language)
             options.append({"value": record["id"], "label": name})
         return vol.Schema(
             {
@@ -1338,41 +1379,8 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         if user_input is not None:
             appliance_id = user_input["appliance_id"]
             if self._appliance_action == "remove":
-                if len(records) <= 1:
-                    await self.hass.config_entries.async_remove(
-                        self.config_entry.entry_id
-                    )
-                    return self.async_abort(reason="last_appliance_removed")
-                registry = er.async_get(self.hass)
-                for entity in tuple(registry.entities.values()):
-                    if (
-                        entity.config_entry_id == self.config_entry.entry_id
-                        and entity.unique_id.startswith(f"{appliance_id}_")
-                    ):
-                        registry.async_remove(entity.entity_id)
-                device_registry = dr.async_get(self.hass)
-                device = _get_device_by_identifier(
-                    device_registry,
-                    (DOMAIN, appliance_id),
-                    self.config_entry.entry_id,
-                )
-                if device is not None:
-                    device_registry.async_remove_device(device.id)
-                await Store(self.hass, 1, f"{DOMAIN}_{appliance_id}").async_remove()
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry,
-                    data={
-                        **self.config_entry.data,
-                        "appliances": [
-                            record
-                            for record in records
-                            if record.get("id") != appliance_id
-                        ],
-                    },
-                )
-                return self.async_create_entry(
-                    title="", data=self.config_entry.options
-                )
+                self._appliance_id = appliance_id
+                return await self.async_step_confirm_remove()
 
             record = next(record for record in records if record.get("id") == appliance_id)
             self._appliance_id = appliance_id
@@ -1390,8 +1398,78 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             return await self.async_step_edit_appliance()
         return self.async_show_form(
             step_id="select_appliance",
-            data_schema=self._category_appliance_schema(records),
+            data_schema=self._category_appliance_schema(
+                records,
+                self.hass.config.language if self.hass is not None else "en",
+            ),
         )
+
+    async def async_step_confirm_remove(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        records = self.config_entry.data["appliances"]
+        record = next(
+            record
+            for record in records
+            if record.get("id") == self._appliance_id
+        )
+        language = self.hass.config.language if self.hass is not None else "en"
+        return self.async_show_menu(
+            step_id="confirm_remove",
+            menu_options=("confirm_remove_appliance", "cancel_remove_appliance"),
+            description_placeholders={
+                "name": self._category_appliance_name(record, language)
+            },
+        )
+
+    async def async_step_confirm_remove_appliance(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        records = self.config_entry.data["appliances"]
+        appliance_id = self._appliance_id
+        if appliance_id is None or not any(
+            record.get("id") == appliance_id for record in records
+        ):
+            return await self.async_step_init()
+        if len(records) <= 1:
+            await self.hass.config_entries.async_remove(self.config_entry.entry_id)
+            return self.async_abort(reason="last_appliance_removed")
+
+        registry = er.async_get(self.hass)
+        for entity in tuple(registry.entities.values()):
+            if (
+                entity.config_entry_id == self.config_entry.entry_id
+                and entity.unique_id.startswith(f"{appliance_id}_")
+            ):
+                registry.async_remove(entity.entity_id)
+        device_registry = dr.async_get(self.hass)
+        device = _get_device_by_identifier(
+            device_registry,
+            (DOMAIN, appliance_id),
+            self.config_entry.entry_id,
+        )
+        if device is not None:
+            device_registry.async_remove_device(device.id)
+        await Store(self.hass, 1, f"{DOMAIN}_{appliance_id}").async_remove()
+        self.hass.config_entries.async_update_entry(
+            self.config_entry,
+            data={
+                **self.config_entry.data,
+                "appliances": [
+                    record
+                    for record in records
+                    if record.get("id") != appliance_id
+                ],
+            },
+        )
+        return self.async_create_entry(title="", data=self.config_entry.options)
+
+    async def async_step_cancel_remove_appliance(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        self._appliance_id = None
+        self._appliance_action = None
+        return await self.async_step_init()
 
     async def async_step_activity_mode(
         self, user_input: dict[str, Any] | None = None
