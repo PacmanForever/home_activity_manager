@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.58 - 2026-11-08
+
+### Added
+
+- Add an Electronics group with screen, AV equipment, console, and computer profiles. Screens and AV equipment also support media-player activity detection.
+- Preserve media-player source ownership and controls with native proxies when the source already belongs to another device.
+- Add optional power and cumulative-energy readings to electronics profiles.
+
+### Tests
+
+- Cover electronics profile CRUD, media-player activity transitions, source association, proxy controls, translations, and documentation requirements.
+
 ## v0.9.57 - 2026-11-07
 
 ### Added

@@ -10,6 +10,7 @@ from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.climate import ClimateEntityFeature, HVACMode
 from homeassistant.components.cover import CoverEntityFeature
 from homeassistant.components.lock import LockEntityFeature
+from homeassistant.components.media_player import MediaPlayerEntityFeature, RepeatMode
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfPower
@@ -27,6 +28,7 @@ from custom_components.home_activity_manager.const import (
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
     CONF_CLIMATE_ENTITY,
+    CONF_MEDIA_PLAYER_ENTITY,
     CONF_COVER_ENTITY,
     CONF_COVER_ENTITY,
     CONF_DOOR_ENTITY,
@@ -95,6 +97,7 @@ from custom_components.home_activity_manager.switch import (
 from custom_components.home_activity_manager.climate import ApplianceClimateProxy
 from custom_components.home_activity_manager.cover import ApplianceCoverProxy
 from custom_components.home_activity_manager.lock import ApplianceLockProxy
+from custom_components.home_activity_manager.media_player import ApplianceMediaPlayerProxy
 
 
 def _find_device(registry, *, identifiers):
@@ -181,6 +184,58 @@ async def test_auxiliary_switch_off_does_not_end_power_cycle(hass, config, monke
 
     assert runtime.detector.is_running
     assert runtime.detector.last_cycle_duration is None
+    await runtime.async_unload()
+
+
+@pytest.mark.asyncio
+async def test_laundry_door_opened_during_cycle_rearms_pending_at_finish(
+    hass, config, monkeypatch
+):
+    current_time = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: current_time[0])
+    config[CONF_PENDING_ACTIONS] = [{"action": "test.pending_reminder"}]
+    config[CONF_EMPTIED_ACTIONS] = [{"action": "test.emptied"}]
+    config[CONF_PENDING_DELAY_SECONDS] = 10
+    hass.states.async_set(
+        config[CONF_POWER_ENTITY], "5", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+    )
+    hass.states.async_set(config[CONF_DOOR_ENTITY], "off")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    emptied_actions: list[str] = []
+    monkeypatch.setattr(runtime, "_run_actions_in_background", emptied_actions.append)
+    await runtime.async_setup()
+
+    current_time[0] += timedelta(seconds=15)
+    await _async_fire_deadline(runtime, current_time[0])
+    assert runtime.detector.is_running
+    assert runtime.pending_unload
+
+    hass.states.async_set(config[CONF_DOOR_ENTITY], "on")
+    await hass.async_block_till_done()
+    assert not runtime.pending_unload
+    assert CONF_EMPTIED_ACTIONS not in emptied_actions
+    hass.states.async_set(config[CONF_DOOR_ENTITY], "off")
+    await hass.async_block_till_done()
+    assert not runtime.pending_unload
+
+    current_time[0] += timedelta(seconds=1)
+    hass.states.async_set(
+        config[CONF_POWER_ENTITY], "0.5", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+    )
+    await hass.async_block_till_done()
+    current_time[0] += timedelta(seconds=60)
+    await _async_fire_deadline(runtime, current_time[0])
+
+    assert not runtime.detector.is_running
+    assert runtime.pending_unload
+    assert runtime.next_pending_reminder == current_time[0] + timedelta(seconds=10)
+
+    hass.states.async_set(config[CONF_DOOR_ENTITY], "on")
+    await hass.async_block_till_done()
+    assert not runtime.pending_unload
+    assert emptied_actions.count(CONF_EMPTIED_ACTIONS) == 1
     await runtime.async_unload()
 
 
@@ -1777,6 +1832,39 @@ async def test_fan_activity_uses_only_the_selected_source(hass, appliance_type):
 
 
 @pytest.mark.asyncio
+async def test_media_player_activity_uses_off_as_only_inactive_state(hass):
+    config = {
+        CONF_APPLIANCE_TYPE: "screen_media_player",
+        CONF_MEDIA_PLAYER_ENTITY: "media_player.living_room_tv",
+        "name": "Living room TV",
+    }
+    hass.states.async_set(config[CONF_MEDIA_PLAYER_ENTITY], "off")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    await runtime.async_setup()
+    assert not runtime.detector.is_running
+
+    for state in ("idle", "paused", "playing"):
+        hass.states.async_set(config[CONF_MEDIA_PLAYER_ENTITY], state)
+        await hass.async_block_till_done()
+        assert runtime.detector.is_running
+
+    hass.states.async_set(config[CONF_MEDIA_PLAYER_ENTITY], "unavailable")
+    await hass.async_block_till_done()
+    assert runtime.detector.is_running
+
+    hass.states.async_set(config[CONF_MEDIA_PLAYER_ENTITY], "unknown")
+    await hass.async_block_till_done()
+    assert runtime.detector.is_running
+
+    hass.states.async_set(config[CONF_MEDIA_PLAYER_ENTITY], "off")
+    await hass.async_block_till_done()
+    assert not runtime.detector.is_running
+    await runtime.async_unload()
+
+
+@pytest.mark.asyncio
 async def test_optional_plug_and_pending_button_controls(
     hass, config, monkeypatch, enable_custom_integrations
 ):
@@ -2648,6 +2736,52 @@ async def test_hidden_input_wrappers_are_removed_and_outputs_remain(
     await hass.config_entries.async_unload(entry.entry_id)
 
 
+@pytest.mark.asyncio
+async def test_media_player_source_with_device_gets_a_proxy(
+    hass, enable_custom_integrations
+):
+    source_entry = MockConfigEntry(domain="media_player_source")
+    source_entry.add_to_hass(hass)
+    source_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=source_entry.entry_id,
+        identifiers={(source_entry.domain, "tv")},
+        name="External TV",
+    )
+    source = er.async_get(hass).async_get_or_create(
+        "media_player",
+        source_entry.domain,
+        "tv",
+        config_entry=source_entry,
+        device_id=source_device.id,
+    )
+    hass.states.async_set(source.entity_id, "playing", {"media_title": "News"})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_APPLIANCE_TYPE: "screen_media_player",
+            CONF_MEDIA_PLAYER_ENTITY: source.entity_id,
+            "name": "Living room screen",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+
+    device_id = _async_appliance_device_id(hass, entry)
+    assert device_id is not None
+    assert er.async_get(hass).async_get(source.entity_id).device_id == source_device.id
+    proxy_id = er.async_get(hass).async_get_entity_id(
+        "media_player", DOMAIN, f"{entry.entry_id}_media_player_proxy"
+    )
+    assert proxy_id is not None
+    assert er.async_get(hass).async_get(proxy_id).device_id == device_id
+    assert hass.states.get(proxy_id).state == "playing"
+    assert hass.states.get(proxy_id).attributes["media_title"] == "News"
+    assert hass.states.get(proxy_id).attributes["source_entity"] == source.entity_id
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 @pytest.mark.parametrize("appliance_type", tuple(APPLIANCE_PROFILES))
 @pytest.mark.asyncio
 async def test_all_profile_inputs_are_represented_without_reassigning_sources(
@@ -2748,7 +2882,7 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
     for input_config, source_entity_id, original_device_id in input_entities:
         source = source_registry.async_get(source_entity_id)
         assert source is not None
-        if input_config.domain in ("climate", "cover", "lock"):
+        if input_config.domain in ("climate", "cover", "lock", "media_player"):
             wrapper_id = integration_registry.async_get_entity_id(
                 input_config.domain,
                 DOMAIN,
@@ -3647,6 +3781,7 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     climate_entity_id = "climate.original_ac"
     cover_entity_id = "cover.original_blind"
     lock_entity_id = "lock.original_door"
+    media_player_entity_id = "media_player.original_tv"
     hass.states.async_set(
         climate_entity_id,
         "cool",
@@ -3700,6 +3835,26 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
             "supported_features": int(LockEntityFeature.OPEN),
         },
     )
+    hass.states.async_set(
+        media_player_entity_id,
+        "playing",
+        {
+            "app_name": "Streaming app",
+            "media_title": "A test title",
+            "media_artist": "A test artist",
+            "volume_level": 0.35,
+            "is_volume_muted": False,
+            "source": "HDMI 1",
+            "source_list": ["HDMI 1", "HDMI 2", 3],
+            "shuffle": True,
+            "repeat": "all",
+            "supported_features": int(
+                MediaPlayerEntityFeature.PLAY
+                | MediaPlayerEntityFeature.VOLUME_SET
+                | MediaPlayerEntityFeature.SELECT_SOURCE
+            ),
+        },
+    )
     climate_runtime = SimpleNamespace(
         hass=hass,
         config={
@@ -3718,17 +3873,27 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
         hass=hass,
         config={CONF_APPLIANCE_TYPE: "opening", CONF_LOCK_ENTITY: lock_entity_id},
     )
+    media_player_runtime = SimpleNamespace(
+        hass=hass,
+        config={
+            CONF_APPLIANCE_TYPE: "screen_media_player",
+            CONF_MEDIA_PLAYER_ENTITY: media_player_entity_id,
+        },
+    )
     climate_entry = MockConfigEntry(domain=DOMAIN, title="AC")
     cover_entry = MockConfigEntry(domain=DOMAIN, title="Blind")
     lock_entry = MockConfigEntry(domain=DOMAIN, title="Door")
+    media_player_entry = MockConfigEntry(domain=DOMAIN, title="TV")
     climate = ApplianceClimateProxy(climate_runtime, climate_entry)
     cover = ApplianceCoverProxy(cover_runtime, cover_entry)
     lock = ApplianceLockProxy(lock_runtime, lock_entry)
-    climate.hass = cover.hass = lock.hass = hass
+    media_player = ApplianceMediaPlayerProxy(media_player_runtime, media_player_entry)
+    climate.hass = cover.hass = lock.hass = media_player.hass = hass
 
     assert climate.suggested_object_id == "original_ac_ham_proxy"
     assert cover.suggested_object_id == "original_blind_ham_proxy"
     assert lock.suggested_object_id == "original_door_ham_proxy"
+    assert media_player.suggested_object_id == "original_tv_ham_proxy"
     assert climate.hvac_mode is HVACMode.COOL
     assert [mode.value for mode in climate.hvac_modes] == ["off", "cool"]
     assert climate.hvac_action.value == "cooling"
@@ -3777,6 +3942,22 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     assert lock.code_format == r"^\d{4}$"
     assert lock.extra_state_attributes["source_entity"] == lock_entity_id
     assert lock.supported_features == LockEntityFeature.OPEN
+    assert media_player.state.value == "playing"
+    assert media_player.app_name == "Streaming app"
+    assert media_player.media_title == "A test title"
+    assert media_player.media_artist == "A test artist"
+    assert media_player.volume_level == 0.35
+    assert media_player.is_volume_muted is False
+    assert media_player.source == "HDMI 1"
+    assert media_player.source_list == ["HDMI 1", "HDMI 2"]
+    assert media_player.shuffle is True
+    assert media_player.repeat is RepeatMode.ALL
+    assert media_player.extra_state_attributes["source_entity"] == media_player_entity_id
+    assert media_player.supported_features == (
+        MediaPlayerEntityFeature.PLAY
+        | MediaPlayerEntityFeature.VOLUME_SET
+        | MediaPlayerEntityFeature.SELECT_SOURCE
+    )
 
     calls = []
 
@@ -3806,6 +3987,12 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     await lock.async_unlock(code="1234")
     await lock.async_lock()
     await lock.async_open()
+    await media_player.async_media_play()
+    await media_player.async_set_volume_level(0.5)
+    await media_player.async_mute_volume(True)
+    await media_player.async_select_source("HDMI 2")
+    await media_player.async_play_media("music", "track-1")
+    await media_player.async_set_repeat(RepeatMode.ONE)
 
     assert calls == [
         ("climate", "set_hvac_mode", {"hvac_mode": HVACMode.OFF, "entity_id": climate_entity_id}, True),
@@ -3828,6 +4015,12 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
         ("lock", "unlock", {"code": "1234", "entity_id": lock_entity_id}, True),
         ("lock", "lock", {"entity_id": lock_entity_id}, True),
         ("lock", "open", {"entity_id": lock_entity_id}, True),
+        ("media_player", "media_play", {"entity_id": media_player_entity_id}, True),
+        ("media_player", "volume_set", {"volume_level": 0.5, "entity_id": media_player_entity_id}, True),
+        ("media_player", "volume_mute", {"is_volume_muted": True, "entity_id": media_player_entity_id}, True),
+        ("media_player", "select_source", {"source": "HDMI 2", "entity_id": media_player_entity_id}, True),
+        ("media_player", "play_media", {"media_content_type": "music", "media_content_id": "track-1", "entity_id": media_player_entity_id}, True),
+        ("media_player", "repeat_set", {"repeat": RepeatMode.ONE, "entity_id": media_player_entity_id}, True),
     ]
 
     hass.states.async_set(cover_entity_id, "opening", {"supported_features": "bad"})

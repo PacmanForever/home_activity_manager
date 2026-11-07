@@ -27,6 +27,7 @@ from custom_components.home_activity_manager.const import (
     CONF_APPLIANCE_GROUP,
     CONF_APPLIANCE_TYPE,
     CONF_CLIMATE_ENTITY,
+    CONF_MEDIA_PLAYER_ENTITY,
     CONF_COVER_ENTITY,
     CONF_ENERGY_ENTITY,
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
@@ -1132,7 +1133,7 @@ async def test_migrate_cover_door_to_access_class(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 12
+    assert entry.version == 13
     access, door = entry.data["appliances"]
     assert access["data"][CONF_APPLIANCE_CLASS] == "access"
     assert door["data"][CONF_APPLIANCE_CLASS] == "door"
@@ -1141,10 +1142,27 @@ async def test_migrate_cover_door_to_access_class(hass):
 
 @pytest.mark.asyncio
 async def test_migrate_future_config_entry_version_is_rejected(hass):
-    entry = MockConfigEntry(domain=DOMAIN, version=13)
+    entry = MockConfigEntry(domain=DOMAIN, version=14)
     entry.add_to_hass(hass)
 
     assert not await async_migrate_entry(hass, entry)
+    assert entry.version == 14
+
+
+@pytest.mark.asyncio
+async def test_migrate_updates_localized_appliance_group_title(hass):
+    hass.config.language = "ca"
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=12,
+        title="Tancament",
+        data={"category": "openings", "appliances": []},
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry)
+
+    assert entry.title == "Tancaments"
     assert entry.version == 13
 
 
@@ -1213,7 +1231,7 @@ async def test_migrate_laundry_and_refrigeration_preserves_group_actions(hass):
     )
     actions = survivor.options[CONF_GROUP_ACTIONS]
 
-    assert survivor.version == 12
+    assert survivor.version == 13
     assert survivor.data["category"] == "large_appliances"
     assert len(survivor.data["appliances"]) == 2
     assert actions[CONF_PENDING_ACTIONS] == [{"action": "test.pending"}]
@@ -1306,7 +1324,7 @@ async def test_migrate_merges_same_category_entries_and_preserves_registry_state
     )
     merged = next(entry for entry in entries if entry is not survivor)
 
-    assert survivor.version == 12
+    assert survivor.version == 13
     assert survivor.data["category"] == "large_appliances"
     assert all(
         record["data"][CONF_APPLIANCE_TYPE] == "laundry"
@@ -1416,7 +1434,7 @@ async def test_migrate_releases_legacy_climate_device_assignment(hass):
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 12
+    assert entry.version == 13
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
 
 
@@ -1444,7 +1462,7 @@ async def test_migrate_removes_unsupported_ac_contact_sensor(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 12
+    assert entry.version == 13
     assert entry.data["category"] == "climate"
     expected_type = (
         "thermostat_climate"
@@ -1485,7 +1503,7 @@ async def test_migrate_removes_refrigerator_compressor_and_plug_alarms(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.version == 12
+    assert entry.version == 13
     assert entry.data["appliances"][0]["data"][CONF_APPLIANCE_CLASS] == "refrigerator"
     assert entry.options == {}
     assert entry.data["appliances"][0]["options"] == {
@@ -1545,6 +1563,16 @@ async def test_every_profile_supports_config_entry_crud(
                     climate_source.domain,
                     revision,
                     config_entry=climate_source,
+                )
+                entity_id = entity_entry.entity_id
+            elif sensor_input.config_key == CONF_MEDIA_PLAYER_ENTITY:
+                media_player_source = MockConfigEntry(domain="media_player_source")
+                media_player_source.add_to_hass(hass)
+                entity_entry = er.async_get(hass).async_get_or_create(
+                    "media_player",
+                    media_player_source.domain,
+                    revision,
+                    config_entry=media_player_source,
                 )
                 entity_id = entity_entry.entity_id
             elif sensor_input.domain == "sensor":
@@ -1666,6 +1694,18 @@ async def test_every_profile_supports_config_entry_crud(
     second_sensor_form, second_sensor_storage = sensor_values(
         f"{appliance_type}_second"
     )
+    if "media_player" in profile.detection_sources:
+        invalid_sensor_form = dict(second_sensor_form)
+        media_player_input = next(
+            item
+            for item in profile.sensor_inputs
+            if item.config_key == CONF_MEDIA_PLAYER_ENTITY
+        )
+        invalid_sensor_form[media_player_input.form_key] = "switch.invalid_source"
+        with pytest.raises(InvalidData):
+            await hass.config_entries.options.async_configure(
+                options_flow_id, invalid_sensor_form
+            )
     if appliance_type == "opening":
         assert "clear_associated_shutter" not in {
             marker.schema for marker in result["data_schema"].schema

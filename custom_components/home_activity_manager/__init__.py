@@ -52,6 +52,7 @@ from .runtime import (
 
 PLATFORMS = [
 	Platform.CLIMATE,
+	Platform.MEDIA_PLAYER,
 	Platform.COVER,
 	Platform.LOCK,
 	Platform.SENSOR,
@@ -148,7 +149,7 @@ def _async_normalize_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> 
 				is_proxy = True
 			elif source_entity_id in runtime._ham_directly_attached_entities:
 				is_proxy = False
-			elif input_config.domain in ("climate", "cover", "lock"):
+			elif input_config.domain in ("climate", "cover", "lock", "media_player"):
 				source_entry = entity_registry.async_get(source_entity_id)
 				is_proxy = source_entry is None or source_entry.device_id not in (
 					None,
@@ -159,7 +160,7 @@ def _async_normalize_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> 
 			if not is_proxy:
 				continue
 
-			if input_config.domain in ("climate", "cover", "lock"):
+			if input_config.domain in ("climate", "cover", "lock", "media_player"):
 				entity_domain = input_config.domain
 				unique_id = f"{appliance_id}_{entity_domain}_proxy"
 			elif input_config.output_entity is None:
@@ -197,7 +198,7 @@ def _async_normalize_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> 
 						new_entity_id=suggested_entity_id,
 					)
 		if (
-			entity.domain in ("climate", "cover", "lock")
+			entity.domain in ("climate", "cover", "lock", "media_player")
 			and entity.unique_id.endswith(f"_{entity.domain}_proxy")
 			and entity.hidden_by == er.RegistryEntryHider.INTEGRATION
 		):
@@ -477,7 +478,7 @@ async def _async_migrate_appliance_groups(
 		data=data,
 		options={CONF_GROUP_ACTIONS: group_actions} if group_actions else {},
 		title=title,
-		version=12,
+		version=13,
 	)
 	return True
 
@@ -525,14 +526,25 @@ async def _async_migrate_to_appliance_groups(
 			return False
 		if entry.version in (8, 9, 10, 11):
 			return await _async_migrate_appliance_groups(hass, entry)
-		return entry.version == 12
+		return entry.version == 13
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	"""Migrate old settings and show native-domain proxies."""
-	if entry.version > 12:
+	if entry.version > 13:
 		return False
+	if entry.version == 13:
+		return True
 	if entry.version == 12:
+		group = entry.data.get("category")
+		if group in APPLIANCE_GROUPS:
+			hass.config_entries.async_update_entry(
+				entry,
+				title=get_appliance_group_name(group, hass.config.language),
+				version=13,
+			)
+		else:
+			hass.config_entries.async_update_entry(entry, version=13)
 		return True
 	_async_normalize_proxy_entities(hass, entry)
 	if entry.version == 11:

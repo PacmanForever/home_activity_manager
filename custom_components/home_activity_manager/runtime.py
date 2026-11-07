@@ -71,6 +71,7 @@ from .const import (
     CONF_FINISH_DURATION_SECONDS,
     CONF_FINISH_POWER_W,
     CONF_LOCK_ENTITY,
+    CONF_MEDIA_PLAYER_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
     CONF_SHUTTER_COVER_ENTITY,
     CONF_MAX_RUNTIME_ACTIONS,
@@ -109,6 +110,7 @@ _ENERGY_UPDATE_INTERVAL = timedelta(minutes=1)
 _ACTIVITY_SOURCE_KEYS = {
     "power": CONF_POWER_ENTITY,
     "climate": CONF_CLIMATE_ENTITY,
+    "media_player": CONF_MEDIA_PLAYER_ENTITY,
     "cover": CONF_COVER_ENTITY,
     "running_sensor": CONF_RUNNING_ENTITY,
     "mail_motion": CONF_MAIL_MOTION_ENTITY,
@@ -342,6 +344,10 @@ class ApplianceRuntime:
             self._apply_climate_state(
                 source_state, now, initialize=True, source_entity_id=source_entity_id
             )
+        elif "media_player" in self.profile.detection_sources:
+            self._apply_media_player_state(
+                source_state, now, initialize=True, source_entity_id=source_entity_id
+            )
         elif "cover" in self.profile.detection_sources:
             self._apply_cover_state(
                 source_state, now, initialize=True, source_entity_id=source_entity_id
@@ -410,7 +416,12 @@ class ApplianceRuntime:
         self._listeners.add(listener)
         return lambda: self._listeners.discard(listener)
 
-    def clear_pending_unload(self, source_entity_id: str | None = None) -> None:
+    def clear_pending_unload(
+        self,
+        source_entity_id: str | None = None,
+        *,
+        run_emptied_action: bool = True,
+    ) -> None:
         """Clear the unload state and cancel all scheduled reminders."""
         was_pending = self.pending_unload
         self._pending_generation += 1
@@ -423,7 +434,11 @@ class ApplianceRuntime:
             and ("mail_motion" in self.profile.detection_sources or "mail_slot" in self.profile.detection_sources)
         ):
             self._queue_actions(CONF_FINISH_ACTIONS, source_entity_id)
-        if was_pending and "emptied" in self.profile.action_groups:
+        if (
+            was_pending
+            and run_emptied_action
+            and "emptied" in self.profile.action_groups
+        ):
             self._queue_actions(CONF_EMPTIED_ACTIONS, source_entity_id)
         self._schedule_save()
         self._schedule_deadline()
@@ -530,6 +545,11 @@ class ApplianceRuntime:
             and entity_id == self.config.get(CONF_CLIMATE_ENTITY)
         ):
             self._apply_climate_state(new_state, now, source_entity_id=entity_id)
+        elif (
+            "media_player" in self.profile.detection_sources
+            and entity_id == self.config.get(CONF_MEDIA_PLAYER_ENTITY)
+        ):
+            self._apply_media_player_state(new_state, now, source_entity_id=entity_id)
         elif (
             "cover" in self.profile.detection_sources
             and entity_id == self.config.get(CONF_COVER_ENTITY)
@@ -647,6 +667,19 @@ class ApplianceRuntime:
         self._apply_running_value(value, now, initialize, source_entity_id)
 
     def _apply_climate_state(
+        self,
+        state: Any,
+        now: datetime,
+        initialize: bool = False,
+        source_entity_id: str | None = None,
+    ) -> None:
+        value = None
+        if state is not None and state.state not in ("unknown", "unavailable"):
+            value = "off" if state.state == "off" else "on"
+
+        self._apply_running_value(value, now, initialize, source_entity_id)
+
+    def _apply_media_player_state(
         self,
         state: Any,
         now: datetime,
@@ -887,7 +920,13 @@ class ApplianceRuntime:
             if "door_alarm" in self.profile.parameter_groups:
                 self._update_alarm_condition("door", self.door_open, now)
             if self.door_open and "pending_unload" in self.profile.parameter_groups:
-                self.clear_pending_unload(source_entity_id)
+                self.clear_pending_unload(
+                    source_entity_id,
+                    run_emptied_action=not (
+                        self.detector.is_running
+                        and "power" in self.profile.detection_sources
+                    ),
+                )
             elif (
                 self.pending_unload
                 and not self.detector.is_running
@@ -922,6 +961,12 @@ class ApplianceRuntime:
                 self._finish_cycle_energy_measurement(event.occurred_at)
                 if "cycle_finish" in self.profile.action_groups:
                     self._queue_actions(CONF_FINISH_ACTIONS, source_entity_id)
+                if (
+                    "pending_unload" in self.profile.parameter_groups
+                    and self.config.get(CONF_DOOR_ENTITY)
+                    and self.door_open is False
+                ):
+                    self.pending_unload = True
                 if (
                     self.pending_unload
                     and self.door_open is False

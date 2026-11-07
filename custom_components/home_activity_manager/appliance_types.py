@@ -9,6 +9,7 @@ from .const import (
     CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
     CONF_LOCK_ENTITY,
+    CONF_MEDIA_PLAYER_ENTITY,
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
     CONF_PLUG_ENTITY,
@@ -39,7 +40,7 @@ class SensorInput:
     @property
     def requires_source_representation(self) -> bool:
         """Return whether this input is represented by a visible source entity."""
-        if self.domain in ("climate", "cover", "lock"):
+        if self.domain in ("climate", "cover", "lock", "media_player"):
             return True
         if self.output_entity == "running":
             return False
@@ -63,7 +64,7 @@ class ApplianceTypeProfile:
         return tuple(
             item
             for item in self.sensor_inputs
-            if item.domain != "climate"
+            if item.domain not in ("climate", "media_player")
             and item.create_wrapper
             and item.output_entity is None
         )
@@ -767,6 +768,18 @@ APPLIANCE_GROUPS = {
     "deliveries": {
         "mailbox": {"mail_slot": "mailbox_slot", "mail_motion": "mailbox_motion"}
     },
+    "electronics": {
+        "screen": {
+            "smart_plug": "screen_switch",
+            "media_player": "screen_media_player",
+        },
+        "av_equipment": {
+            "smart_plug": "av_equipment_switch",
+            "media_player": "av_equipment_media_player",
+        },
+        "console": {"smart_plug": "console_switch"},
+        "computer": {"smart_plug": "computer_switch"},
+    },
 }
 
 APPLIANCE_PROFILES["laundry"] = replace(
@@ -901,6 +914,92 @@ APPLIANCE_PROFILES["aquarium_power"] = ApplianceTypeProfile(
     supports_max_runtime=False,
 )
 
+APPLIANCE_PROFILES["screen_switch"] = ApplianceTypeProfile(
+    sensor_inputs=(
+        SensorInput(
+            form_key="screen_switch_plug_entity",
+            config_key=CONF_PLUG_ENTITY,
+            domain="switch",
+            required=True,
+            detection_source="smart_plug",
+            output_entity="plug",
+        ),
+        SensorInput(form_key="screen_switch_power_entity", config_key=CONF_POWER_ENTITY, domain="sensor", device_classes=("power",), output_entity="power"),
+        SensorInput(form_key="screen_switch_energy_entity", config_key=CONF_ENERGY_ENTITY, domain="sensor", device_classes=("energy",), output_entity="total_energy", proxy_always=True),
+    ),
+    parameter_groups=(),
+    action_groups=("cycle_start", "cycle_finish"),
+    output_entities=("power", "total_energy", "last_cycle_duration", "last_cycle_energy", "running", "plug"),
+    supports_pending_unload=False,
+    estimates_remaining=False,
+    supports_max_runtime=False,
+)
+APPLIANCE_PROFILES["screen_media_player"] = ApplianceTypeProfile(
+    sensor_inputs=(
+        SensorInput(form_key="screen_media_player_entity", config_key=CONF_MEDIA_PLAYER_ENTITY, domain="media_player", required=True, detection_source="media_player", create_wrapper=False),
+        SensorInput(form_key="screen_media_player_power_entity", config_key=CONF_POWER_ENTITY, domain="sensor", device_classes=("power",), output_entity="power"),
+        SensorInput(form_key="screen_media_player_energy_entity", config_key=CONF_ENERGY_ENTITY, domain="sensor", device_classes=("energy",), output_entity="total_energy", proxy_always=True),
+    ),
+    parameter_groups=(),
+    action_groups=("cycle_start", "cycle_finish"),
+    output_entities=("power", "total_energy", "last_cycle_duration", "last_cycle_energy", "running"),
+    supports_pending_unload=False,
+    estimates_remaining=False,
+    supports_max_runtime=False,
+)
+APPLIANCE_PROFILES["av_equipment_switch"] = ApplianceTypeProfile(
+    sensor_inputs=(
+        SensorInput(form_key="av_equipment_switch_plug_entity", config_key=CONF_PLUG_ENTITY, domain="switch", required=True, detection_source="smart_plug", output_entity="plug"),
+        SensorInput(form_key="av_equipment_switch_power_entity", config_key=CONF_POWER_ENTITY, domain="sensor", device_classes=("power",), output_entity="power"),
+        SensorInput(form_key="av_equipment_switch_energy_entity", config_key=CONF_ENERGY_ENTITY, domain="sensor", device_classes=("energy",), output_entity="total_energy", proxy_always=True),
+    ),
+    parameter_groups=(),
+    action_groups=("cycle_start", "cycle_finish"),
+    output_entities=("power", "total_energy", "last_cycle_duration", "last_cycle_energy", "running", "plug"),
+    supports_pending_unload=False,
+    estimates_remaining=False,
+    supports_max_runtime=False,
+)
+APPLIANCE_PROFILES["av_equipment_media_player"] = ApplianceTypeProfile(
+    sensor_inputs=(
+        SensorInput(form_key="av_equipment_media_player_entity", config_key=CONF_MEDIA_PLAYER_ENTITY, domain="media_player", required=True, detection_source="media_player", create_wrapper=False),
+        SensorInput(form_key="av_equipment_media_player_power_entity", config_key=CONF_POWER_ENTITY, domain="sensor", device_classes=("power",), output_entity="power"),
+        SensorInput(form_key="av_equipment_media_player_energy_entity", config_key=CONF_ENERGY_ENTITY, domain="sensor", device_classes=("energy",), output_entity="total_energy", proxy_always=True),
+    ),
+    parameter_groups=(),
+    action_groups=("cycle_start", "cycle_finish"),
+    output_entities=("power", "total_energy", "last_cycle_duration", "last_cycle_energy", "running"),
+    supports_pending_unload=False,
+    estimates_remaining=False,
+    supports_max_runtime=False,
+)
+APPLIANCE_PROFILES["console_switch"] = ApplianceTypeProfile(
+    sensor_inputs=(
+        SensorInput(form_key="console_switch_plug_entity", config_key=CONF_PLUG_ENTITY, domain="switch", required=True, detection_source="smart_plug", output_entity="plug"),
+        SensorInput(form_key="console_switch_power_entity", config_key=CONF_POWER_ENTITY, domain="sensor", device_classes=("power",), output_entity="power"),
+        SensorInput(form_key="console_switch_energy_entity", config_key=CONF_ENERGY_ENTITY, domain="sensor", device_classes=("energy",), output_entity="total_energy", proxy_always=True),
+    ),
+    parameter_groups=(),
+    action_groups=("cycle_start", "cycle_finish"),
+    output_entities=("power", "total_energy", "last_cycle_duration", "last_cycle_energy", "running", "plug"),
+    supports_pending_unload=False,
+    estimates_remaining=False,
+    supports_max_runtime=False,
+)
+APPLIANCE_PROFILES["computer_switch"] = ApplianceTypeProfile(
+    sensor_inputs=(
+        SensorInput(form_key="computer_switch_plug_entity", config_key=CONF_PLUG_ENTITY, domain="switch", required=True, detection_source="smart_plug", output_entity="plug"),
+        SensorInput(form_key="computer_switch_power_entity", config_key=CONF_POWER_ENTITY, domain="sensor", device_classes=("power",), output_entity="power"),
+        SensorInput(form_key="computer_switch_energy_entity", config_key=CONF_ENERGY_ENTITY, domain="sensor", device_classes=("energy",), output_entity="total_energy", proxy_always=True),
+    ),
+    parameter_groups=(),
+    action_groups=("cycle_start", "cycle_finish"),
+    output_entities=("power", "total_energy", "last_cycle_duration", "last_cycle_energy", "running", "plug"),
+    supports_pending_unload=False,
+    estimates_remaining=False,
+    supports_max_runtime=False,
+)
+
 APPLIANCE_GROUP_NAMES = {
     "climate": "Climate control",
     "large_appliances": "Large appliances",
@@ -908,6 +1007,7 @@ APPLIANCE_GROUP_NAMES = {
     "openings": "Openings",
     "sun_protection": "Sun protection",
     "deliveries": "Deliveries",
+    "electronics": "Electronics",
 }
 
 APPLIANCE_GROUP_TRANSLATIONS = {
@@ -918,6 +1018,7 @@ APPLIANCE_GROUP_TRANSLATIONS = {
         "openings": "Tancaments",
         "sun_protection": "Protecció solar",
         "deliveries": "Lliuraments",
+        "electronics": "Electrònica",
     },
     "es": {
         "climate": "Climatización",
@@ -926,6 +1027,7 @@ APPLIANCE_GROUP_TRANSLATIONS = {
         "openings": "Aberturas",
         "sun_protection": "Protección solar",
         "deliveries": "Entregas",
+        "electronics": "Electrónica",
     },
 }
 
@@ -947,6 +1049,10 @@ APPLIANCE_CLASS_NAMES = {
     "aquarium": "Aquarium",
     "opening": "Opening",
     "sun_protection": "Sun protection",
+    "screen": "Screen",
+    "av_equipment": "AV equipment",
+    "console": "Console",
+    "computer": "Computer",
 }
 
 APPLIANCE_CLASS_TRANSLATIONS = {
@@ -967,6 +1073,10 @@ APPLIANCE_CLASS_TRANSLATIONS = {
         "freezer": "Congelador",
         "opening": "Obertura",
         "sun_protection": "Protecció solar",
+        "screen": "Pantalla",
+        "av_equipment": "Equip AV",
+        "console": "Consola",
+        "computer": "Ordinador",
     },
     "es": {
         "air_conditioner": "Aire acondicionado",
@@ -985,6 +1095,10 @@ APPLIANCE_CLASS_TRANSLATIONS = {
         "freezer": "Congelador",
         "opening": "Abertura",
         "sun_protection": "Protección solar",
+        "screen": "Pantalla",
+        "av_equipment": "Equipo AV",
+        "console": "Consola",
+        "computer": "Ordenador",
     },
 }
 
@@ -1064,11 +1178,17 @@ APPLIANCE_TYPES = (
     "dryer",
     "mailbox_slot",
     "mailbox_motion",
+    "console_switch",
     "laundry",
+    "av_equipment_switch",
+    "av_equipment_media_player",
     "refrigerator_switch",
     "refrigerator",
     "opening_cover",
     "opening",
+    "computer_switch",
+    "screen_switch",
+    "screen_media_player",
     "sun_protection_cover",
     "sun_protection_contact",
     "washer",
@@ -1101,6 +1221,12 @@ APPLIANCE_MODEL_NAMES = {
     "opening_cover": "Opening (cover)",
     "sun_protection_contact": "Sun protection (contact sensor)",
     "sun_protection_cover": "Sun protection (cover)",
+    "screen_switch": "Screen (switch)",
+    "screen_media_player": "Screen (media player)",
+    "av_equipment_switch": "AV equipment (switch)",
+    "av_equipment_media_player": "AV equipment (media player)",
+    "console_switch": "Console (switch)",
+    "computer_switch": "Computer (switch)",
 }
 
 APPLIANCE_DETECTION_MODEL_NAMES = {
@@ -1138,6 +1264,11 @@ APPLIANCE_DETECTION_MODEL_NAMES = {
         "en": "Mail-slot contact/opening sensor",
         "ca": "Sensor de contacte/obertura de portella",
         "es": "Sensor de contacto/apertura de trampilla",
+    },
+    "media_player": {
+        "en": "Media player",
+        "ca": "Entitat media_player",
+        "es": "Entidad media_player",
     },
 }
 
@@ -1194,6 +1325,12 @@ LEGACY_APPLIANCE_GROUPS = {
     "refrigerator_switch": "large_appliances",
     "aquarium_plug": "animal_care",
     "aquarium_power": "animal_care",
+    "screen_switch": "electronics",
+    "screen_media_player": "electronics",
+    "av_equipment_switch": "electronics",
+    "av_equipment_media_player": "electronics",
+    "console_switch": "electronics",
+    "computer_switch": "electronics",
 }
 
 

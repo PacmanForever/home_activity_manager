@@ -54,6 +54,7 @@ from .const import (
     CONF_MAIL_MOTION_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
     CONF_LOCK_ENTITY,
+    CONF_MEDIA_PLAYER_ENTITY,
     CONF_MAX_RUNTIME_ACTIONS,
     CONF_MAX_RUNTIME_SECONDS,
     CONF_PENDING_ACTIONS,
@@ -99,6 +100,7 @@ _ENTRY_DATA_KEYS = {
     CONF_PH_ENTITY,
     CONF_WATER_LEVEL_ENTITY,
     CONF_CLIMATE_ENTITY,
+    CONF_MEDIA_PLAYER_ENTITY,
     CONF_COVER_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
     CONF_SHUTTER_COVER_ENTITY,
@@ -716,6 +718,15 @@ def _validate_climate_entity(
     return entity_entry is not None and entity_entry.domain == "climate"
 
 
+def _validate_media_player_entity(
+    hass: HomeAssistant, entity_id: str | None
+) -> bool:
+    if entity_id is None:
+        return False
+    entity_entry = er.async_get(hass).async_get(entity_id)
+    return entity_entry is not None and entity_entry.domain == "media_player"
+
+
 def _validate_pending(values: dict[str, Any]) -> bool:
     try:
         delay = float(values[CONF_PENDING_DELAY_SECONDS])
@@ -807,6 +818,7 @@ def _entry_data(values: dict[str, Any]) -> dict[str, Any]:
     source_keys = {
         "power": CONF_POWER_ENTITY,
         "climate": CONF_CLIMATE_ENTITY,
+        "media_player": CONF_MEDIA_PLAYER_ENTITY,
         "running_sensor": CONF_RUNNING_ENTITY,
         "mail_motion": CONF_MAIL_MOTION_ENTITY,
         "mail_slot": CONF_MAIL_SLOT_ENTITY,
@@ -1025,6 +1037,24 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors={"base": "climate_entity_requires_no_device"},
                     last_step=False,
                 )
+            if (
+                "media_player" in profile.detection_sources
+                and not _validate_media_player_entity(
+                    self.hass, self._draft.get(CONF_MEDIA_PLAYER_ENTITY)
+                )
+            ):
+                return self.async_show_form(
+                    step_id=_profile_step_id(
+                        "sensors", self._draft[CONF_APPLIANCE_TYPE]
+                    ),
+                    data_schema=_sensor_schema(
+                        _sensor_form_values(self._draft, profile),
+                        profile,
+                        self.hass,
+                    ),
+                    errors={"base": "media_player_entity_requires_media_player"},
+                    last_step=False,
+                )
             return await self.async_step_parameters()
         profile = get_appliance_profile(self._draft[CONF_APPLIANCE_TYPE])
         return self.async_show_form(
@@ -1138,6 +1168,25 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_activity_mode_openings = async_step_activity_mode
     async_step_activity_mode_deliveries = async_step_activity_mode
     async_step_activity_mode_refrigeration = async_step_activity_mode
+    async_step_activity_mode_electronics = async_step_activity_mode
+    async_step_sensors_screen_switch = async_step_sensors
+    async_step_parameters_screen_switch = async_step_parameters
+    async_step_actions_screen_switch = async_step_actions
+    async_step_sensors_screen_media_player = async_step_sensors
+    async_step_parameters_screen_media_player = async_step_parameters
+    async_step_actions_screen_media_player = async_step_actions
+    async_step_sensors_av_equipment_switch = async_step_sensors
+    async_step_parameters_av_equipment_switch = async_step_parameters
+    async_step_actions_av_equipment_switch = async_step_actions
+    async_step_sensors_av_equipment_media_player = async_step_sensors
+    async_step_parameters_av_equipment_media_player = async_step_parameters
+    async_step_actions_av_equipment_media_player = async_step_actions
+    async_step_sensors_console_switch = async_step_sensors
+    async_step_parameters_console_switch = async_step_parameters
+    async_step_actions_console_switch = async_step_actions
+    async_step_sensors_computer_switch = async_step_sensors
+    async_step_parameters_computer_switch = async_step_parameters
+    async_step_actions_computer_switch = async_step_actions
     async_step_sensors_thermostat_climate = async_step_sensors
     async_step_sensors_air_conditioner_climate = async_step_sensors
     async_step_sensors_aquarium_plug = async_step_sensors
@@ -1604,6 +1653,22 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     errors={"base": "climate_entity_requires_no_device"},
                     last_step=False,
                 )
+            if (
+                "media_player" in profile.detection_sources
+                and not _validate_media_player_entity(
+                    self.hass, values.get(CONF_MEDIA_PLAYER_ENTITY)
+                )
+            ):
+                return self.async_show_form(
+                    step_id=_profile_step_id("sensors", values[CONF_APPLIANCE_TYPE]),
+                    data_schema=_sensor_schema(
+                        _sensor_form_values(values, profile),
+                        profile,
+                        self.hass,
+                    ),
+                    errors={"base": "media_player_entity_requires_no_device"},
+                    last_step=False,
+                )
             return await self.async_step_parameters()
         profile = get_appliance_profile(values[CONF_APPLIANCE_TYPE])
         return self.async_show_form(
@@ -1765,6 +1830,25 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_actions_refrigerator_switch = async_step_actions
     async_step_activity_mode_laundry = async_step_activity_mode
     async_step_activity_mode_refrigeration = async_step_activity_mode
+    async_step_activity_mode_electronics = async_step_activity_mode
+    async_step_sensors_screen_switch = async_step_sensors
+    async_step_parameters_screen_switch = async_step_parameters
+    async_step_actions_screen_switch = async_step_actions
+    async_step_sensors_screen_media_player = async_step_sensors
+    async_step_parameters_screen_media_player = async_step_parameters
+    async_step_actions_screen_media_player = async_step_actions
+    async_step_sensors_av_equipment_switch = async_step_sensors
+    async_step_parameters_av_equipment_switch = async_step_parameters
+    async_step_actions_av_equipment_switch = async_step_actions
+    async_step_sensors_av_equipment_media_player = async_step_sensors
+    async_step_parameters_av_equipment_media_player = async_step_parameters
+    async_step_actions_av_equipment_media_player = async_step_actions
+    async_step_sensors_console_switch = async_step_sensors
+    async_step_parameters_console_switch = async_step_parameters
+    async_step_actions_console_switch = async_step_actions
+    async_step_sensors_computer_switch = async_step_sensors
+    async_step_parameters_computer_switch = async_step_parameters
+    async_step_actions_computer_switch = async_step_actions
     async_step_sensors_laundry = async_step_sensors
     async_step_parameters_laundry = async_step_parameters
     async_step_actions_laundry = async_step_actions

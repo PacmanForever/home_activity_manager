@@ -101,6 +101,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 "openings",
                 "sun_protection",
                 "deliveries",
+                "electronics",
             },
         )
         mapped_classes = {
@@ -112,6 +113,21 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertEqual(
             set(APPLIANCE_CLASS_NAMES) - mapped_classes,
             {"blind", "opening", "sun_protection"},
+        )
+        self.assertEqual(
+            APPLIANCE_GROUPS["electronics"],
+            {
+                "screen": {
+                    "smart_plug": "screen_switch",
+                    "media_player": "screen_media_player",
+                },
+                "av_equipment": {
+                    "smart_plug": "av_equipment_switch",
+                    "media_player": "av_equipment_media_player",
+                },
+                "console": {"smart_plug": "console_switch"},
+                "computer": {"smart_plug": "computer_switch"},
+            },
         )
         for classes in APPLIANCE_GROUPS.values():
             for modes in classes.values():
@@ -192,7 +208,19 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertEqual(
             set(mapped),
             set(APPLIANCE_PROFILES)
-            - {"laundry", "aquarium_plug", "aquarium_power", "fan_power", "fan_switch"},
+            - {
+                "laundry",
+                "aquarium_plug",
+                "aquarium_power",
+                "fan_power",
+                "fan_switch",
+                "screen_switch",
+                "screen_media_player",
+                "av_equipment_switch",
+                "av_equipment_media_player",
+                "console_switch",
+                "computer_switch",
+            },
         )
         for modes in APPLIANCE_CATEGORIES.values():
             for mode, profile in modes.items():
@@ -311,9 +339,9 @@ class ConfigFlowSchemaTests(unittest.TestCase):
     def test_group_labels_are_plural_in_all_languages(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
         expected = {
-            "en": {"openings": "Openings", "deliveries": "Deliveries"},
-            "ca": {"openings": "Tancaments", "deliveries": "Lliuraments"},
-            "es": {"openings": "Aberturas", "deliveries": "Entregas"},
+            "en": {"openings": "Openings", "deliveries": "Deliveries", "electronics": "Electronics"},
+            "ca": {"openings": "Tancaments", "deliveries": "Lliuraments", "electronics": "Electrònica"},
+            "es": {"openings": "Aberturas", "deliveries": "Entregas", "electronics": "Electrónica"},
         }
         self.assertEqual(
             {key: APPLIANCE_GROUP_NAMES[key] for key in expected["en"]},
@@ -365,6 +393,69 @@ class ConfigFlowSchemaTests(unittest.TestCase):
 
         for path in paths:
             assert_no_jinja(json.loads(path.read_text(encoding="utf-8")), str(path))
+
+    def test_switch_translations_use_consistent_terminology(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        paths = (
+            root / "strings.json",
+            root / "translations" / "en.json",
+            root / "translations" / "es.json",
+            root / "translations" / "ca.json",
+        )
+        obsolete_terms = (
+            "smart plug",
+            "smart switch",
+            "smart-plug",
+            "smart-switch",
+            "plug-off",
+            "plug off",
+            "plug",
+            "endoll",
+            "enchufe",
+            "interruptor intel·ligent",
+            "interruptor inteligente",
+        )
+        expected_mode_labels = {
+            "strings.json": "Activity detection with a switch",
+            "en.json": "Activity detection with a switch",
+            "es.json": "Detección de actividad con interruptor",
+            "ca.json": "Detecció d’activitat amb interruptor",
+        }
+        expected_proxy_names = {
+            "strings.json": "Switch (HAM Proxy)",
+            "en.json": "Switch (HAM Proxy)",
+            "es.json": "Interruptor (HAM Proxy)",
+            "ca.json": "Interruptor (HAM Proxy)",
+        }
+
+        def assert_consistent(value, path: str) -> None:
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    assert_consistent(child, f"{path}.{key}")
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    assert_consistent(child, f"{path}[{index}]")
+            elif isinstance(value, str):
+                for term in obsolete_terms:
+                    self.assertNotIn(term, value.lower(), path)
+
+        for path in paths:
+            translation = json.loads(path.read_text(encoding="utf-8"))
+            assert_consistent(translation, str(path))
+            for selector_key, selector in translation["selector"].items():
+                if selector_key.startswith("activity_mode") and "smart_plug" in selector.get(
+                    "options", {}
+                ):
+                    self.assertEqual(
+                        selector["options"]["smart_plug"],
+                        expected_mode_labels[path.name],
+                        f"{path}:{selector_key}",
+                    )
+            self.assertEqual(
+                translation["entity"]["switch"]["plug"]["name"],
+                expected_proxy_names[path.name],
+                str(path),
+            )
 
     def test_legacy_blind_class_remains_editable_but_is_not_a_new_choice(self) -> None:
         self.assertNotIn("blind", APPLIANCE_GROUPS["sun_protection"])
@@ -425,6 +516,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             [
                 "climate",
                 "animal_care",
+                "electronics",
                 "large_appliances",
                 "deliveries",
                 "sun_protection",
@@ -1231,6 +1323,16 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 ("state", "pending_unload"), expected_names
             ):
                 self.assertEqual(binary_sensor_names[key]["name"], expected_name)
+        expected_button_names = (
+            ("Turn off “Pending to unload”", "Reset “Total energy”"),
+            ("Turn off “Pending to unload”", "Reset “Total energy”"),
+            ("Desactiva «Pendiente de vaciar»", "Reinicia «Energía total»"),
+            ("Desactiva “Pendent de buidar”", "Reinicia “Energia total”"),
+        )
+        for translation, expected_names in zip(translations, expected_button_names):
+            button_names = translation["entity"]["button"]
+            for key, expected_name in zip(("clear_pending", "reset_energy"), expected_names):
+                self.assertEqual(button_names[key]["name"], expected_name)
         expected_input_names = (
             ("Motion sensor (HAM Proxy)", "Main-door contact/opening sensor (HAM Proxy)", "Mail-slot contact/opening sensor (HAM Proxy)"),
             ("Motion sensor (HAM Proxy)", "Main-door contact/opening sensor (HAM Proxy)", "Mail-slot contact/opening sensor (HAM Proxy)"),

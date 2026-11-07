@@ -11,7 +11,7 @@
 [![Home Assistant](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FPacmanForever%2Fhome_activity_manager%2Fmain%2Fdocs%2Fhome_assistant_compatibility.json&query=%24.tested_version&suffix=%20tested&label=home%20assistant&color=blue)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 [![Daily HA compatibility](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml/badge.svg?branch=main)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 
-Home Activity Manager makes compatible household devices smarter by bringing their Home Assistant entities together under a dedicated device. It adds activity tracking, actions, reminders, and alarms, and is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles are organized into climate control, large appliances (laundry and refrigeration), animal care, deliveries, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
+Home Activity Manager makes compatible household devices smarter by bringing their Home Assistant entities together under a dedicated device. It adds activity tracking, actions, reminders, and alarms, and is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles are organized into climate control, large appliances (laundry and refrigeration), animal care, deliveries, electronics, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
 
 **Last updated:** 2026-11-07
 
@@ -46,7 +46,7 @@ Climate control
 |   `-- Activity detection with a climate entity
 |-- Fan
 |   |-- Activity detection with a power sensor
-|   `-- Activity detection with a smart switch
+|   `-- Activity detection with a switch
 `-- Thermostat
     `-- Activity detection with a climate entity
 
@@ -64,14 +64,14 @@ Large appliances
 |   `-- Activity detection with a power sensor
 |-- Refrigerator
 |   |-- Activity detection with a power sensor
-|   `-- Activity detection with a smart plug
+|   `-- Activity detection with a switch
 `-- Freezer
     |-- Activity detection with a power sensor
-    `-- Activity detection with a smart plug
+    `-- Activity detection with a switch
 
 Animal care
 `-- Aquarium
-    |-- Activity detection with a smart plug
+    |-- Activity detection with a switch
     `-- Activity detection with a power sensor
 
 Openings
@@ -87,6 +87,18 @@ Sun protection
 `-- Awning
     |-- Activity detection with a contact sensor
     `-- Activity detection with a cover entity
+
+Electronics
+|-- Screen
+|   |-- Activity detection with a switch
+|   `-- Activity detection with a media player
+|-- AV equipment
+|   |-- Activity detection with a switch
+|   `-- Activity detection with a media player
+|-- Console
+|   `-- Activity detection with a switch
+`-- Computer (PC or NAS)
+    `-- Activity detection with a switch
 ```
 
 Small appliances are not selectable until a concrete appliance class is defined.
@@ -103,7 +115,10 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 | Climate control | Air conditioner: climate entity | `climate.living_room` | The climate mode is the activity source: `off` is stopped and any other mode is active, including when `hvac_action` is idle. The original climate controls remain available. |
 | Climate control | Thermostat | `climate.living_room` | Any climate state other than `off` is active, including when the thermostat is idle; `off` ends activity. |
 | Climate control | Fan: power | `sensor.fan_power` | Power must stay above the configured start threshold for its confirmation time; it ends after staying below the finish threshold for its confirmation time. |
-| Climate control | Fan: smart switch | `switch.fan` | `on` starts activity and `off` ends it. Optional power and energy sensors are measurements only. |
+| Climate control | Fan: switch | `switch.fan` | `on` starts activity and `off` ends it. Optional power and energy sensors are measurements only. |
+| Electronics | Screen or AV equipment: switch | `switch.living_room_screen` | `on` starts activity and `off` ends it. Optional power and energy sensors are measurements only. |
+| Electronics | Screen or AV equipment: media player | `media_player.living_room_tv` | `off` ends activity; any other available state means active. `unknown` and `unavailable` do not change activity. |
+| Electronics | Console or computer (PC/NAS): switch | `switch.home_server` | `on` starts activity and `off` ends it. Optional power and energy sensors are measurements only. |
 | Deliveries | Mailbox: interior motion | `binary_sensor.mailbox_motion` plus `binary_sensor.front_door` | A new motion `on` transition records an arrival. Opening the main-door contact ends the pending collection. |
 | Deliveries | Mailbox: mail-slot contact | `binary_sensor.mail_slot` plus `binary_sensor.front_door` | A new slot-contact `on` transition records an arrival. Opening the main-door contact ends the pending collection. |
 | Large appliances | Washer | `sensor.washer_power` | Uses the configured power thresholds and confirmation times to detect a cycle. |
@@ -114,11 +129,11 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 | Openings | Access: cover | `cover.garage_door` | A settled `open` state starts activity and `closed` ends it. `opening` and `closing` keep the last settled state and do not trigger actions. |
 | Openings | Window: contact | `binary_sensor.bedroom_window_contact` | `on` means open and starts activity; `off` means closed and ends it. |
 | Large appliances | Refrigerator: power | `sensor.refrigerator_power` plus `binary_sensor.refrigerator_door` | Power detects compressor activity; the required door contact supports the door-open alarm. |
-| Large appliances | Refrigerator: smart plug | `switch.refrigerator_plug` plus `binary_sensor.refrigerator_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
+| Large appliances | Refrigerator: switch | `switch.refrigerator_plug` plus `binary_sensor.refrigerator_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
 | Large appliances | Freezer: power | `sensor.freezer_power` plus `binary_sensor.freezer_door` | Power detects compressor activity; the required door contact supports the door-open alarm. |
-| Large appliances | Freezer: smart plug | `switch.freezer_plug` plus `binary_sensor.freezer_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
-| Animal care | Aquarium: smart plug | `switch.aquarium_plug` | The plug detects activity; optional sensors can report power, cumulative energy, illuminance, water temperature, pH, and water level. |
-| Animal care | Aquarium: power | `sensor.aquarium_power` | Power thresholds detect activity; a smart plug, cumulative energy sensor, and the same optional readings can also be configured. |
+| Large appliances | Freezer: switch | `switch.freezer_plug` plus `binary_sensor.freezer_door` | The switch state detects activity (`on` active, `off` inactive); the required door contact supports the door-open alarm. |
+| Animal care | Aquarium: switch | `switch.aquarium_plug` | The switch detects activity; optional sensors can report power, cumulative energy, illuminance, water temperature, pH, and water level. |
+| Animal care | Aquarium: power | `sensor.aquarium_power` | Power thresholds detect activity; a switch, cumulative energy sensor, and the same optional readings can also be configured. |
 | Sun protection | Awning: contact | `binary_sensor.awning_position` | Tracks open/closed position and cycle duration, not motor movement; it does not create a `running` entity. |
 | Sun protection | Awning: cover | `cover.awning` | A settled `open` state is active and `closed` is inactive. `opening` and `closing` keep the last settled state. |
 
@@ -126,7 +141,7 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 
 - **Air conditioner:** choose contact-sensor, power-based, or climate-entity activity detection. Contact mode requires its binary sensor; power mode uses configurable thresholds and confirmation times. Climate mode requires an existing climate entity, keeps its original controls, and follows `off` versus any active mode regardless of `hvac_action`.
 - **Thermostat:** use an existing climate entity as the activity source. If it has no device, the original entity is associated directly with the managed device and no proxy is created. If it already belongs to a device, that association is preserved and a native climate proxy is added to the managed device. In both cases the source remains owned by its original integration. Proxies mirror standard climate state and controls and forward standard climate actions; vendor-specific services are not proxied. Activity follows climate mode (`off` versus any active mode), including periods when `hvac_action` is idle.
-- **Fan:** choose a required power sensor with configurable thresholds, or a required smart switch where `on` starts and `off` ends activity. In switch mode, optional power and cumulative energy sensors add measurements only; they do not change activity detection. Both modes expose running state, last active duration, and configurable start/end actions.
+- **Fan:** choose a required power sensor with configurable thresholds, or a required switch where `on` starts and `off` ends activity. In switch mode, optional power and cumulative energy sensors add measurements only; they do not change activity detection. Both modes expose running state, last active duration, and configurable start/end actions.
 
 ### Deliveries
 
@@ -134,11 +149,15 @@ Mailbox profiles detect arrivals with either an interior motion sensor or a mail
 
 ### Large appliances
 
-Washer, dryer, and dishwasher profiles detect cycles from power thresholds and configurable confirmation times. Each appliance can optionally monitor its door, control a smart plug, track pending unloading, and send reminders. Refrigerator and freezer profiles detect compressor activity from power or use a smart plug as the activity source; both require a door contact and support the door-open alarm. A smart plug selected alongside power is an optional control and does not change activity detection.
+Washer, dryer, and dishwasher profiles detect cycles from power thresholds and configurable confirmation times. Each appliance can optionally monitor its door, control a switch, track pending unloading, and send reminders. Opening the door during an active cycle clears pending unloading without running the **Emptied** action. If the door is closed again before the cycle ends, pending unloading is re-armed at cycle completion so an interim opening to add items does not suppress the post-cycle reminder. An open or unavailable door at cycle completion does not re-arm it. Refrigerator and freezer profiles detect compressor activity from power or use a switch as the activity source; both require a door contact and support the door-open alarm. A switch selected alongside power is an optional control and does not change activity detection.
 
 ### Animal care
 
-Aquarium profiles use either a required smart plug or a required power sensor as the activity source. Both profiles accept an optional cumulative energy sensor; otherwise, the total is calculated from power when available. Optional readings also include power, illuminance, water temperature, pH, and water level, depending on the selected profile. Illuminance is a sensor reading, not a light-control entity. The group exposes cycle-start and cycle-end shared actions.
+Aquarium profiles use either a required switch or a required power sensor as the activity source. Both profiles accept an optional cumulative energy sensor; otherwise, the total is calculated from power when available. Optional readings also include power, illuminance, water temperature, pH, and water level, depending on the selected profile. Illuminance is a sensor reading, not a light-control entity. The group exposes cycle-start and cycle-end shared actions.
+
+### Electronics
+
+Screens and AV equipment can use either a required switch or a required media-player entity. Consoles and computers (including PCs and NAS devices, shown as **Ordinador** in Catalan) use a required switch. Switch mode follows `on`/`off`; media-player mode treats `off` as inactive and any other available state as active. `unknown` and `unavailable` preserve the current activity state. Optional power and cumulative-energy sensors provide readings only and never override the selected activity source. Media-player proxies mirror standard state and supported features and forward supported controls.
 
 ### Openings
 
@@ -162,22 +181,23 @@ Windows use a required contact sensor, and conventional doors use contact detect
 - Power and energy can be monitored independently of activity detection where supported. Energy uses a selected cumulative sensor or is calculated from power.
 - Cycle-capable devices with configured power or cumulative energy also expose **Energy consumed in the last cycle**. It is unknown until a measured cycle completes and retains that completed value while the next cycle runs. A selected cumulative sensor takes precedence and its start-to-finish difference is used; otherwise, power is integrated during confirmed activity. This result is independent of total energy and its reset button. An unavailable or reset cumulative source does not fall back to power.
 - A Repairs issue is raised when a configured input is missing or unavailable and clears when the input recovers.
-- Compatible profiles can configure an immediate smart-plug-off alarm with its own repeat interval and count. It pauses while the plug state is unavailable and rearms when switched on.
+- Compatible profiles can configure an immediate switch-off alarm with its own repeat interval and count. It pauses while the switch state is unavailable and rearms when switched on.
 
 ### Group actions
 
-Configure shared actions from the group's options. The offered hooks are the ordered union of hooks supported by profiles under that group. Each appliance runs a shared action only when its own profile supports that hook and its configured source emits the event; optional lock and shutter hooks, for example, run only for an appliance with that configured capability. A group action is not a single once-per-group event. Each event is determined by that appliance's own activity source and applicable parameters. For timed hooks, timers and repeat limits come from the appliance's parameters, not the group action settings. This applies to maximum-runtime actions, pending reminders, and door, compressor, or smart-plug alarms. A hook runs only when that appliance emits the corresponding event; for example, the maximum-runtime hook requires a maximum runtime to be configured. Omitted optional values use the integration's defaults. Repeat counts are additional runs after the first, so three additional repeats allow up to four runs for that appliance.
+Configure shared actions from the group's options. The offered hooks are the ordered union of hooks supported by profiles under that group. Each appliance runs a shared action only when its own profile supports that hook and its configured source emits the event; optional lock and shutter hooks, for example, run only for an appliance with that configured capability. A group action is not a single once-per-group event. Each event is determined by that appliance's own activity source and applicable parameters. For timed hooks, timers and repeat limits come from the appliance's parameters, not the group action settings. This applies to maximum-runtime actions, pending reminders, and door, compressor, or switch alarms. A hook runs only when that appliance emits the corresponding event; for example, the maximum-runtime hook requires a maximum runtime to be configured. Omitted optional values use the integration's defaults. Repeat counts are additional runs after the first, so three additional repeats allow up to four runs for that appliance.
 
-For example, the shared smart-plug-off action runs immediately for each appliance whose plug turns off. That appliance's repeat interval and additional-repeat count control later runs independently of the other appliances in the group. The first action is not counted as a repeat. These alarm parameters are configured with the appliance, not in the group actions form.
+For example, the shared switch-off action runs immediately for each appliance whose switch turns off. That appliance's repeat interval and additional-repeat count control later runs independently of the other appliances in the group. The first action is not counted as a repeat. These alarm parameters are configured with the appliance, not in the group actions form.
 
 | Group | Hooks offered across its profiles |
 | --- | --- |
-| Climate control | Activity starts, activity ends, smart plug off |
+| Climate control | Activity starts, activity ends, switch off |
 | Deliveries | Arrival, collection reminder, collected |
-| Large appliances | Activity starts, activity ends, maximum runtime, pending unload, emptied, smart plug off, door-open alarm |
+| Large appliances | Activity starts, activity ends, maximum runtime, pending unload, emptied, switch off, door-open alarm |
 | Animal care | Activity starts, activity ends |
 | Openings | Activity starts, activity ends, lock locked, lock unlocked, shutter open, shutter closed |
 | Sun protection | Activity starts, activity ends |
+| Electronics | Activity starts, activity ends |
 
 Group action templates receive `ham_device_name` (the managed Home Assistant device's name), `ham_device_area_name` (its assigned area, or `None`), and `ham_source_class` (the configured appliance class, translated into Home Assistant's language). These describe the appliance whose group action is running, not the entity that triggered it. When a configured input entity triggers the action, `ham_source_entity_id` contains that original entity ID, not this integration's proxy entity. Timer-triggered actions still receive `ham_source_class`, but do not define `ham_source_entity_id`.
 
@@ -207,15 +227,15 @@ Each device-type-and-mode profile uses its own sensor, parameter and action fiel
 
 Where a profile exposes total energy, a cumulative energy sensor can be selected independently of the activity source. Its total is displayed in kWh and is never changed by this integration. If no external sensor is selected, profiles with a total-energy output calculate a persistent total from power readings. The reset button appears when power and a total-energy output are both available. It resets the integration's displayed energy total to zero without writing to the external sensor; when an external sensor is selected, its current reading becomes the reset baseline and later increases are shown as consumption since reset. The calculated total is maintained separately, so switching energy sources can change the displayed total; an unavailable external sensor does not fall back to the calculated total.
 
-Power-cycle defaults are 4 W for 15 seconds to start and 1 W for 60 seconds to finish. Durations are stored in seconds, selected with native duration controls, and limited to 24 hours. An auxiliary plug controls the managed device's power but does not override its selected activity source. In power-based profiles, the power sensor determines when activity ends; in the switch-based refrigerator profile, the switch itself determines activity. Laundry pending-unload reminders and refrigerator door alarms run once, then repeat up to the configured number of additional repetitions. The plug-off alarm is available only in profiles that declare it; refrigerator plugs do not trigger alarms.
+Power-cycle defaults are 4 W for 15 seconds to start and 1 W for 60 seconds to finish. Durations are stored in seconds, selected with native duration controls, and limited to 24 hours. An auxiliary switch controls the managed device's power but does not override its selected activity source. In power-based profiles, the power sensor determines when activity ends; in the switch-based refrigerator profile, the switch itself determines activity. Laundry pending-unload reminders and refrigerator door alarms run once, then repeat up to the configured number of additional repetitions. The switch-off alarm is available only in profiles that declare it; refrigerator switches do not trigger alarms.
 
 ## Entities and automations
 
-Outputs depend on the selected profile and configured inputs. A selected power sensor provides a power entity; an energy sensor or power sensor provides an energy entity. Cycle-based profiles provide activity state and last-activity duration; estimated remaining time is limited to laundry profiles. Both refrigerator modes expose activity and a door-open alarm; neither has a compressor-inactivity or plug-off alarm. Mailboxes expose their main-door and pending-collection states, plus a button to clear pending status. Detecting mail starts the mailbox cycle and runs its start actions; opening the main door or pressing the clear button ends the cycle, runs its end actions, and cancels reminders. A selected smart plug is exposed on the managed device. Contact-based doors with an associated shutter expose its open/closed state.
+Outputs depend on the selected profile and configured inputs. A selected power sensor provides a power entity; an energy sensor or power sensor provides an energy entity. Cycle-based profiles provide activity state and last-activity duration; estimated remaining time is limited to laundry profiles. Both refrigerator modes expose activity and a door-open alarm; neither has a compressor-inactivity or switch-off alarm. Mailboxes expose their main-door and pending-collection states, plus a button to clear pending status. Detecting mail starts the mailbox cycle and runs its start actions; opening the main door or pressing the clear button ends the cycle, runs its end actions, and cancels reminders. A selected switch is exposed on the managed device. Contact-based doors with an associated shutter expose its open/closed state.
 
-**HAM proxies** are duplicates: HAM creates a separate entity on the appliance device while leaving the source entity intact. For a visible input that can be reused directly, HAM associates an unassigned source with the appliance and does not create a duplicate; if the source already belongs to another device, that association stays in place and HAM adds a proxy. This applies across supported sensor, switch, contact, climate, cover, and lock inputs. Inputs used only internally, such as mailbox arrival motion, are not shown or associated. Calculated outputs such as **Running**, durations, pending status, and locally calculated energy are not proxies.
+**HAM proxies** are duplicates: HAM creates a separate entity on the appliance device while leaving the source entity intact. For a visible input that can be reused directly, HAM associates an unassigned source with the appliance and does not create a duplicate; if the source already belongs to another device, that association stays in place and HAM adds a proxy. This applies across supported sensor, switch, contact, climate, media-player, cover, and lock inputs. Inputs used only internally, such as mailbox arrival motion, are not shown or associated. Calculated outputs such as **Running**, durations, pending status, and locally calculated energy are not proxies.
 
-An external cumulative-energy sensor is the exception: HAM always creates an energy proxy so its displayed total can use a local reset baseline without writing to the original sensor. By default, every proxy has a name ending in `(HAM Proxy)` and an `entity_id` ending in `_ham_proxy`. It uses the source's custom name, then its integration name, or a translated fallback if neither exists. Home Assistant adds the device context where relevant; the proxy's `entity_id` remains stable. Climate, cover, and lock proxies mirror standard state and supported features and forward supported actions. Direct association preserves the source name; the source remains owned by its original integration. On unload or removal, HAM releases only direct associations that still point to its device and removes only its own stale proxies.
+An external cumulative-energy sensor is the exception: HAM always creates an energy proxy so its displayed total can use a local reset baseline without writing to the original sensor. By default, every proxy has a name ending in `(HAM Proxy)` and an `entity_id` ending in `_ham_proxy`. It uses the source's custom name, then its integration name, or a translated fallback if neither exists. Home Assistant adds the device context where relevant; the proxy's `entity_id` remains stable. Climate, media-player, cover, and lock proxies mirror standard state and supported features and forward supported actions. Direct association preserves the source name; the source remains owned by its original integration. On unload or removal, HAM releases only direct associations that still point to its device and removes only its own stale proxies.
 
 Contact-based doors with an associated shutter expose a separate last-open duration sensor for each layer. The shutter duration sensor is present only while a shutter source is configured.
 
