@@ -100,6 +100,7 @@ class ApplianceSensor(SensorEntity):
         self._attr_icon = {
             "power": "mdi:flash",
             "total_energy": "mdi:lightning-bolt",
+            "last_cycle_energy": "mdi:lightning-bolt-circle",
             "last_cycle_duration": "mdi:timer-check-outline",
             "shutter_last_cycle_duration": "mdi:timer-check-outline",
             "lock_unlock_duration": "mdi:lock-clock",
@@ -292,6 +293,15 @@ async def async_setup_entry(
                 SensorStateClass.TOTAL_INCREASING,
                 proxy_sources.get("total_energy"),
             ),
+            "last_cycle_energy": ApplianceSensor(
+                runtime,
+                entry,
+                "last_cycle_energy",
+                lambda runtime=runtime: runtime.last_cycle_energy_kwh,
+                UnitOfEnergy.KILO_WATT_HOUR,
+                SensorDeviceClass.ENERGY,
+                None,
+            ),
             "last_cycle_duration": ApplianceSensor(
                 runtime,
                 entry,
@@ -379,6 +389,16 @@ async def async_setup_entry(
                 if runtime.config.get(CONF_ENERGY_ENTITY) or (
                     key in runtime.profile.output_entities
                     and runtime.config.get(CONF_POWER_ENTITY)
+                ):
+                    expected_keys.add(key)
+                continue
+            if key == "last_cycle_energy":
+                if (
+                    key in runtime.profile.output_entities
+                    and (
+                        runtime.config.get(CONF_ENERGY_ENTITY)
+                        or runtime.config.get(CONF_POWER_ENTITY)
+                    )
                 ):
                     expected_keys.add(key)
                 continue

@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.57 - 2026-11-07
+
+### Added
+
+- Expose a persistent sensor for energy consumed during the most recently completed cycle. Use cumulative-energy deltas when configured, otherwise integrate power during confirmed activity.
+- Translate the new sensor name in English, Catalan, and Spanish.
+
+### Tests
+
+- Cover power integration, external-meter precedence and failures, source changes, persistence, sensor metadata, and profile eligibility.
+
 ## v0.9.56 - 2026-11-06
 
 ### Fixed

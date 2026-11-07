@@ -13,7 +13,7 @@
 
 Home Activity Manager makes compatible household devices smarter by bringing their Home Assistant entities together under a dedicated device. It adds activity tracking, actions, reminders, and alarms, and is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles are organized into climate control, large appliances (laundry and refrigeration), animal care, deliveries, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
 
-**Last updated:** 2026-11-06
+**Last updated:** 2026-11-07
 
 ## Installation
 
@@ -160,6 +160,7 @@ Windows use a required contact sensor, and conventional doors use contact detect
 - Cycle, reminder, and alarm state is restored after Home Assistant restarts. Configured actions run in order; reminders and alarms wait for the previous run to finish before repeating.
 - Running state is exposed when a profile can infer activity. Opening and contact-only sun-protection profiles expose position instead; cycle-based profiles expose last-cycle duration.
 - Power and energy can be monitored independently of activity detection where supported. Energy uses a selected cumulative sensor or is calculated from power.
+- Cycle-capable devices with configured power or cumulative energy also expose **Energy consumed in the last cycle**. It is unknown until a measured cycle completes and retains that completed value while the next cycle runs. A selected cumulative sensor takes precedence and its start-to-finish difference is used; otherwise, power is integrated during confirmed activity. This result is independent of total energy and its reset button. An unavailable or reset cumulative source does not fall back to power.
 - A Repairs issue is raised when a configured input is missing or unavailable and clears when the input recovers.
 - Compatible profiles can configure an immediate smart-plug-off alarm with its own repeat interval and count. It pauses while the plug state is unavailable and rearms when switched on.
 

@@ -258,6 +258,14 @@ class ApplianceRuntime:
         self._energy_updated_at: datetime | None = None
         self._external_energy_reset_baseline_kwh: float | None = None
         self._external_energy_reset_pending = False
+        self.last_cycle_energy_kwh: float | None = None
+        self._cycle_energy_active = False
+        self._cycle_energy_kwh = 0.0
+        self._cycle_energy_has_power = False
+        self._cycle_energy_entity: str | None = None
+        self._cycle_energy_power_entity: str | None = None
+        self._cycle_energy_external_start_kwh: float | None = None
+        self._cycle_energy_updated_at: datetime | None = None
         self._listeners: set[Callable[[], None]] = set()
         self._action_locks: dict[str, asyncio.Lock] = {}
         self._unsubscribe_states: Callable[[], None] | None = None
@@ -295,6 +303,8 @@ class ApplianceRuntime:
             )
 
         now = dt_util.utcnow()
+        if self._cycle_energy_active:
+            self._cycle_energy_updated_at = now
         lock_entity = self.config.get(CONF_LOCK_ENTITY)
         if lock_entity:
             self._apply_lock_state(
@@ -896,6 +906,7 @@ class ApplianceRuntime:
     ) -> None:
         for event in events:
             if event.transition is CycleTransition.STARTED:
+                self._start_cycle_energy_measurement(event.occurred_at)
                 self.max_runtime_fired = False
                 if "pending_unload" in self.profile.parameter_groups and self.config.get(
                     CONF_DOOR_ENTITY
@@ -908,6 +919,7 @@ class ApplianceRuntime:
                 if "cycle_start" in self.profile.action_groups:
                     self._queue_actions(CONF_START_ACTIONS, source_entity_id)
             else:
+                self._finish_cycle_energy_measurement(event.occurred_at)
                 if "cycle_finish" in self.profile.action_groups:
                     self._queue_actions(CONF_FINISH_ACTIONS, source_entity_id)
                 if (
@@ -1078,11 +1090,78 @@ class ApplianceRuntime:
                 self._notify()
 
     def _integrate_energy_to(self, now: datetime) -> None:
+        self._integrate_cycle_power_to(now)
         if self._energy_power_w is None or self._energy_updated_at is None:
             return
         elapsed_seconds = max((now - self._energy_updated_at).total_seconds(), 0.0)
         self.energy_kwh += self._energy_power_w * elapsed_seconds / 3_600_000
         self._energy_updated_at = now
+
+    def _integrate_cycle_power_to(self, now: datetime) -> None:
+        if not self._cycle_energy_active or self._cycle_energy_entity is not None:
+            return
+        updated_at = self._cycle_energy_updated_at
+        if updated_at is None:
+            self._cycle_energy_updated_at = now
+            return
+        elapsed_seconds = max((now - updated_at).total_seconds(), 0.0)
+        if elapsed_seconds and self._energy_power_w is not None:
+            self._cycle_energy_kwh += (
+                self._energy_power_w * elapsed_seconds / 3_600_000
+            )
+            self._cycle_energy_has_power = True
+        self._cycle_energy_updated_at = max(updated_at, now)
+
+    def _start_cycle_energy_measurement(self, started_at: datetime) -> None:
+        self._cycle_energy_active = True
+        self._cycle_energy_kwh = 0.0
+        self._cycle_energy_has_power = False
+        self._cycle_energy_entity = self.config.get(CONF_ENERGY_ENTITY)
+        self._cycle_energy_power_entity = self.config.get(CONF_POWER_ENTITY)
+        self._cycle_energy_external_start_kwh = None
+        if self._cycle_energy_entity is not None:
+            self._cycle_energy_external_start_kwh = self._external_energy_kwh(
+                self.hass.states.get(self._cycle_energy_entity)
+            )
+        self._cycle_energy_updated_at = started_at
+        self._integrate_cycle_power_to(dt_util.utcnow())
+
+    def _finish_cycle_energy_measurement(self, finished_at: datetime) -> None:
+        if not self._cycle_energy_active:
+            self.last_cycle_energy_kwh = None
+            return
+        self._integrate_cycle_power_to(finished_at)
+        current_energy_entity = self.config.get(CONF_ENERGY_ENTITY)
+        current_power_entity = self.config.get(CONF_POWER_ENTITY)
+        if self._cycle_energy_entity is not None:
+            end_energy_kwh = self._external_energy_kwh(
+                self.hass.states.get(self._cycle_energy_entity)
+            )
+            if (
+                self._cycle_energy_entity == current_energy_entity
+                and self._cycle_energy_external_start_kwh is not None
+                and end_energy_kwh is not None
+                and end_energy_kwh >= self._cycle_energy_external_start_kwh
+            ):
+                self.last_cycle_energy_kwh = (
+                    end_energy_kwh - self._cycle_energy_external_start_kwh
+                )
+            else:
+                self.last_cycle_energy_kwh = None
+        elif (
+            self._cycle_energy_entity == current_energy_entity
+            and
+            self._cycle_energy_power_entity == current_power_entity
+            and self._cycle_energy_has_power
+        ):
+            self.last_cycle_energy_kwh = self._cycle_energy_kwh
+        else:
+            self.last_cycle_energy_kwh = None
+        self._cycle_energy_active = False
+        self._cycle_energy_external_start_kwh = None
+        self._cycle_energy_updated_at = None
+        self._schedule_save()
+        self._notify()
 
     def _queue_actions(self, key: str, source_entity_id: str | None) -> None:
         if self.group_actions.get(key) and source_entity_id is not None:
@@ -1372,6 +1451,20 @@ class ApplianceRuntime:
                 self._external_energy_reset_baseline_kwh
             ),
             "external_energy_reset_pending": self._external_energy_reset_pending,
+            "last_cycle_energy_kwh": self.last_cycle_energy_kwh,
+            "cycle_energy_active": self._cycle_energy_active,
+            "cycle_energy_kwh": self._cycle_energy_kwh,
+            "cycle_energy_has_power": self._cycle_energy_has_power,
+            "cycle_energy_entity": self._cycle_energy_entity,
+            "cycle_energy_power_entity": self._cycle_energy_power_entity,
+            "cycle_energy_external_start_kwh": (
+                self._cycle_energy_external_start_kwh
+            ),
+            "cycle_energy_updated_at": (
+                self._cycle_energy_updated_at.isoformat()
+                if self._cycle_energy_updated_at is not None
+                else None
+            ),
             "door_open": self.door_open,
             "pending_unload": self.pending_unload,
             "pending_reminder_count": self.pending_reminder_count,
@@ -1449,6 +1542,35 @@ class ApplianceRuntime:
             if not math.isfinite(energy) or energy < 0:
                 raise ValueError("Invalid stored energy")
             self.energy_kwh = energy
+            last_cycle_energy = stored.get("last_cycle_energy_kwh")
+            if last_cycle_energy is not None:
+                if isinstance(last_cycle_energy, bool):
+                    raise ValueError("Invalid stored last cycle energy")
+                last_cycle_energy = float(last_cycle_energy)
+                if not math.isfinite(last_cycle_energy) or last_cycle_energy < 0:
+                    raise ValueError("Invalid stored last cycle energy")
+            self.last_cycle_energy_kwh = last_cycle_energy
+            self._cycle_energy_active = bool(stored.get("cycle_energy_active", False))
+            active_cycle_energy = float(stored.get("cycle_energy_kwh", 0.0))
+            if not math.isfinite(active_cycle_energy) or active_cycle_energy < 0:
+                raise ValueError("Invalid active cycle energy")
+            self._cycle_energy_kwh = active_cycle_energy
+            self._cycle_energy_has_power = bool(
+                stored.get("cycle_energy_has_power", False)
+            )
+            self._cycle_energy_entity = stored.get("cycle_energy_entity")
+            self._cycle_energy_power_entity = stored.get("cycle_energy_power_entity")
+            external_start = stored.get("cycle_energy_external_start_kwh")
+            if external_start is not None:
+                if isinstance(external_start, bool):
+                    raise ValueError("Invalid active external energy baseline")
+                external_start = float(external_start)
+                if not math.isfinite(external_start) or external_start < 0:
+                    raise ValueError("Invalid active external energy baseline")
+            self._cycle_energy_external_start_kwh = external_start
+            self._cycle_energy_updated_at = self._parse_timestamp(
+                stored.get("cycle_energy_updated_at")
+            )
             if stored.get("energy_entity", self.config.get(CONF_ENERGY_ENTITY)) == self.config.get(
                 CONF_ENERGY_ENTITY
             ):
@@ -1517,6 +1639,14 @@ class ApplianceRuntime:
             )
             self._last_valid_power_w = None
             self.energy_kwh = 0.0
+            self.last_cycle_energy_kwh = None
+            self._cycle_energy_active = False
+            self._cycle_energy_kwh = 0.0
+            self._cycle_energy_has_power = False
+            self._cycle_energy_entity = None
+            self._cycle_energy_power_entity = None
+            self._cycle_energy_external_start_kwh = None
+            self._cycle_energy_updated_at = None
             self._external_energy_reset_baseline_kwh = None
             self._external_energy_reset_pending = False
             self.door_open = None

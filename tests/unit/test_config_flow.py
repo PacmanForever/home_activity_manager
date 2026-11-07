@@ -730,6 +730,15 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 )
                 if "power" in profile.detection_sources:
                     self.assertIn("total_energy", profile.output_entities)
+                has_energy_measurement = any(
+                    item.config_key in (CONF_POWER_ENTITY, CONF_ENERGY_ENTITY)
+                    for item in profile.sensor_inputs
+                )
+                self.assertEqual(
+                    "last_cycle_energy" in profile.output_entities,
+                    "last_cycle_duration" in profile.output_entities
+                    and has_energy_measurement,
+                )
                 if "total_energy" in profile.output_entities:
                     self.assertTrue(
                         any(

@@ -376,6 +376,9 @@ async def test_runtime_state_restores_after_unload(hass, config, monkeypatch):
     current_time[0] += timedelta(seconds=15)
     await _async_fire_deadline(runtime, current_time[0])
     runtime.energy_kwh = 0.125
+    runtime.last_cycle_energy_kwh = 0.05
+    runtime._cycle_energy_kwh = 0.03
+    runtime._cycle_energy_has_power = True
     runtime.pending_unload = True
     runtime.pending_reminder_count = 1
     runtime.next_pending_reminder = current_time[0] + timedelta(minutes=15)
@@ -386,6 +389,10 @@ async def test_runtime_state_restores_after_unload(hass, config, monkeypatch):
 
     assert restored.detector.is_running
     assert restored.energy_kwh == 0.125
+    assert restored.last_cycle_energy_kwh == 0.05
+    assert restored._cycle_energy_active
+    assert restored._cycle_energy_kwh == 0.03
+    assert restored._cycle_energy_has_power
     assert restored.pending_unload is True
     assert restored.pending_reminder_count == 1
     assert restored.next_pending_reminder == current_time[0] + timedelta(minutes=15)
@@ -409,6 +416,115 @@ async def test_energy_integrates_power_over_elapsed_time(hass, config, monkeypat
 
     assert runtime.energy_kwh == pytest.approx(0.1)
     await runtime.async_unload()
+
+
+@pytest.mark.asyncio
+async def test_last_cycle_energy_integrates_power_until_confirmed_finish(
+    hass, config, monkeypatch
+):
+    current_time = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: current_time[0])
+    hass.states.async_set(
+        config[CONF_POWER_ENTITY], "100", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    await runtime.async_setup()
+
+    assert runtime.last_cycle_energy_kwh is None
+    current_time[0] += timedelta(seconds=15)
+    await _async_fire_deadline(runtime, current_time[0])
+    assert runtime.detector.is_running
+    assert runtime.last_cycle_energy_kwh is None
+
+    current_time[0] += timedelta(hours=1)
+    await _async_fire_deadline(runtime, current_time[0])
+    hass.states.async_set(
+        config[CONF_POWER_ENTITY], "0", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+    )
+    await hass.async_block_till_done()
+    current_time[0] += timedelta(seconds=60)
+    await _async_fire_deadline(runtime, current_time[0])
+
+    assert not runtime.detector.is_running
+    assert runtime.last_cycle_energy_kwh == pytest.approx(0.1)
+    await runtime.async_unload()
+
+
+@pytest.mark.asyncio
+async def test_last_cycle_energy_prefers_external_delta_and_does_not_fallback(
+    hass, monkeypatch, enable_custom_integrations
+):
+    current_time = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: current_time[0])
+    config = {
+        CONF_APPLIANCE_TYPE: "air_conditioner_contact",
+        CONF_RUNNING_ENTITY: "binary_sensor.ac_louver",
+        CONF_POWER_ENTITY: "sensor.ac_power",
+        CONF_ENERGY_ENTITY: "sensor.ac_energy",
+        "name": "Air conditioner",
+    }
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    hass.states.async_set(
+        config[CONF_POWER_ENTITY], "100", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+    )
+    hass.states.async_set(
+        config[CONF_ENERGY_ENTITY], "1000", {ATTR_UNIT_OF_MEASUREMENT: "Wh"}
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    energy_entity_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_last_cycle_energy"
+    )
+    energy_entity = registry.async_get(energy_entity_id)
+    assert energy_entity is not None
+    assert energy_entity.translation_key == "last_cycle_energy"
+    assert hass.states.get(energy_entity_id).state == "unknown"
+    assert hass.states.get(energy_entity_id).attributes["unit_of_measurement"] == "kWh"
+    assert hass.states.get(energy_entity_id).attributes["device_class"] == "energy"
+    assert "state_class" not in hass.states.get(energy_entity_id).attributes
+
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
+    await hass.async_block_till_done()
+    hass.states.async_set(
+        config[CONF_ENERGY_ENTITY], "1.4", {ATTR_UNIT_OF_MEASUREMENT: "kWh"}
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(energy_entity_id).state == "unknown"
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    await hass.async_block_till_done()
+    assert float(hass.states.get(energy_entity_id).state) == pytest.approx(0.4)
+
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
+    await hass.async_block_till_done()
+    assert float(hass.states.get(energy_entity_id).state) == pytest.approx(0.4)
+    current_time[0] += timedelta(hours=1)
+    await _async_fire_deadline(entry.runtime_data, current_time[0])
+    hass.states.async_set(config[CONF_ENERGY_ENTITY], "unavailable")
+    await hass.async_block_till_done()
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    await hass.async_block_till_done()
+    assert hass.states.get(energy_entity_id).state == "unknown"
+
+    hass.states.async_set(
+        config[CONF_ENERGY_ENTITY], "2.0", {ATTR_UNIT_OF_MEASUREMENT: "kWh"}
+    )
+    await hass.async_block_till_done()
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "on")
+    await hass.async_block_till_done()
+    entry.runtime_data.config[CONF_ENERGY_ENTITY] = "sensor.ac_energy_next"
+    hass.states.async_set(
+        "sensor.ac_energy_next", "5.0", {ATTR_UNIT_OF_MEASUREMENT: "kWh"}
+    )
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    await hass.async_block_till_done()
+    assert hass.states.get(energy_entity_id).state == "unknown"
+    assert await hass.config_entries.async_unload(entry.entry_id)
 
 
 @pytest.mark.asyncio
@@ -1073,6 +1189,7 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
         f"{entry.entry_id}_power",
         f"{entry.entry_id}_total_energy",
         f"{entry.entry_id}_last_cycle_duration",
+        f"{entry.entry_id}_last_cycle_energy",
         f"{entry.entry_id}_estimated_remaining",
         f"{entry.entry_id}_running",
         f"{entry.entry_id}_energy_reset",
@@ -1254,7 +1371,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.56" for device in appliance_devices)
+    assert all(device.sw_version == "0.9.57" for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -3092,6 +3209,7 @@ async def test_refrigerator_creates_only_its_declared_entities(
         f"{entry.entry_id}_power",
         f"{entry.entry_id}_total_energy",
         f"{entry.entry_id}_last_cycle_duration",
+        f"{entry.entry_id}_last_cycle_energy",
         f"{entry.entry_id}_running",
         f"{entry.entry_id}_door",
         f"{entry.entry_id}_energy_reset",

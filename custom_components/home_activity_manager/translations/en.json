@@ -305,6 +305,7 @@
       "total_energy": {"name": "Total energy"},
       "proxy_total_energy": {"name": "Total energy (HAM Proxy)"},
       "last_cycle_duration": {"name": "Last cycle duration"},
+      "last_cycle_energy": {"name": "Energy consumed in the last cycle"},
       "door_open_duration": {"name": "Duration of the last door opening"},
       "window_open_duration": {"name": "Duration of the last window opening"},
       "access_open_duration": {"name": "Duration of the last access opening"},
