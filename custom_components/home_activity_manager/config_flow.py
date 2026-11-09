@@ -39,6 +39,7 @@ from .const import (
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
     CONF_DOOR_ENTITY,
     CONF_ENERGY_ENTITY,
+    CONF_FAN_ENTITY,
     CONF_DOOR_OPEN_ACTIONS,
     ACTION_GROUP_CONFIG_KEYS,
     CONF_GROUP_ACTIONS,
@@ -55,6 +56,7 @@ from .const import (
     CONF_MAIL_SLOT_ENTITY,
     CONF_LOCK_ENTITY,
     CONF_MEDIA_PLAYER_ENTITY,
+    CONF_VACUUM_ENTITY,
     CONF_MAX_RUNTIME_ACTIONS,
     CONF_MAX_RUNTIME_SECONDS,
     CONF_PENDING_ACTIONS,
@@ -100,7 +102,9 @@ _ENTRY_DATA_KEYS = {
     CONF_PH_ENTITY,
     CONF_WATER_LEVEL_ENTITY,
     CONF_CLIMATE_ENTITY,
+    CONF_FAN_ENTITY,
     CONF_MEDIA_PLAYER_ENTITY,
+    CONF_VACUUM_ENTITY,
     CONF_COVER_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
     CONF_SHUTTER_COVER_ENTITY,
@@ -727,6 +731,20 @@ def _validate_media_player_entity(
     return entity_entry is not None and entity_entry.domain == "media_player"
 
 
+def _validate_fan_entity(hass: HomeAssistant, entity_id: str | None) -> bool:
+    if entity_id is None:
+        return False
+    entity_entry = er.async_get(hass).async_get(entity_id)
+    return entity_entry is not None and entity_entry.domain == "fan"
+
+
+def _validate_vacuum_entity(hass: HomeAssistant, entity_id: str | None) -> bool:
+    if entity_id is None:
+        return False
+    entity_entry = er.async_get(hass).async_get(entity_id)
+    return entity_entry is not None and entity_entry.domain == "vacuum"
+
+
 def _validate_pending(values: dict[str, Any]) -> bool:
     try:
         delay = float(values[CONF_PENDING_DELAY_SECONDS])
@@ -818,7 +836,9 @@ def _entry_data(values: dict[str, Any]) -> dict[str, Any]:
     source_keys = {
         "power": CONF_POWER_ENTITY,
         "climate": CONF_CLIMATE_ENTITY,
+        "fan": CONF_FAN_ENTITY,
         "media_player": CONF_MEDIA_PLAYER_ENTITY,
+        "vacuum": CONF_VACUUM_ENTITY,
         "running_sensor": CONF_RUNNING_ENTITY,
         "mail_motion": CONF_MAIL_MOTION_ENTITY,
         "mail_slot": CONF_MAIL_SLOT_ENTITY,
@@ -921,7 +941,7 @@ def _entry_options(values: dict[str, Any]) -> dict[str, Any]:
 class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle initial setup of an appliance category."""
 
-    VERSION = 12
+    VERSION = 13
 
     def __init__(self) -> None:
         self._draft: dict[str, Any] = {}
@@ -1037,6 +1057,36 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors={"base": "climate_entity_requires_no_device"},
                     last_step=False,
                 )
+            if "fan" in profile.detection_sources and not _validate_fan_entity(
+                self.hass, self._draft.get(CONF_FAN_ENTITY)
+            ):
+                return self.async_show_form(
+                    step_id=_profile_step_id(
+                        "sensors", self._draft[CONF_APPLIANCE_TYPE]
+                    ),
+                    data_schema=_sensor_schema(
+                        _sensor_form_values(self._draft, profile),
+                        profile,
+                        self.hass,
+                    ),
+                    errors={"base": "fan_entity_requires_fan"},
+                    last_step=False,
+                )
+            if "vacuum" in profile.detection_sources and not _validate_vacuum_entity(
+                self.hass, self._draft.get(CONF_VACUUM_ENTITY)
+            ):
+                return self.async_show_form(
+                    step_id=_profile_step_id(
+                        "sensors", self._draft[CONF_APPLIANCE_TYPE]
+                    ),
+                    data_schema=_sensor_schema(
+                        _sensor_form_values(self._draft, profile),
+                        profile,
+                        self.hass,
+                    ),
+                    errors={"base": "vacuum_entity_requires_vacuum"},
+                    last_step=False,
+                )
             if (
                 "media_player" in profile.detection_sources
                 and not _validate_media_player_entity(
@@ -1053,6 +1103,42 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                         self.hass,
                     ),
                     errors={"base": "media_player_entity_requires_media_player"},
+                    last_step=False,
+                )
+            if (
+                "fan" in profile.detection_sources
+                and not _validate_fan_entity(
+                    self.hass, self._draft.get(CONF_FAN_ENTITY)
+                )
+            ):
+                return self.async_show_form(
+                    step_id=_profile_step_id(
+                        "sensors", self._draft[CONF_APPLIANCE_TYPE]
+                    ),
+                    data_schema=_sensor_schema(
+                        _sensor_form_values(self._draft, profile),
+                        profile,
+                        self.hass,
+                    ),
+                    errors={"base": "fan_entity_requires_fan"},
+                    last_step=False,
+                )
+            if (
+                "vacuum" in profile.detection_sources
+                and not _validate_vacuum_entity(
+                    self.hass, self._draft.get(CONF_VACUUM_ENTITY)
+                )
+            ):
+                return self.async_show_form(
+                    step_id=_profile_step_id(
+                        "sensors", self._draft[CONF_APPLIANCE_TYPE]
+                    ),
+                    data_schema=_sensor_schema(
+                        _sensor_form_values(self._draft, profile),
+                        profile,
+                        self.hass,
+                    ),
+                    errors={"base": "vacuum_entity_requires_vacuum"},
                     last_step=False,
                 )
             return await self.async_step_parameters()
@@ -1169,6 +1255,7 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_activity_mode_deliveries = async_step_activity_mode
     async_step_activity_mode_refrigeration = async_step_activity_mode
     async_step_activity_mode_electronics = async_step_activity_mode
+    async_step_activity_mode_small_appliances = async_step_activity_mode
     async_step_sensors_screen_switch = async_step_sensors
     async_step_parameters_screen_switch = async_step_parameters
     async_step_actions_screen_switch = async_step_actions
@@ -1219,6 +1306,15 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     async_step_sensors_fan_switch = async_step_sensors
     async_step_parameters_fan_switch = async_step_parameters
     async_step_actions_fan_switch = async_step_actions
+    async_step_sensors_fan_entity = async_step_sensors
+    async_step_parameters_fan_entity = async_step_parameters
+    async_step_actions_fan_entity = async_step_actions
+    async_step_sensors_generic_switch = async_step_sensors
+    async_step_parameters_generic_switch = async_step_parameters
+    async_step_actions_generic_switch = async_step_actions
+    async_step_sensors_robot_vacuum_vacuum = async_step_sensors
+    async_step_parameters_robot_vacuum_vacuum = async_step_parameters
+    async_step_actions_robot_vacuum_vacuum = async_step_actions
     async_step_sensors_washer = async_step_sensors
     async_step_parameters_washer = async_step_parameters
     async_step_actions_washer = async_step_actions
@@ -1813,6 +1909,15 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_sensors_fan_switch = async_step_sensors
     async_step_parameters_fan_switch = async_step_parameters
     async_step_actions_fan_switch = async_step_actions
+    async_step_sensors_fan_entity = async_step_sensors
+    async_step_parameters_fan_entity = async_step_parameters
+    async_step_actions_fan_entity = async_step_actions
+    async_step_sensors_generic_switch = async_step_sensors
+    async_step_parameters_generic_switch = async_step_parameters
+    async_step_actions_generic_switch = async_step_actions
+    async_step_sensors_robot_vacuum_vacuum = async_step_sensors
+    async_step_parameters_robot_vacuum_vacuum = async_step_parameters
+    async_step_actions_robot_vacuum_vacuum = async_step_actions
     async_step_sensors_washer = async_step_sensors
     async_step_parameters_washer = async_step_parameters
     async_step_actions_washer = async_step_actions
@@ -1831,6 +1936,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
     async_step_activity_mode_laundry = async_step_activity_mode
     async_step_activity_mode_refrigeration = async_step_activity_mode
     async_step_activity_mode_electronics = async_step_activity_mode
+    async_step_activity_mode_small_appliances = async_step_activity_mode
     async_step_sensors_screen_switch = async_step_sensors
     async_step_parameters_screen_switch = async_step_parameters
     async_step_actions_screen_switch = async_step_actions

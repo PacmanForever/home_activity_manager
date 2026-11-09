@@ -102,6 +102,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 "sun_protection",
                 "deliveries",
                 "electronics",
+                "small_appliances",
             },
         )
         mapped_classes = {
@@ -214,6 +215,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 "aquarium_power",
                 "fan_power",
                 "fan_switch",
+                "fan_entity",
                 "screen_switch",
                 "screen_media_player",
                 "av_equipment_switch",
@@ -339,9 +341,9 @@ class ConfigFlowSchemaTests(unittest.TestCase):
     def test_group_labels_are_plural_in_all_languages(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
         expected = {
-            "en": {"openings": "Openings", "deliveries": "Deliveries", "electronics": "Electronics"},
-            "ca": {"openings": "Tancaments", "deliveries": "Lliuraments", "electronics": "Electrònica"},
-            "es": {"openings": "Aberturas", "deliveries": "Entregas", "electronics": "Electrónica"},
+            "en": {"openings": "Openings", "deliveries": "Deliveries", "electronics": "Electronics", "small_appliances": "Small appliances"},
+            "ca": {"openings": "Tancaments", "deliveries": "Lliuraments", "electronics": "Electrònica", "small_appliances": "Petits electrodomèstics"},
+            "es": {"openings": "Aberturas", "deliveries": "Entregas", "electronics": "Electrónica", "small_appliances": "Pequeños electrodomésticos"},
         }
         self.assertEqual(
             {key: APPLIANCE_GROUP_NAMES[key] for key in expected["en"]},
@@ -519,6 +521,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 "electronics",
                 "large_appliances",
                 "deliveries",
+                "small_appliances",
                 "sun_protection",
                 "openings",
             ],
@@ -1505,7 +1508,9 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                             self.assertTrue(
                                 "(required)" in sensor_labels[sensor_input.form_key]
                                 or "(obligatori)" in sensor_labels[sensor_input.form_key]
+                                or "(obligatòria)" in sensor_labels[sensor_input.form_key]
                                 or "(obligatorio)" in sensor_labels[sensor_input.form_key]
+                                or "(obligatoria)" in sensor_labels[sensor_input.form_key]
                             )
                     action_labels = translation[flow]["step"][
                         f"actions_{profile_name}"

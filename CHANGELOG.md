@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.9.59 - 2026-11-09
+
+### Added
+
+- Add fan-entity activity detection and control proxies for fan entities.
+- Add Small appliances profiles for generic switch-controlled devices and robot vacuums.
+- Add native fan and vacuum proxies that preserve source ownership and forward supported controls.
+
+### Fixed
+
+- Align the config flow version with the latest migration version to prevent new entries from entering a migration error state.
+
+### Tests
+
+- Cover profile setup, activity-state handling, proxy controls, source associations, translations, and compatibility with the current Home Assistant version.
+
 ## v0.9.58 - 2026-11-08
 
 ### Added

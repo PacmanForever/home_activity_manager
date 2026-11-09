@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from .const import (
     CONF_DOOR_ENTITY,
     CONF_ENERGY_ENTITY,
+    CONF_FAN_ENTITY,
     CONF_ILLUMINANCE_ENTITY,
     CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
@@ -17,6 +18,7 @@ from .const import (
     CONF_PH_ENTITY,
     CONF_RUNNING_ENTITY,
     CONF_TEMPERATURE_ENTITY,
+    CONF_VACUUM_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
     CONF_SHUTTER_COVER_ENTITY,
     CONF_WATER_LEVEL_ENTITY,
@@ -40,7 +42,7 @@ class SensorInput:
     @property
     def requires_source_representation(self) -> bool:
         """Return whether this input is represented by a visible source entity."""
-        if self.domain in ("climate", "cover", "lock", "media_player"):
+        if self.domain in ("climate", "cover", "lock", "media_player", "fan", "vacuum"):
             return True
         if self.output_entity == "running":
             return False
@@ -64,7 +66,7 @@ class ApplianceTypeProfile:
         return tuple(
             item
             for item in self.sensor_inputs
-            if item.domain not in ("climate", "media_player")
+            if item.domain not in ("climate", "media_player", "fan", "vacuum")
             and item.create_wrapper
             and item.output_entity is None
         )
@@ -424,6 +426,90 @@ APPLIANCE_PROFILES = {
         estimates_remaining=False,
         supports_max_runtime=False,
     ),
+    "fan_entity": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="fan_entity_fan_entity",
+                config_key=CONF_FAN_ENTITY,
+                domain="fan",
+                required=True,
+                detection_source="fan",
+                create_wrapper=False,
+            ),
+            SensorInput(
+                form_key="fan_entity_power_entity",
+                config_key=CONF_POWER_ENTITY,
+                domain="sensor",
+                device_classes=("power",),
+                output_entity="power",
+            ),
+            SensorInput(
+                form_key="fan_entity_energy_entity",
+                config_key=CONF_ENERGY_ENTITY,
+                domain="sensor",
+                device_classes=("energy",),
+                output_entity="total_energy",
+                proxy_always=True,
+            ),
+        ),
+        parameter_groups=(),
+        action_groups=("cycle_start", "cycle_finish"),
+        output_entities=("power", "total_energy", "last_cycle_duration", "last_cycle_energy", "running"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
+    "generic_switch": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="generic_switch_plug_entity",
+                config_key=CONF_PLUG_ENTITY,
+                domain="switch",
+                required=True,
+                detection_source="smart_plug",
+                output_entity="plug",
+            ),
+            SensorInput(
+                form_key="generic_switch_power_entity",
+                config_key=CONF_POWER_ENTITY,
+                domain="sensor",
+                device_classes=("power",),
+                output_entity="power",
+            ),
+            SensorInput(
+                form_key="generic_switch_energy_entity",
+                config_key=CONF_ENERGY_ENTITY,
+                domain="sensor",
+                device_classes=("energy",),
+                output_entity="total_energy",
+                proxy_always=True,
+            ),
+        ),
+        parameter_groups=(),
+        action_groups=("cycle_start", "cycle_finish"),
+        output_entities=("power", "total_energy", "last_cycle_duration", "last_cycle_energy", "running", "plug"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
+    "robot_vacuum_vacuum": ApplianceTypeProfile(
+        sensor_inputs=(
+            SensorInput(
+                form_key="robot_vacuum_vacuum_entity",
+                config_key=CONF_VACUUM_ENTITY,
+                domain="vacuum",
+                required=True,
+                detection_source="vacuum",
+                create_wrapper=False,
+            ),
+        ),
+        parameter_groups=(),
+        action_groups=("cycle_start", "cycle_finish"),
+        output_entities=("last_cycle_duration", "running"),
+        supports_pending_unload=False,
+        estimates_remaining=False,
+        supports_max_runtime=False,
+    ),
     "refrigerator": ApplianceTypeProfile(
         sensor_inputs=(
             SensorInput(
@@ -726,6 +812,10 @@ APPLIANCE_CATEGORIES = {
     },
     "washer": {"power": "washer"},
     "dishwasher": {"power": "dishwasher"},
+    "small_appliances": {
+        "smart_plug": "generic_switch",
+        "vacuum": "robot_vacuum_vacuum",
+    },
 }
 
 APPLIANCE_GROUPS = {
@@ -735,7 +825,7 @@ APPLIANCE_GROUPS = {
             "power": "air_conditioner_power",
             "climate": "air_conditioner_climate",
         },
-        "fan": {"power": "fan_power", "smart_plug": "fan_switch"},
+        "fan": {"power": "fan_power", "smart_plug": "fan_switch", "fan": "fan_entity"},
         "thermostat": {"climate": "thermostat_climate"},
     },
     "large_appliances": {
@@ -779,6 +869,10 @@ APPLIANCE_GROUPS = {
         },
         "console": {"smart_plug": "console_switch"},
         "computer": {"smart_plug": "computer_switch"},
+    },
+    "small_appliances": {
+        "generic": {"smart_plug": "generic_switch"},
+        "robot_vacuum": {"vacuum": "robot_vacuum_vacuum"},
     },
 }
 
@@ -1008,6 +1102,7 @@ APPLIANCE_GROUP_NAMES = {
     "sun_protection": "Sun protection",
     "deliveries": "Deliveries",
     "electronics": "Electronics",
+    "small_appliances": "Small appliances",
 }
 
 APPLIANCE_GROUP_TRANSLATIONS = {
@@ -1019,6 +1114,7 @@ APPLIANCE_GROUP_TRANSLATIONS = {
         "sun_protection": "Protecció solar",
         "deliveries": "Lliuraments",
         "electronics": "Electrònica",
+        "small_appliances": "Petits electrodomèstics",
     },
     "es": {
         "climate": "Climatización",
@@ -1028,6 +1124,7 @@ APPLIANCE_GROUP_TRANSLATIONS = {
         "sun_protection": "Protección solar",
         "deliveries": "Entregas",
         "electronics": "Electrónica",
+        "small_appliances": "Pequeños electrodomésticos",
     },
 }
 
@@ -1053,6 +1150,8 @@ APPLIANCE_CLASS_NAMES = {
     "av_equipment": "AV equipment",
     "console": "Console",
     "computer": "Computer",
+    "generic": "Generic appliance",
+    "robot_vacuum": "Robot vacuum",
 }
 
 APPLIANCE_CLASS_TRANSLATIONS = {
@@ -1077,6 +1176,8 @@ APPLIANCE_CLASS_TRANSLATIONS = {
         "av_equipment": "Equip AV",
         "console": "Consola",
         "computer": "Ordinador",
+        "generic": "Electrodomèstic genèric",
+        "robot_vacuum": "Aspirador robòtic",
     },
     "es": {
         "air_conditioner": "Aire acondicionado",
@@ -1099,6 +1200,8 @@ APPLIANCE_CLASS_TRANSLATIONS = {
         "av_equipment": "Equipo AV",
         "console": "Consola",
         "computer": "Ordenador",
+        "generic": "Electrodoméstico genérico",
+        "robot_vacuum": "Aspirador robótico",
     },
 }
 
@@ -1145,6 +1248,8 @@ APPLIANCE_CATEGORY_TRANSLATIONS = {
 
 def get_appliance_category_name(category: str, language: str = "en") -> str:
     """Return the category name in the configured Home Assistant language."""
+    if category in APPLIANCE_GROUP_NAMES:
+        return get_appliance_group_name(category, language)
     translations = APPLIANCE_CATEGORY_TRANSLATIONS.get(language.split("-")[0])
     if translations is None:
         return APPLIANCE_CATEGORY_NAMES[category]
@@ -1206,6 +1311,9 @@ APPLIANCE_MODEL_NAMES = {
     "thermostat_climate": "Thermostat (climate entity)",
     "fan_power": "Fan (power sensor)",
     "fan_switch": "Fan (smart switch)",
+    "fan_entity": "Fan (fan entity)",
+    "generic_switch": "Generic appliance (smart switch)",
+    "robot_vacuum_vacuum": "Robot vacuum (vacuum entity)",
     "washer": "Washer",
     "dishwasher": "Dishwasher",
     "dryer": "Dryer",
@@ -1270,6 +1378,16 @@ APPLIANCE_DETECTION_MODEL_NAMES = {
         "ca": "Entitat media_player",
         "es": "Entidad media_player",
     },
+    "fan": {
+        "en": "Fan entity",
+        "ca": "Entitat fan",
+        "es": "Entidad fan",
+    },
+    "vacuum": {
+        "en": "Vacuum entity",
+        "ca": "Entitat vacuum",
+        "es": "Entidad vacuum",
+    },
 }
 
 APPLIANCE_UNCLASSIFIED_MODEL_NAMES = {
@@ -1290,6 +1408,9 @@ LEGACY_APPLIANCE_CLASSES = {
     "air_conditioner_power": "air_conditioner",
     "fan_power": "fan",
     "fan_switch": "fan",
+    "fan_entity": "fan",
+    "generic_switch": "generic",
+    "robot_vacuum_vacuum": "robot_vacuum",
     "refrigerator": "refrigerator",
     "refrigerator_switch": "refrigerator",
         "aquarium_plug": "aquarium",
@@ -1311,6 +1432,9 @@ LEGACY_APPLIANCE_GROUPS = {
     "air_conditioner_power": "climate",
     "fan_power": "climate",
     "fan_switch": "climate",
+    "fan_entity": "climate",
+    "generic_switch": "small_appliances",
+    "robot_vacuum_vacuum": "small_appliances",
     "washer": "large_appliances",
     "dishwasher": "large_appliances",
     "dryer": "large_appliances",

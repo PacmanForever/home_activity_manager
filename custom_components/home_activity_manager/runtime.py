@@ -56,6 +56,7 @@ from .const import (
     CONF_CLIMATE_ENTITY,
     CONF_COVER_ENTITY,
     CONF_DOOR_ENTITY,
+    CONF_FAN_ENTITY,
     CONF_GROUP_ACTIONS,
     CONF_ENERGY_ENTITY,
     CONF_DOOR_OPEN_ACTIONS,
@@ -83,6 +84,7 @@ from .const import (
     CONF_PLUG_ENTITY,
     CONF_POWER_ENTITY,
     CONF_RUNNING_ENTITY,
+    CONF_VACUUM_ENTITY,
     CONF_START_ACTIONS,
     CONF_START_DURATION_SECONDS,
     CONF_START_POWER_W,
@@ -110,7 +112,9 @@ _ENERGY_UPDATE_INTERVAL = timedelta(minutes=1)
 _ACTIVITY_SOURCE_KEYS = {
     "power": CONF_POWER_ENTITY,
     "climate": CONF_CLIMATE_ENTITY,
+    "fan": CONF_FAN_ENTITY,
     "media_player": CONF_MEDIA_PLAYER_ENTITY,
+    "vacuum": CONF_VACUUM_ENTITY,
     "cover": CONF_COVER_ENTITY,
     "running_sensor": CONF_RUNNING_ENTITY,
     "mail_motion": CONF_MAIL_MOTION_ENTITY,
@@ -344,6 +348,14 @@ class ApplianceRuntime:
             self._apply_climate_state(
                 source_state, now, initialize=True, source_entity_id=source_entity_id
             )
+        elif "fan" in self.profile.detection_sources:
+            self._apply_fan_state(
+                source_state, now, initialize=True, source_entity_id=source_entity_id
+            )
+        elif "vacuum" in self.profile.detection_sources:
+            self._apply_vacuum_state(
+                source_state, now, initialize=True, source_entity_id=source_entity_id
+            )
         elif "media_player" in self.profile.detection_sources:
             self._apply_media_player_state(
                 source_state, now, initialize=True, source_entity_id=source_entity_id
@@ -546,6 +558,16 @@ class ApplianceRuntime:
         ):
             self._apply_climate_state(new_state, now, source_entity_id=entity_id)
         elif (
+            "fan" in self.profile.detection_sources
+            and entity_id == self.config.get(CONF_FAN_ENTITY)
+        ):
+            self._apply_fan_state(new_state, now, source_entity_id=entity_id)
+        elif (
+            "vacuum" in self.profile.detection_sources
+            and entity_id == self.config.get(CONF_VACUUM_ENTITY)
+        ):
+            self._apply_vacuum_state(new_state, now, source_entity_id=entity_id)
+        elif (
             "media_player" in self.profile.detection_sources
             and entity_id == self.config.get(CONF_MEDIA_PLAYER_ENTITY)
         ):
@@ -677,6 +699,33 @@ class ApplianceRuntime:
         if state is not None and state.state not in ("unknown", "unavailable"):
             value = "off" if state.state == "off" else "on"
 
+        self._apply_running_value(value, now, initialize, source_entity_id)
+
+    def _apply_fan_state(
+        self,
+        state: Any,
+        now: datetime,
+        initialize: bool = False,
+        source_entity_id: str | None = None,
+    ) -> None:
+        value = None
+        if state is not None and state.state in ("on", "off"):
+            value = state.state
+        self._apply_running_value(value, now, initialize, source_entity_id)
+
+    def _apply_vacuum_state(
+        self,
+        state: Any,
+        now: datetime,
+        initialize: bool = False,
+        source_entity_id: str | None = None,
+    ) -> None:
+        value = None
+        if state is not None:
+            if state.state in ("cleaning", "returning", "paused"):
+                value = "on"
+            elif state.state in ("idle", "docked"):
+                value = "off"
         self._apply_running_value(value, now, initialize, source_entity_id)
 
     def _apply_media_player_state(

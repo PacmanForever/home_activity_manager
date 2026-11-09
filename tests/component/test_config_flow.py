@@ -527,7 +527,7 @@ async def test_options_flow_sorts_add_appliance_choices_in_active_language(
         for marker, field in result["data_schema"].schema.items()
         if marker.schema == "activity_mode"
     )
-    assert mode_field.config["options"] == ["smart_plug", "power"]
+    assert mode_field.config["options"] == ["fan", "smart_plug", "power"]
 
 
 @pytest.mark.asyncio
@@ -648,7 +648,7 @@ async def test_activity_modes_follow_the_selected_category(
 
 
 @pytest.mark.asyncio
-async def test_fan_activity_modes_offer_power_and_smart_switch(
+async def test_fan_activity_modes_offer_power_smart_switch_and_fan_entity(
     hass, enable_custom_integrations
 ):
     result = await hass.config_entries.flow.async_init(
@@ -664,7 +664,7 @@ async def test_fan_activity_modes_offer_power_and_smart_switch(
 
     assert result["step_id"] == "activity_mode_climate"
     mode_selector = next(iter(result["data_schema"].schema.values()))
-    assert set(mode_selector.config["options"]) == {"power", "smart_plug"}
+    assert set(mode_selector.config["options"]) == {"fan", "power", "smart_plug"}
     result = await hass.config_entries.flow.async_configure(
         flow_id, {"activity_mode": "smart_plug"}
     )
@@ -1575,6 +1575,21 @@ async def test_every_profile_supports_config_entry_crud(
                     config_entry=media_player_source,
                 )
                 entity_id = entity_entry.entity_id
+            elif sensor_input.domain in {"fan", "vacuum"}:
+                source_entry = MockConfigEntry(
+                    domain=f"{sensor_input.domain}_source"
+                )
+                source_entry.add_to_hass(hass)
+                entity_entry = er.async_get(hass).async_get_or_create(
+                    sensor_input.domain,
+                    source_entry.domain,
+                    revision,
+                    config_entry=source_entry,
+                )
+                entity_id = entity_entry.entity_id
+                hass.states.async_set(
+                    entity_id, "off" if sensor_input.domain == "fan" else "docked"
+                )
             elif sensor_input.domain == "sensor":
                 entity_id = f"sensor.{revision}_{sensor_input.output_entity or 'input'}"
             elif sensor_input.config_key == CONF_COVER_ENTITY:
@@ -1702,6 +1717,27 @@ async def test_every_profile_supports_config_entry_crud(
             if item.config_key == CONF_MEDIA_PLAYER_ENTITY
         )
         invalid_sensor_form[media_player_input.form_key] = "switch.invalid_source"
+        with pytest.raises(InvalidData):
+            await hass.config_entries.options.async_configure(
+                options_flow_id, invalid_sensor_form
+            )
+    for source_domain in ("fan", "vacuum"):
+        native_input = next(
+            (item for item in profile.sensor_inputs if item.domain == source_domain),
+            None,
+        )
+        if native_input is None:
+            continue
+        wrong_domain_entry = MockConfigEntry(domain="wrong_domain_source")
+        wrong_domain_entry.add_to_hass(hass)
+        wrong_domain_entity = er.async_get(hass).async_get_or_create(
+            "switch",
+            wrong_domain_entry.domain,
+            f"{source_domain}_{appliance_type}",
+            config_entry=wrong_domain_entry,
+        )
+        invalid_sensor_form = dict(second_sensor_form)
+        invalid_sensor_form[native_input.form_key] = wrong_domain_entity.entity_id
         with pytest.raises(InvalidData):
             await hass.config_entries.options.async_configure(
                 options_flow_id, invalid_sensor_form
