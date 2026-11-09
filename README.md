@@ -100,13 +100,13 @@ Electronics
 |   `-- Activity detection with a switch
 `-- Computer (PC or NAS)
     `-- Activity detection with a switch
-```
 
 Small appliances
 |-- Generic appliance
 |   `-- Activity detection with a switch
 `-- Robot vacuum
     `-- Activity detection with a vacuum entity
+```
 Group, appliance-class, and activity-mode choices are sorted alphabetically by their translated labels in the active Home Assistant language.
 
 ### Activity detection examples
