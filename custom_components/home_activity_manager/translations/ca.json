@@ -160,7 +160,7 @@
         },
         "data_description": {"activity_mode": "Només aquest sensor determina l'activitat de l'dispositiu."}
       },
-      "add_appliance": {"title": "Afegeix un dispositiu", "data": {"name": "Nom que es mostrarà per a aquest dispositiu", "appliance_group": "Agrupació de dispositius"}},
+      "add_appliance": {"title": "Afegeix un dispositiu", "data": {"name": "Nom que es mostrarà per a aquest dispositiu", "area_id": "Àrea (opcional)", "appliance_group": "Agrupació de dispositius"}},
       "select_appliance": {"title": "Selecciona el dispositiu", "data": {"appliance_id": "Dispositiu"}},
       "confirm_remove": {"title": "Confirma l’eliminació", "description": "Vols eliminar {name}?", "menu_options": {"confirm_remove_appliance": "Confirma", "cancel_remove_appliance": "Cancel·la"}},
       "group_actions": {
@@ -361,12 +361,24 @@
     }
   },
   "entity": {
-    "climate": {"climate_proxy": {"name": "Controls de climate (HAM Proxy)"}},
-    "fan": {"fan_proxy": {"name": "Controls del ventilador (HAM Proxy)"}},
+    "climate": {"climate_proxy": {"name": "Climatització (HAM Proxy)"}},
+    "fan": {"fan_proxy": {"name": "Ventilador (HAM Proxy)"}},
     "media_player": {"media_player_proxy": {"name": "Reproductor multimèdia (HAM Proxy)"}},
-    "cover": {"cover_proxy": {"name": "Controls del cover (HAM Proxy)"}},
-    "lock": {"lock_proxy": {"name": "Controls del pany (HAM Proxy)"}},
-    "vacuum": {"vacuum_proxy": {"name": "Controls de l’aspirador (HAM Proxy)"}},
+    "cover": {
+      "cover_proxy": {"name": "Coberta (HAM Proxy)"},
+      "cover_proxy_awning": {"name": "Tendal (HAM Proxy)"},
+      "cover_proxy_blind": {"name": "Persiana (HAM Proxy)"},
+      "cover_proxy_curtain": {"name": "Cortina (HAM Proxy)"},
+      "cover_proxy_damper": {"name": "Registre (HAM Proxy)"},
+      "cover_proxy_door": {"name": "Porta (HAM Proxy)"},
+      "cover_proxy_garage": {"name": "Porta del garatge (HAM Proxy)"},
+      "cover_proxy_gate": {"name": "Reixa (HAM Proxy)"},
+      "cover_proxy_shade": {"name": "Estor (HAM Proxy)"},
+      "cover_proxy_shutter": {"name": "Persiana (HAM Proxy)"},
+      "cover_proxy_window": {"name": "Finestra (HAM Proxy)"}
+    },
+    "lock": {"lock_proxy": {"name": "Pany (HAM Proxy)"}},
+    "vacuum": {"vacuum_proxy": {"name": "Aspirador (HAM Proxy)"}},
     "sensor": {
       "power": {"name": "Potència actual"},
       "proxy_power": {"name": "Potència actual (HAM Proxy)"},
@@ -394,6 +406,7 @@
       "running": {"name": "En funcionament"},
       "state": {"name": "Estat"},
       "door_state": {"name": "Estat de la porta"},
+      "sliding_door_state": {"name": "Estat del corredís"},
       "window_state": {"name": "Estat de la finestra"},
       "access_state": {"name": "Estat de l’accés"},
       "awning_state": {"name": "Estat del tendal"},

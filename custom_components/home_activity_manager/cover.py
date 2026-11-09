@@ -39,13 +39,25 @@ class ApplianceCoverProxy(EntityProxyMixin, CoverEntity):
     """Mirror standard cover state and forward supported cover actions."""
 
     def __init__(self, runtime: ApplianceRuntime, entry: ConfigEntry) -> None:
+        source_entity_id = runtime.config.get(
+            CONF_COVER_ENTITY
+        ) or runtime.config[CONF_SHUTTER_COVER_ENTITY]
+        source_state = runtime.hass.states.get(source_entity_id)
+        device_class = (
+            source_state.attributes.get("device_class")
+            if source_state is not None
+            else None
+        )
+        try:
+            translation_key = f"cover_proxy_{CoverDeviceClass(device_class).value}"
+        except (TypeError, ValueError):
+            translation_key = "cover_proxy"
         self._init_proxy(
             runtime,
             entry,
-            runtime.config.get(CONF_COVER_ENTITY)
-            or runtime.config[CONF_SHUTTER_COVER_ENTITY],
+            source_entity_id,
             "cover",
-            "cover_proxy",
+            translation_key,
         )
 
     @property

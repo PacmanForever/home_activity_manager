@@ -368,6 +368,7 @@ def _add_appliance_identity_schema(group: str) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_NAME): selector.TextSelector(),
+            vol.Optional("area_id"): selector.AreaSelector(),
             vol.Required(CONF_APPLIANCE_GROUP, default=group): _LockedSelectSelector(
                 selector.SelectSelectorConfig(
                     options=[group],
@@ -1367,6 +1368,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         self._draft: dict[str, Any] = {}
         self._saved: dict[str, Any] = {}
         self._appliance_id: str | None = None
+        self._appliance_area_id: str | None = None
         self._appliance_action: str | None = None
 
     async def async_step_init(
@@ -1483,6 +1485,7 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
         appliance_group = self.config_entry.data["category"]
         if user_input is not None:
             self._draft[CONF_NAME] = user_input[CONF_NAME].strip()
+            self._appliance_area_id = user_input.get("area_id")
             return await self.async_step_appliance_class()
         return self.async_show_form(
             step_id="add_appliance",
@@ -1851,6 +1854,16 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
                     await self.hass.config_entries.async_reload(
                         self.config_entry.entry_id
                     )
+                    if self._appliance_area_id:
+                        device = _get_device_by_identifier(
+                            dr.async_get(self.hass),
+                            (DOMAIN, self._appliance_id),
+                            self.config_entry.entry_id,
+                        )
+                        if device is not None:
+                            dr.async_get(self.hass).async_update_device(
+                                device.id, area_id=self._appliance_area_id
+                            )
                 return self.async_create_entry(
                     title="", data=self.config_entry.options
                 )

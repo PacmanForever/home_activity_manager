@@ -57,6 +57,7 @@ _RUNNING_ICONS = {
 }
 _STATE_TRANSLATION_KEYS = {
     "door": "door_state",
+    "sliding_door": "sliding_door_state",
     "window": "window_state",
     "access": "access_state",
     "awning": "awning_state",

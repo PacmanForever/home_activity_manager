@@ -5,7 +5,12 @@ import asyncio
 import pytest
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
-from homeassistant.helpers import device_registry as dr, entity_registry as er, selector
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+    selector,
+)
 from homeassistant.helpers.storage import Store
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.plugins import enable_custom_integrations
@@ -531,8 +536,9 @@ async def test_options_flow_sorts_add_appliance_choices_in_active_language(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("assign_area", [True, False])
 async def test_options_flow_adds_mailbox_to_loaded_group_device_registry(
-    hass, enable_custom_integrations
+    hass, enable_custom_integrations, assign_area
 ):
     existing_id = "existing-mailbox"
     existing_arrival = "binary_sensor.existing_mail_arrival"
@@ -561,14 +567,26 @@ async def test_options_flow_adds_mailbox_to_loaded_group_device_registry(
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
+    area_registry = ar.async_get(hass)
+    existing_area = area_registry.async_create("Existing area")
+    device_registry = dr.async_get(hass)
+    existing_device = device_module._get_device_by_identifier(
+        device_registry, (DOMAIN, existing_id), entry.entry_id
+    )
+    assert existing_device is not None
+    device_registry.async_update_device(existing_device.id, area_id=existing_area.id)
+    new_area = area_registry.async_create("New area") if assign_area else None
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
     flow_id = result["flow_id"]
     result = await hass.config_entries.options.async_configure(
         flow_id, {"appliance_action": "add"}
     )
+    add_appliance_input = {"name": "New mailbox"}
+    if new_area is not None:
+        add_appliance_input["area_id"] = new_area.id
     result = await hass.config_entries.options.async_configure(
-        flow_id, {"name": "New mailbox"}
+        flow_id, add_appliance_input
     )
     assert result["step_id"] == "activity_mode_deliveries"
     result = await hass.config_entries.options.async_configure(
@@ -609,13 +627,15 @@ async def test_options_flow_adds_mailbox_to_loaded_group_device_registry(
         "binary_sensor", DOMAIN, f"{new_appliance_id}_pending_unload"
     )
     device = device_module._get_device_by_identifier(
-        dr.async_get(hass), (DOMAIN, new_appliance_id), entry.entry_id
+        device_registry, (DOMAIN, new_appliance_id), entry.entry_id
     )
 
     assert len(entry.runtime_data) == 2
     assert pending_entity_id is not None
     assert device is not None
     assert entity_registry.async_get(pending_entity_id).device_id == device.id
+    assert device.area_id == (new_area.id if new_area is not None else None)
+    assert device_registry.async_get(existing_device.id).area_id == existing_area.id
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

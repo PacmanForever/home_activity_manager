@@ -4663,6 +4663,58 @@ async def test_lock_source_with_existing_parent_uses_named_visible_proxy(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("device_class", "expected_name"),
+    [
+        ("awning", "Awning (HAM Proxy)"),
+        ("blind", "Blind (HAM Proxy)"),
+        ("shutter", "Shutter (HAM Proxy)"),
+        ("custom", "Cover (HAM Proxy)"),
+    ],
+)
+async def test_cover_proxy_fallback_uses_source_device_class(
+    hass, enable_custom_integrations, device_class, expected_name
+):
+    source_config_entry = MockConfigEntry(domain="cover_source")
+    source_config_entry.add_to_hass(hass)
+    source_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=source_config_entry.entry_id,
+        identifiers={(source_config_entry.domain, "awning")},
+        name="Physical cover",
+    )
+    source_entity = er.async_get(hass).async_get_or_create(
+        "cover",
+        source_config_entry.domain,
+        "awning",
+        config_entry=source_config_entry,
+        device_id=source_device.id,
+    )
+    hass.states.async_set(
+        source_entity.entity_id,
+        "closed",
+        {"device_class": device_class},
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_APPLIANCE_TYPE: "opening_cover",
+            CONF_COVER_ENTITY: source_entity.entity_id,
+            "name": "Access",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+
+    proxy_id = er.async_get(hass).async_get_entity_id(
+        "cover", DOMAIN, f"{entry.entry_id}_cover_proxy"
+    )
+    assert proxy_id is not None
+    proxy = er.async_get(hass).async_get(proxy_id)
+    assert proxy.original_name == expected_name
+
+
+@pytest.mark.asyncio
 async def test_unavailable_alarm_inputs_pause_without_clearing_or_false_alarm(
     hass, monkeypatch
 ):

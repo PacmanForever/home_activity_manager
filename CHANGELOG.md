@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.60 - 2026-11-09
+
+### Added
+
+- Add sliding doors to the Openings group with translated activity state.
+- Allow an optional area to be assigned when adding an appliance to an existing group.
+
+### Tests
+
+- Cover sliding-door setup and runtime behavior, and area assignment without changing existing device areas.
+
 ## v0.9.59 - 2026-11-09
 
 ### Added
