@@ -116,6 +116,13 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             {"blind", "opening", "sun_protection"},
         )
         self.assertEqual(
+            APPLIANCE_GROUPS["openings"]["sliding_door"],
+            {"running_sensor": "opening"},
+        )
+        self.assertEqual(
+            get_appliance_class_name("sliding_door", "ca"), "Corredís"
+        )
+        self.assertEqual(
             APPLIANCE_GROUPS["electronics"],
             {
                 "screen": {
@@ -1314,6 +1321,53 @@ class ConfigFlowSchemaTests(unittest.TestCase):
         self.assertEqual(key_shape(translations[1]), expected)
         self.assertEqual(key_shape(translations[2]), expected)
         self.assertEqual(key_shape(translations[3]), expected)
+        expected_proxy_names = (
+            {
+                ("climate", "climate_proxy"): "Climate (HAM Proxy)",
+                ("fan", "fan_proxy"): "Fan (HAM Proxy)",
+                ("media_player", "media_player_proxy"): "Media player (HAM Proxy)",
+                ("vacuum", "vacuum_proxy"): "Vacuum (HAM Proxy)",
+                ("lock", "lock_proxy"): "Lock (HAM Proxy)",
+                ("cover", "cover_proxy_awning"): "Awning (HAM Proxy)",
+                ("cover", "cover_proxy_shutter"): "Shutter (HAM Proxy)",
+                ("cover", "cover_proxy"): "Cover (HAM Proxy)",
+            },
+            {
+                ("climate", "climate_proxy"): "Climate (HAM Proxy)",
+                ("fan", "fan_proxy"): "Fan (HAM Proxy)",
+                ("media_player", "media_player_proxy"): "Media player (HAM Proxy)",
+                ("vacuum", "vacuum_proxy"): "Vacuum (HAM Proxy)",
+                ("lock", "lock_proxy"): "Lock (HAM Proxy)",
+                ("cover", "cover_proxy_awning"): "Awning (HAM Proxy)",
+                ("cover", "cover_proxy_shutter"): "Shutter (HAM Proxy)",
+                ("cover", "cover_proxy"): "Cover (HAM Proxy)",
+            },
+            {
+                ("climate", "climate_proxy"): "Climatización (HAM Proxy)",
+                ("fan", "fan_proxy"): "Ventilador (HAM Proxy)",
+                ("media_player", "media_player_proxy"): "Reproductor multimedia (HAM Proxy)",
+                ("vacuum", "vacuum_proxy"): "Aspiradora (HAM Proxy)",
+                ("lock", "lock_proxy"): "Cerradura (HAM Proxy)",
+                ("cover", "cover_proxy_awning"): "Toldo (HAM Proxy)",
+                ("cover", "cover_proxy_shutter"): "Persiana (HAM Proxy)",
+                ("cover", "cover_proxy"): "Cubierta (HAM Proxy)",
+            },
+            {
+                ("climate", "climate_proxy"): "Climatització (HAM Proxy)",
+                ("fan", "fan_proxy"): "Ventilador (HAM Proxy)",
+                ("media_player", "media_player_proxy"): "Reproductor multimèdia (HAM Proxy)",
+                ("vacuum", "vacuum_proxy"): "Aspirador (HAM Proxy)",
+                ("lock", "lock_proxy"): "Pany (HAM Proxy)",
+                ("cover", "cover_proxy_awning"): "Tendal (HAM Proxy)",
+                ("cover", "cover_proxy_shutter"): "Persiana (HAM Proxy)",
+                ("cover", "cover_proxy"): "Coberta (HAM Proxy)",
+            },
+        )
+        for translation, expected_names in zip(translations, expected_proxy_names):
+            for (domain, key), expected_name in expected_names.items():
+                self.assertEqual(
+                    translation["entity"][domain][key]["name"], expected_name
+                )
         expected_status_names = (
             ("State", "Pending to unload"),
             ("State", "Pending to unload"),

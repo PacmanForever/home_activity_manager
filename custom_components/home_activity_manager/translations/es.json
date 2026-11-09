@@ -160,7 +160,7 @@
         },
         "data_description": {"activity_mode": "Solo este sensor determina la actividad del dispositivo."}
       },
-      "add_appliance": {"title": "Añadir un dispositivo", "data": {"name": "Nombre que se mostrará para este dispositivo", "appliance_group": "Agrupación de dispositivos"}},
+      "add_appliance": {"title": "Añadir un dispositivo", "data": {"name": "Nombre que se mostrará para este dispositivo", "area_id": "Área (opcional)", "appliance_group": "Agrupación de dispositivos"}},
       "select_appliance": {"title": "Seleccionar dispositivo", "data": {"appliance_id": "Dispositivo"}},
       "confirm_remove": {"title": "Confirmar eliminación", "description": "¿Seguro que quieres eliminar {name}?", "menu_options": {"confirm_remove_appliance": "Confirmar", "cancel_remove_appliance": "Cancelar"}},
       "group_actions": {
@@ -361,12 +361,24 @@
     }
   },
   "entity": {
-    "climate": {"climate_proxy": {"name": "Controles de climate (HAM Proxy)"}},
-    "fan": {"fan_proxy": {"name": "Controles del ventilador (HAM Proxy)"}},
+    "climate": {"climate_proxy": {"name": "Climatización (HAM Proxy)"}},
+    "fan": {"fan_proxy": {"name": "Ventilador (HAM Proxy)"}},
     "media_player": {"media_player_proxy": {"name": "Reproductor multimedia (HAM Proxy)"}},
-    "cover": {"cover_proxy": {"name": "Controles de cover (HAM Proxy)"}},
-    "lock": {"lock_proxy": {"name": "Controles de la cerradura (HAM Proxy)"}},
-    "vacuum": {"vacuum_proxy": {"name": "Controles del aspirador (HAM Proxy)"}},
+    "cover": {
+      "cover_proxy": {"name": "Cubierta (HAM Proxy)"},
+      "cover_proxy_awning": {"name": "Toldo (HAM Proxy)"},
+      "cover_proxy_blind": {"name": "Persiana (HAM Proxy)"},
+      "cover_proxy_curtain": {"name": "Cortina (HAM Proxy)"},
+      "cover_proxy_damper": {"name": "Compuerta (HAM Proxy)"},
+      "cover_proxy_door": {"name": "Puerta (HAM Proxy)"},
+      "cover_proxy_garage": {"name": "Puerta de garaje (HAM Proxy)"},
+      "cover_proxy_gate": {"name": "Puerta (HAM Proxy)"},
+      "cover_proxy_shade": {"name": "Estor (HAM Proxy)"},
+      "cover_proxy_shutter": {"name": "Persiana (HAM Proxy)"},
+      "cover_proxy_window": {"name": "Ventana (HAM Proxy)"}
+    },
+    "lock": {"lock_proxy": {"name": "Cerradura (HAM Proxy)"}},
+    "vacuum": {"vacuum_proxy": {"name": "Aspiradora (HAM Proxy)"}},
     "sensor": {
       "power": {"name": "Potencia actual"},
       "proxy_power": {"name": "Potencia actual (HAM Proxy)"},
@@ -394,6 +406,7 @@
       "running": {"name": "En funcionamiento"},
       "state": {"name": "Estado"},
       "door_state": {"name": "Estado de la puerta"},
+      "sliding_door_state": {"name": "Estado del cierre corredero"},
       "window_state": {"name": "Estado de la ventana"},
       "access_state": {"name": "Estado del acceso"},
       "awning_state": {"name": "Estado del toldo"},

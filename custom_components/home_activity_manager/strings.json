@@ -160,7 +160,7 @@
         },
         "data_description": {"activity_mode": "Only this sensor determines device activity."}
       },
-      "add_appliance": {"title": "Add a device", "data": {"name": "Name shown for this device", "appliance_group": "Device group"}},
+      "add_appliance": {"title": "Add a device", "data": {"name": "Name shown for this device", "area_id": "Area (optional)", "appliance_group": "Device group"}},
       "select_appliance": {"title": "Select device", "data": {"appliance_id": "Device"}},
       "confirm_remove": {"title": "Confirm device removal", "description": "Are you sure you want to remove {name}?", "menu_options": {"confirm_remove_appliance": "Confirm", "cancel_remove_appliance": "Cancel"}},
       "group_actions": {
@@ -361,12 +361,24 @@
     }
   },
   "entity": {
-    "climate": {"climate_proxy": {"name": "Climate controls (HAM Proxy)"}},
-    "fan": {"fan_proxy": {"name": "Fan controls (HAM Proxy)"}},
+    "climate": {"climate_proxy": {"name": "Climate (HAM Proxy)"}},
+    "fan": {"fan_proxy": {"name": "Fan (HAM Proxy)"}},
     "media_player": {"media_player_proxy": {"name": "Media player (HAM Proxy)"}},
-    "vacuum": {"vacuum_proxy": {"name": "Vacuum controls (HAM Proxy)"}},
-    "cover": {"cover_proxy": {"name": "Cover controls (HAM Proxy)"}},
-    "lock": {"lock_proxy": {"name": "Lock controls (HAM Proxy)"}},
+    "vacuum": {"vacuum_proxy": {"name": "Vacuum (HAM Proxy)"}},
+    "cover": {
+      "cover_proxy": {"name": "Cover (HAM Proxy)"},
+      "cover_proxy_awning": {"name": "Awning (HAM Proxy)"},
+      "cover_proxy_blind": {"name": "Blind (HAM Proxy)"},
+      "cover_proxy_curtain": {"name": "Curtain (HAM Proxy)"},
+      "cover_proxy_damper": {"name": "Damper (HAM Proxy)"},
+      "cover_proxy_door": {"name": "Door (HAM Proxy)"},
+      "cover_proxy_garage": {"name": "Garage door (HAM Proxy)"},
+      "cover_proxy_gate": {"name": "Gate (HAM Proxy)"},
+      "cover_proxy_shade": {"name": "Shade (HAM Proxy)"},
+      "cover_proxy_shutter": {"name": "Shutter (HAM Proxy)"},
+      "cover_proxy_window": {"name": "Window (HAM Proxy)"}
+    },
+    "lock": {"lock_proxy": {"name": "Lock (HAM Proxy)"}},
     "sensor": {
       "power": {"name": "Current Power"},
       "proxy_power": {"name": "Current Power (HAM Proxy)"},
@@ -394,6 +406,7 @@
       "running": {"name": "Running"},
       "state": {"name": "State"},
       "door_state": {"name": "Door state"},
+      "sliding_door_state": {"name": "Sliding state"},
       "window_state": {"name": "Window state"},
       "access_state": {"name": "Access state"},
       "awning_state": {"name": "Awning state"},
