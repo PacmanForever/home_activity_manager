@@ -345,6 +345,27 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 expected[name],
             )
 
+    def test_sliding_door_selector_label_is_translated_in_all_languages(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        expected = {
+            "strings.json": "Sliding",
+            "en.json": "Sliding",
+            "ca.json": "Corredís",
+            "es.json": "Corredero",
+        }
+        paths = {
+            "strings.json": root / "strings.json",
+            "en.json": root / "translations" / "en.json",
+            "ca.json": root / "translations" / "ca.json",
+            "es.json": root / "translations" / "es.json",
+        }
+        for name, path in paths.items():
+            translation = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                translation["selector"]["appliance_class"]["options"]["sliding_door"],
+                expected[name],
+            )
+
     def test_group_labels_are_plural_in_all_languages(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
         expected = {
