@@ -52,7 +52,9 @@ from .runtime import (
 
 PLATFORMS = [
 	Platform.CLIMATE,
+	Platform.FAN,
 	Platform.MEDIA_PLAYER,
+	Platform.VACUUM,
 	Platform.COVER,
 	Platform.LOCK,
 	Platform.SENSOR,
@@ -149,7 +151,9 @@ def _async_normalize_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> 
 				is_proxy = True
 			elif source_entity_id in runtime._ham_directly_attached_entities:
 				is_proxy = False
-			elif input_config.domain in ("climate", "cover", "lock", "media_player"):
+			elif input_config.domain in (
+				"climate", "cover", "lock", "media_player", "fan", "vacuum"
+			):
 				source_entry = entity_registry.async_get(source_entity_id)
 				is_proxy = source_entry is None or source_entry.device_id not in (
 					None,
@@ -160,7 +164,9 @@ def _async_normalize_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> 
 			if not is_proxy:
 				continue
 
-			if input_config.domain in ("climate", "cover", "lock", "media_player"):
+			if input_config.domain in (
+				"climate", "cover", "lock", "media_player", "fan", "vacuum"
+			):
 				entity_domain = input_config.domain
 				unique_id = f"{appliance_id}_{entity_domain}_proxy"
 			elif input_config.output_entity is None:
@@ -198,7 +204,9 @@ def _async_normalize_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> 
 						new_entity_id=suggested_entity_id,
 					)
 		if (
-			entity.domain in ("climate", "cover", "lock", "media_player")
+			entity.domain in (
+				"climate", "cover", "lock", "media_player", "fan", "vacuum"
+			)
 			and entity.unique_id.endswith(f"_{entity.domain}_proxy")
 			and entity.hidden_by == er.RegistryEntryHider.INTEGRATION
 		):

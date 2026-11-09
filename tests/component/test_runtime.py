@@ -3,14 +3,18 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 import inspect
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.components.climate import ClimateEntityFeature, HVACMode
 from homeassistant.components.cover import CoverEntityFeature
+from homeassistant.components.fan import FanEntityFeature
 from homeassistant.components.lock import LockEntityFeature
 from homeassistant.components.media_player import MediaPlayerEntityFeature, RepeatMode
+from homeassistant.components.vacuum.const import VacuumActivity, VacuumEntityFeature
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfPower
@@ -28,6 +32,7 @@ from custom_components.home_activity_manager.const import (
     CONF_COMPRESSOR_INACTIVE_ACTIONS,
     CONF_COMPRESSOR_INACTIVE_DELAY_SECONDS,
     CONF_CLIMATE_ENTITY,
+    CONF_FAN_ENTITY,
     CONF_MEDIA_PLAYER_ENTITY,
     CONF_COVER_ENTITY,
     CONF_COVER_ENTITY,
@@ -58,6 +63,7 @@ from custom_components.home_activity_manager.const import (
     CONF_PLUG_OFF_REPEAT_INTERVAL_SECONDS,
     CONF_POWER_ENTITY,
     CONF_RUNNING_ENTITY,
+    CONF_VACUUM_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
     CONF_SHUTTER_COVER_ENTITY,
     CONF_SHUTTER_OPEN_ACTIONS,
@@ -96,8 +102,10 @@ from custom_components.home_activity_manager.switch import (
 )
 from custom_components.home_activity_manager.climate import ApplianceClimateProxy
 from custom_components.home_activity_manager.cover import ApplianceCoverProxy
+from custom_components.home_activity_manager.fan import ApplianceFanProxy
 from custom_components.home_activity_manager.lock import ApplianceLockProxy
 from custom_components.home_activity_manager.media_player import ApplianceMediaPlayerProxy
+from custom_components.home_activity_manager.vacuum import ApplianceVacuumProxy
 
 
 def _find_device(registry, *, identifiers):
@@ -1426,7 +1434,14 @@ async def test_category_entry_groups_appliances_without_parent_device(
     assert all(device is not None for device in appliance_devices)
     assert all(device.via_device_id is None for device in appliance_devices)
     assert all(device.manufacturer == "@pacmanforever" for device in appliance_devices)
-    assert all(device.sw_version == "0.9.58" for device in appliance_devices)
+    manifest_path = (
+        Path(__file__).parents[2]
+        / "custom_components"
+        / "home_activity_manager"
+        / "manifest.json"
+    )
+    integration_version = json.loads(manifest_path.read_text(encoding="utf-8"))["version"]
+    assert all(device.sw_version == integration_version for device in appliance_devices)
     assert [device.model for device in appliance_devices] == [
         "Large appliances · Washer · Power sensor",
         "Large appliances · Dishwasher · Power sensor",
@@ -1828,6 +1843,70 @@ async def test_fan_activity_uses_only_the_selected_source(hass, appliance_type):
         await hass.async_block_till_done()
         assert not runtime.detector.is_running
 
+    await runtime.async_unload()
+
+
+@pytest.mark.asyncio
+async def test_fan_entity_activity_ignores_speed_and_unavailable_states(hass):
+    config = {
+        CONF_APPLIANCE_TYPE: "fan_entity",
+        CONF_FAN_ENTITY: "fan.living_room",
+        "name": "Living room fan",
+    }
+    hass.states.async_set(config[CONF_FAN_ENTITY], "off", {"percentage": 0})
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    await runtime.async_setup()
+    assert not runtime.detector.is_running
+
+    hass.states.async_set(config[CONF_FAN_ENTITY], "on", {"percentage": 25})
+    await hass.async_block_till_done()
+    assert runtime.detector.is_running
+    started_at = runtime.detector.cycle_started_at
+
+    hass.states.async_set(config[CONF_FAN_ENTITY], "on", {"percentage": 75})
+    await hass.async_block_till_done()
+    assert runtime.detector.cycle_started_at == started_at
+
+    for state in ("unavailable", "unknown"):
+        hass.states.async_set(config[CONF_FAN_ENTITY], state)
+        await hass.async_block_till_done()
+        assert runtime.detector.is_running
+
+    hass.states.async_set(config[CONF_FAN_ENTITY], "off", {"percentage": 0})
+    await hass.async_block_till_done()
+    assert not runtime.detector.is_running
+    await runtime.async_unload()
+
+
+@pytest.mark.asyncio
+async def test_robot_vacuum_activity_states_and_errors(hass):
+    config = {
+        CONF_APPLIANCE_TYPE: "robot_vacuum_vacuum",
+        CONF_VACUUM_ENTITY: "vacuum.roomba",
+        "name": "Robot vacuum",
+    }
+    hass.states.async_set(config[CONF_VACUUM_ENTITY], "docked")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    await runtime.async_setup()
+    assert not runtime.detector.is_running
+
+    for state in ("cleaning", "returning", "paused"):
+        hass.states.async_set(config[CONF_VACUUM_ENTITY], state)
+        await hass.async_block_till_done()
+        assert runtime.detector.is_running
+
+    for state in ("error", "unavailable", "unknown"):
+        hass.states.async_set(config[CONF_VACUUM_ENTITY], state)
+        await hass.async_block_till_done()
+        assert runtime.detector.is_running
+
+    hass.states.async_set(config[CONF_VACUUM_ENTITY], "idle")
+    await hass.async_block_till_done()
+    assert not runtime.detector.is_running
     await runtime.async_unload()
 
 
@@ -4088,6 +4167,118 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     assert climate.native_current_temperature is None
     assert climate.preset_mode is None
     assert climate.preset_modes is None
+
+
+@pytest.mark.asyncio
+async def test_fan_and_vacuum_proxies_mirror_and_forward_controls(hass, monkeypatch):
+    fan_entity_id = "fan.original_fan"
+    vacuum_entity_id = "vacuum.original_vacuum"
+    hass.states.async_set(
+        fan_entity_id,
+        "on",
+        {
+            "current_direction": "forward",
+            "percentage": 65,
+            "percentage_step": 5,
+            "preset_mode": "quiet",
+            "preset_modes": ["quiet", "turbo", 1],
+            "speed_count": 20,
+            "oscillating": True,
+            "supported_features": int(FanEntityFeature.SET_SPEED),
+        },
+    )
+    hass.states.async_set(
+        vacuum_entity_id,
+        "cleaning",
+        {
+            "battery_level": 82,
+            "fan_speed": "turbo",
+            "fan_speed_list": ["quiet", "turbo", 1],
+            "supported_features": int(
+                VacuumEntityFeature.START | VacuumEntityFeature.PAUSE
+            ),
+        },
+    )
+    fan_runtime = SimpleNamespace(
+        hass=hass,
+        config={CONF_APPLIANCE_TYPE: "fan_entity", CONF_FAN_ENTITY: fan_entity_id},
+    )
+    vacuum_runtime = SimpleNamespace(
+        hass=hass,
+        config={
+            CONF_APPLIANCE_TYPE: "robot_vacuum_vacuum",
+            CONF_VACUUM_ENTITY: vacuum_entity_id,
+        },
+    )
+    fan = ApplianceFanProxy(fan_runtime, MockConfigEntry(domain=DOMAIN, title="Fan"))
+    vacuum = ApplianceVacuumProxy(
+        vacuum_runtime, MockConfigEntry(domain=DOMAIN, title="Vacuum")
+    )
+    fan.hass = vacuum.hass = hass
+
+    assert fan.is_on is True
+    assert fan.current_direction == "forward"
+    assert fan.percentage == 65
+    assert fan.speed_count == 20
+    assert fan.oscillating is True
+    assert fan.preset_mode == "quiet"
+    assert fan.preset_modes == ["quiet", "turbo"]
+    assert fan.supported_features == FanEntityFeature.SET_SPEED
+    assert fan.extra_state_attributes["source_entity"] == fan_entity_id
+    assert vacuum.activity == VacuumActivity.CLEANING
+    assert vacuum.battery_level == 82
+    assert vacuum.fan_speed == "turbo"
+    assert vacuum.fan_speed_list == ["quiet", "turbo"]
+    assert vacuum.supported_features == (
+        VacuumEntityFeature.START | VacuumEntityFeature.PAUSE
+    )
+    assert vacuum.extra_state_attributes["source_entity"] == vacuum_entity_id
+
+    calls = []
+
+    async def record_service_call(
+        _service_registry, domain, service, service_data, blocking=False
+    ):
+        calls.append((domain, service, service_data, blocking))
+
+    monkeypatch.setattr(type(hass.services), "async_call", record_service_call)
+    await fan.async_turn_on(percentage=40, preset_mode="quiet")
+    await fan.async_turn_on()
+    await fan.async_turn_off()
+    await fan.async_set_percentage(55)
+    await fan.async_increase_speed(percentage_step=10)
+    await fan.async_decrease_speed()
+    await fan.async_oscillate(True)
+    await fan.async_set_direction("reverse")
+    await fan.async_set_preset_mode("turbo")
+    await vacuum.async_start()
+    await vacuum.async_pause()
+    await vacuum.async_stop()
+    await vacuum.async_return_to_base()
+    await vacuum.async_clean_spot()
+    await vacuum.async_locate()
+    await vacuum.async_set_fan_speed("quiet")
+    await vacuum.async_send_command("zone_clean", params=[1, 2])
+
+    assert calls == [
+        ("fan", "turn_on", {"percentage": 40, "preset_mode": "quiet", "entity_id": fan_entity_id}, True),
+        ("fan", "turn_on", {"entity_id": fan_entity_id}, True),
+        ("fan", "turn_off", {"entity_id": fan_entity_id}, True),
+        ("fan", "set_percentage", {"percentage": 55, "entity_id": fan_entity_id}, True),
+        ("fan", "increase_speed", {"percentage_step": 10, "entity_id": fan_entity_id}, True),
+        ("fan", "decrease_speed", {"entity_id": fan_entity_id}, True),
+        ("fan", "oscillate", {"oscillating": True, "entity_id": fan_entity_id}, True),
+        ("fan", "set_direction", {"direction": "reverse", "entity_id": fan_entity_id}, True),
+        ("fan", "set_preset_mode", {"preset_mode": "turbo", "entity_id": fan_entity_id}, True),
+        ("vacuum", "start", {"entity_id": vacuum_entity_id}, True),
+        ("vacuum", "pause", {"entity_id": vacuum_entity_id}, True),
+        ("vacuum", "stop", {"entity_id": vacuum_entity_id}, True),
+        ("vacuum", "return_to_base", {"entity_id": vacuum_entity_id}, True),
+        ("vacuum", "clean_spot", {"entity_id": vacuum_entity_id}, True),
+        ("vacuum", "locate", {"entity_id": vacuum_entity_id}, True),
+        ("vacuum", "set_fan_speed", {"fan_speed": "quiet", "entity_id": vacuum_entity_id}, True),
+        ("vacuum", "send_command", {"command": "zone_clean", "params": [1, 2], "entity_id": vacuum_entity_id}, True),
+    ]
 
 
 def test_input_and_runtime_binary_sensor_states_and_attributes(hass):

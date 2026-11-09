@@ -11,7 +11,7 @@
 [![Home Assistant](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FPacmanForever%2Fhome_activity_manager%2Fmain%2Fdocs%2Fhome_assistant_compatibility.json&query=%24.tested_version&suffix=%20tested&label=home%20assistant&color=blue)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 [![Daily HA compatibility](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml/badge.svg?branch=main)](https://github.com/PacmanForever/home_activity_manager/actions/workflows/daily-ha.yml)
 
-Home Activity Manager makes compatible household devices smarter by bringing their Home Assistant entities together under a dedicated device. It adds activity tracking, actions, reminders, and alarms, and is especially useful for non-smart devices monitored with existing sensors. Its extensible profiles are organized into climate control, large appliances (laundry and refrigeration), animal care, deliveries, electronics, openings, and sun protection. It needs no cloud service, credentials, external helpers, or automations.
+**Turn a non-smart appliance into a Home Assistant device.** Home Activity Manager groups its existing entities, such as a smart plug's power sensor and a door contact, under one dedicated device in Home Assistant. The appliance stays physically unchanged, while its activity, controls, reminders, and alarms are managed together. No cloud service, credentials, external helpers, or automations are needed. Its extensible profiles cover climate control, large appliances (laundry and refrigeration), animal care, deliveries, electronics, openings, and sun protection.
 
 **Last updated:** 2026-11-07
 
@@ -46,7 +46,8 @@ Climate control
 |   `-- Activity detection with a climate entity
 |-- Fan
 |   |-- Activity detection with a power sensor
-|   `-- Activity detection with a switch
+|   |-- Activity detection with a switch
+|   `-- Activity detection with a fan entity
 `-- Thermostat
     `-- Activity detection with a climate entity
 
@@ -99,9 +100,13 @@ Electronics
 |   `-- Activity detection with a switch
 `-- Computer (PC or NAS)
     `-- Activity detection with a switch
-```
 
-Small appliances are not selectable until a concrete appliance class is defined.
+Small appliances
+|-- Generic appliance
+|   `-- Activity detection with a switch
+`-- Robot vacuum
+    `-- Activity detection with a vacuum entity
+```
 Group, appliance-class, and activity-mode choices are sorted alphabetically by their translated labels in the active Home Assistant language.
 
 ### Activity detection examples
@@ -116,6 +121,9 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 | Climate control | Thermostat | `climate.living_room` | Any climate state other than `off` is active, including when the thermostat is idle; `off` ends activity. |
 | Climate control | Fan: power | `sensor.fan_power` | Power must stay above the configured start threshold for its confirmation time; it ends after staying below the finish threshold for its confirmation time. |
 | Climate control | Fan: switch | `switch.fan` | `on` starts activity and `off` ends it. Optional power and energy sensors are measurements only. |
+| Climate control | Fan: entity | `fan.living_room` | `on` starts activity and `off` ends it. Speed changes do not restart activity; `unknown` and `unavailable` do not change it. |
+| Small appliances | Generic appliance | `switch.coffee_maker` | `on` starts activity and `off` ends it. Optional power and energy sensors are measurements only. |
+| Small appliances | Robot vacuum | `vacuum.living_room` | `cleaning`, `returning`, and `paused` are active; `idle` and `docked` are inactive. Error and unavailable states do not change activity. |
 | Electronics | Screen or AV equipment: switch | `switch.living_room_screen` | `on` starts activity and `off` ends it. Optional power and energy sensors are measurements only. |
 | Electronics | Screen or AV equipment: media player | `media_player.living_room_tv` | `off` ends activity; any other available state means active. `unknown` and `unavailable` do not change activity. |
 | Electronics | Console or computer (PC/NAS): switch | `switch.home_server` | `on` starts activity and `off` ends it. Optional power and energy sensors are measurements only. |
@@ -141,7 +149,11 @@ The entity IDs below are examples; select entities from your own Home Assistant 
 
 - **Air conditioner:** choose contact-sensor, power-based, or climate-entity activity detection. Contact mode requires its binary sensor; power mode uses configurable thresholds and confirmation times. Climate mode requires an existing climate entity, keeps its original controls, and follows `off` versus any active mode regardless of `hvac_action`.
 - **Thermostat:** use an existing climate entity as the activity source. If it has no device, the original entity is associated directly with the managed device and no proxy is created. If it already belongs to a device, that association is preserved and a native climate proxy is added to the managed device. In both cases the source remains owned by its original integration. Proxies mirror standard climate state and controls and forward standard climate actions; vendor-specific services are not proxied. Activity follows climate mode (`off` versus any active mode), including periods when `hvac_action` is idle.
-- **Fan:** choose a required power sensor with configurable thresholds, or a required switch where `on` starts and `off` ends activity. In switch mode, optional power and cumulative energy sensors add measurements only; they do not change activity detection. Both modes expose running state, last active duration, and configurable start/end actions.
+- **Fan:** choose a required power sensor with configurable thresholds, a required switch, or a required fan entity. Switch and fan-entity modes use `on`/`off`; speed changes do not restart fan-entity activity, and unknown or unavailable states do not change it. Optional power and cumulative-energy sensors are measurements only. All modes expose running state, last active duration, and configurable start/end actions.
+
+### Small appliances
+
+The generic appliance profile requires a switch as its activity source; optional power and cumulative-energy sensors provide readings only. The robot-vacuum profile requires a vacuum entity. `cleaning`, `returning`, and `paused` are active, while `idle` and `docked` are inactive; `error`, `unknown`, and `unavailable` preserve the current activity state. The original source remains owned by its integration. If it has no device, it is associated directly with the managed appliance; otherwise, Home Activity Manager adds a native proxy that mirrors supported state and forwards supported controls.
 
 ### Deliveries
 
@@ -233,9 +245,9 @@ Power-cycle defaults are 4 W for 15 seconds to start and 1 W for 60 seconds to f
 
 Outputs depend on the selected profile and configured inputs. A selected power sensor provides a power entity; an energy sensor or power sensor provides an energy entity. Cycle-based profiles provide activity state and last-activity duration; estimated remaining time is limited to laundry profiles. Both refrigerator modes expose activity and a door-open alarm; neither has a compressor-inactivity or switch-off alarm. Mailboxes expose their main-door and pending-collection states, plus a button to clear pending status. Detecting mail starts the mailbox cycle and runs its start actions; opening the main door or pressing the clear button ends the cycle, runs its end actions, and cancels reminders. A selected switch is exposed on the managed device. Contact-based doors with an associated shutter expose its open/closed state.
 
-**HAM proxies** are duplicates: HAM creates a separate entity on the appliance device while leaving the source entity intact. For a visible input that can be reused directly, HAM associates an unassigned source with the appliance and does not create a duplicate; if the source already belongs to another device, that association stays in place and HAM adds a proxy. This applies across supported sensor, switch, contact, climate, media-player, cover, and lock inputs. Inputs used only internally, such as mailbox arrival motion, are not shown or associated. Calculated outputs such as **Running**, durations, pending status, and locally calculated energy are not proxies.
+**HAM proxies** are duplicates: HAM creates a separate entity on the appliance device while leaving the source entity intact. For a visible input that can be reused directly, HAM associates an unassigned source with the appliance and does not create a duplicate; if the source already belongs to another device, that association stays in place and HAM adds a proxy. This applies across supported sensor, switch, contact, climate, media-player, fan, vacuum, cover, and lock inputs. Inputs used only internally, such as mailbox arrival motion, are not shown or associated. Calculated outputs such as **Running**, durations, pending status, and locally calculated energy are not proxies.
 
-An external cumulative-energy sensor is the exception: HAM always creates an energy proxy so its displayed total can use a local reset baseline without writing to the original sensor. By default, every proxy has a name ending in `(HAM Proxy)` and an `entity_id` ending in `_ham_proxy`. It uses the source's custom name, then its integration name, or a translated fallback if neither exists. Home Assistant adds the device context where relevant; the proxy's `entity_id` remains stable. Climate, media-player, cover, and lock proxies mirror standard state and supported features and forward supported actions. Direct association preserves the source name; the source remains owned by its original integration. On unload or removal, HAM releases only direct associations that still point to its device and removes only its own stale proxies.
+An external cumulative-energy sensor is the exception: HAM always creates an energy proxy so its displayed total can use a local reset baseline without writing to the original sensor. By default, every proxy has a name ending in `(HAM Proxy)` and an `entity_id` ending in `_ham_proxy`. It uses the source's custom name, then its integration name, or a translated fallback if neither exists. Home Assistant adds the device context where relevant; the proxy's `entity_id` remains stable. Climate, media-player, fan, vacuum, cover, and lock proxies mirror standard state and supported features and forward supported actions. Direct association preserves the source name; the source remains owned by its original integration. On unload or removal, HAM releases only direct associations that still point to its device and removes only its own stale proxies.
 
 Contact-based doors with an associated shutter expose a separate last-open duration sensor for each layer. The shutter duration sensor is present only while a shutter source is configured.
 
