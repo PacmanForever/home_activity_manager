@@ -18,6 +18,7 @@ from .const import (
     CONF_APPLIANCE_CLASS,
     CONF_APPLIANCE_TYPE,
     CONF_DOOR_ENTITY,
+    CONF_LOCK_ENTITY,
     CONF_MAIL_SLOT_ENTITY,
     CONF_RUNNING_ENTITY,
     CONF_SHUTTER_CONTACT_ENTITY,
@@ -137,6 +138,9 @@ class ApplianceBinarySensor(BinarySensorEntity):
         source_key = {"door": CONF_DOOR_ENTITY, "mail_slot": CONF_MAIL_SLOT_ENTITY}.get(
             self._key
         )
+        if self._key == "lock_state":
+            state = self.hass.states.get(self._runtime.config.get(CONF_LOCK_ENTITY))
+            return state is not None and state.state != "unavailable"
         if source_key is not None:
             state = self.hass.states.get(self._runtime.config.get(source_key))
             return state is not None and state.state != "unavailable"
@@ -394,6 +398,23 @@ async def async_setup_entry(
                     lambda runtime=runtime: runtime.door_open,
                     BinarySensorDeviceClass.DOOR,
                     proxy_sources.get("door"),
+                )
+            )
+        if (
+            "lock_state" in runtime.profile.output_entities
+            and runtime.config.get(CONF_LOCK_ENTITY)
+        ):
+            runtime_entities.append(
+                ApplianceBinarySensor(
+                    runtime,
+                    entry,
+                    "lock_state",
+                    lambda runtime=runtime: (
+                        runtime.lock_state == "locked"
+                        if runtime.lock_state is not None
+                        else None
+                    ),
+                    BinarySensorDeviceClass.LOCK,
                 )
             )
         if (

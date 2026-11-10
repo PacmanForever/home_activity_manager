@@ -409,6 +409,7 @@
       "sliding_door_state": {"name": "Estat del corredís"},
       "window_state": {"name": "Estat de la finestra"},
       "access_state": {"name": "Estat de l’accés"},
+      "lock_state": {"name": "Estat del pany"},
       "awning_state": {"name": "Estat del tendal"},
       "shutter_state": {"name": "Estat de la persiana"},
       "proxy_door": {"name": "Porta (HAM Proxy)"},

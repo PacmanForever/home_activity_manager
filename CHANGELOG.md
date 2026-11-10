@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.61 - 2026-11-10
+
+### Added
+
+- Expose a lock-state binary sensor for opening devices with a configured lock.
+- Translate the lock-state sensor name in English, Catalan, and Spanish.
+
+### Tests
+
+- Cover lock-state transitions, unavailable states, and omission when no lock is configured.
+
 ## v0.9.60 - 2026-11-09
 
 ### Added
