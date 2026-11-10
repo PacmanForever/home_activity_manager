@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.62 - 2026-11-10
+
+### Fixed
+
+- Correct the lock-state binary sensor to follow Home Assistant's `lock` device-class semantics.
+- Show locked, unlocked, and unknown padlock icons for the lock-state sensor.
+
+### Tests
+
+- Verify lock-state values and icons for locked, unlocked, transitional, and unavailable states.
+
 ## v0.9.61 - 2026-11-10
 
 ### Added

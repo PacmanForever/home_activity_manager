@@ -228,6 +228,10 @@ class ApplianceBinarySensor(BinarySensorEntity):
             return "mdi:mailbox-open-up" if self.is_on else "mdi:mailbox-up"
         if self._key == "shutter":
             return "mdi:window-shutter-open" if self.is_on else "mdi:window-shutter"
+        if self._key == "lock_state":
+            if self.is_on is None:
+                return "mdi:lock-question"
+            return "mdi:lock-open" if self.is_on else "mdi:lock"
         if self._key == "pending_unload":
             if appliance_type in ("mailbox_motion", "mailbox_slot"):
                 return "mdi:email-alert" if self.is_on else "mdi:email-outline"
@@ -410,7 +414,7 @@ async def async_setup_entry(
                     entry,
                     "lock_state",
                     lambda runtime=runtime: (
-                        runtime.lock_state == "locked"
+                        runtime.lock_state == "unlocked"
                         if runtime.lock_state is not None
                         else None
                     ),
