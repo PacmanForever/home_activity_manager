@@ -2453,6 +2453,49 @@ async def test_lock_unlock_duration_is_not_created_without_configured_lock(
     assert registry.async_get_entity_id(
         "sensor", DOMAIN, f"{entry.entry_id}_lock_unlock_duration"
     ) is None
+    assert registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_lock_state"
+    ) is None
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_lock_state_binary_sensor_tracks_configured_lock(
+    hass, enable_custom_integrations
+):
+    config = {
+        CONF_APPLIANCE_TYPE: "access_contact",
+        CONF_APPLIANCE_CLASS: "access",
+        CONF_RUNNING_ENTITY: "binary_sensor.access_contact",
+        CONF_LOCK_ENTITY: "lock.access_lock",
+        "name": "Access",
+    }
+    hass.states.async_set(config[CONF_RUNNING_ENTITY], "off")
+    hass.states.async_set(config[CONF_LOCK_ENTITY], "locked")
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    registry = er.async_get(hass)
+    lock_state_entity_id = registry.async_get_entity_id(
+        "binary_sensor", DOMAIN, f"{entry.entry_id}_lock_state"
+    )
+    assert lock_state_entity_id is not None
+    assert registry.async_get(lock_state_entity_id).translation_key == "lock_state"
+    assert hass.states.get(lock_state_entity_id).attributes["device_class"] == "lock"
+    assert hass.states.get(lock_state_entity_id).state == "on"
+
+    hass.states.async_set(config[CONF_LOCK_ENTITY], "unlocked")
+    await hass.async_block_till_done()
+    assert hass.states.get(lock_state_entity_id).state == "off"
+
+    hass.states.async_set(config[CONF_LOCK_ENTITY], "locking")
+    await hass.async_block_till_done()
+    assert hass.states.get(lock_state_entity_id).state == "off"
+
+    hass.states.async_set(config[CONF_LOCK_ENTITY], "unavailable")
+    await hass.async_block_till_done()
+    assert hass.states.get(lock_state_entity_id).state == "unavailable"
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

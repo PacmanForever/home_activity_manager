@@ -409,6 +409,7 @@
       "sliding_door_state": {"name": "Sliding state"},
       "window_state": {"name": "Window state"},
       "access_state": {"name": "Access state"},
+      "lock_state": {"name": "Lock state"},
       "awning_state": {"name": "Awning state"},
       "shutter_state": {"name": "Shutter state"},
       "proxy_door": {"name": "Door (HAM Proxy)"},

@@ -409,6 +409,7 @@
       "sliding_door_state": {"name": "Estado del cierre corredero"},
       "window_state": {"name": "Estado de la ventana"},
       "access_state": {"name": "Estado del acceso"},
+      "lock_state": {"name": "Estado de la cerradura"},
       "awning_state": {"name": "Estado del toldo"},
       "shutter_state": {"name": "Estado de la persiana"},
       "proxy_door": {"name": "Puerta (HAM Proxy)"},
