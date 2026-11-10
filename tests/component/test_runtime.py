@@ -2483,19 +2483,22 @@ async def test_lock_state_binary_sensor_tracks_configured_lock(
     assert lock_state_entity_id is not None
     assert registry.async_get(lock_state_entity_id).translation_key == "lock_state"
     assert hass.states.get(lock_state_entity_id).attributes["device_class"] == "lock"
-    assert hass.states.get(lock_state_entity_id).state == "on"
+    assert hass.states.get(lock_state_entity_id).state == "off"
+    assert hass.states.get(lock_state_entity_id).attributes["icon"] == "mdi:lock"
 
     hass.states.async_set(config[CONF_LOCK_ENTITY], "unlocked")
     await hass.async_block_till_done()
-    assert hass.states.get(lock_state_entity_id).state == "off"
+    assert hass.states.get(lock_state_entity_id).state == "on"
+    assert hass.states.get(lock_state_entity_id).attributes["icon"] == "mdi:lock-open"
 
     hass.states.async_set(config[CONF_LOCK_ENTITY], "locking")
     await hass.async_block_till_done()
-    assert hass.states.get(lock_state_entity_id).state == "off"
+    assert hass.states.get(lock_state_entity_id).state == "on"
 
     hass.states.async_set(config[CONF_LOCK_ENTITY], "unavailable")
     await hass.async_block_till_done()
     assert hass.states.get(lock_state_entity_id).state == "unavailable"
+    assert hass.states.get(lock_state_entity_id).attributes["icon"] == "mdi:lock-question"
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
