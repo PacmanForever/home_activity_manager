@@ -36,6 +36,7 @@ from .const import (
 )
 from .device import (
 	_get_device_by_identifier,
+	appliance_device_info,
 	move_device_to_config_entry,
 	remove_appliance_group_devices,
 )
@@ -225,6 +226,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 		runtime = ApplianceRuntime(hass, entry, config)
 		await runtime.async_setup()
 		runtimes[appliance_id] = runtime
+	device_registry = dr.async_get(hass)
+	for appliance in entry.data.get("appliances", []):
+		area_id = appliance.get("area_id")
+		appliance_id = appliance.get("id")
+		if not area_id or not isinstance(appliance_id, str):
+			continue
+		if _get_device_by_identifier(
+			device_registry, (DOMAIN, appliance_id), entry.entry_id
+		) is not None:
+			continue
+		config = runtimes[appliance_id].config
+		device = device_registry.async_get_or_create(
+			config_entry_id=entry.entry_id,
+			**appliance_device_info(entry, config, hass),
+		)
+		device_registry.async_update_device(device.id, area_id=area_id)
 	entry.runtime_data = ApplianceRuntimeCollection(runtimes)
 	entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
 	await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

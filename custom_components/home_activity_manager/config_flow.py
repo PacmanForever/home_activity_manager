@@ -267,6 +267,7 @@ def _identity_schema(
     return vol.Schema(
         {
             _required(CONF_NAME, values): selector.TextSelector(),
+            vol.Optional("area_id"): selector.AreaSelector(),
             _required(CONF_APPLIANCE_GROUP, values): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=sorted_groups,
@@ -1210,6 +1211,8 @@ class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
                 "data": _entry_data(self._draft),
                 "options": _entry_options(self._draft),
             }
+            if self._draft.get("area_id"):
+                appliance["area_id"] = self._draft["area_id"]
             if self._existing_entry is not None:
                 entry = self.hass.config_entries.async_get_entry(
                     self._existing_entry.entry_id

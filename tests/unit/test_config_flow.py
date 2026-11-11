@@ -1558,8 +1558,19 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                         for name, candidate in APPLIANCE_PROFILES.items()
                         if candidate is profile
                     )
+                    identity_schema = (
+                        _identity_schema({})
+                        if flow == "config"
+                        else _options_identity_schema(
+                            {
+                                CONF_APPLIANCE_TYPE: "mailbox_motion",
+                                CONF_APPLIANCE_CLASS: "mailbox",
+                            },
+                            "deliveries",
+                        )
+                    )
                     step_schemas = {
-                        identity_step: _identity_schema({}),
+                        identity_step: identity_schema,
                         f"sensors_{profile_name}": _sensor_schema(
                             _sensor_form_values(values, profile), profile
                         ),

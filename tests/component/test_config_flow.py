@@ -212,6 +212,55 @@ async def test_add_appliance_through_four_config_flow_steps(
 
 
 @pytest.mark.asyncio
+async def test_initial_flow_assigns_selected_area_to_new_appliance(
+    hass, enable_custom_integrations
+):
+    area = ar.async_get(hass).async_create("Kitchen")
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    flow_id = result["flow_id"]
+    area_selector = next(
+        field
+        for marker, field in result["data_schema"].schema.items()
+        if marker.schema == "area_id"
+    )
+    assert isinstance(area_selector, selector.AreaSelector)
+
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {
+            "name": "Kitchen mailbox",
+            "area_id": area.id,
+            CONF_APPLIANCE_GROUP: "deliveries",
+        },
+    )
+    if result["step_id"] == "appliance_class":
+        result = await hass.config_entries.flow.async_configure(
+            flow_id, {CONF_APPLIANCE_CLASS: "mailbox"}
+        )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {"activity_mode": "mail_motion"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {"mailbox_motion_arrival_entity": "binary_sensor.kitchen_mail_motion"},
+    )
+    assert result["step_id"] == "actions_mailbox_motion"
+    result = await hass.config_entries.flow.async_configure(flow_id, {})
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    appliance = result["data"]["appliances"][0]
+    assert appliance["area_id"] == area.id
+    device = device_module._get_device_by_identifier(
+        dr.async_get(hass), (DOMAIN, appliance["id"]), result["result"].entry_id
+    )
+    assert device is not None
+    assert device.area_id == area.id
+
+
+@pytest.mark.asyncio
 async def test_add_access_with_primary_cover_mode(hass, enable_custom_integrations):
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -889,22 +938,22 @@ async def test_climate_entity_must_be_replaced_in_options(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("arrival_key", "door_key", "profile"),
+    ("arrival_key", "arrival_config_key", "profile"),
     [
         (
             "mailbox_motion_arrival_entity",
-            "mailbox_motion_door_entity",
+            CONF_MAIL_MOTION_ENTITY,
             "mailbox_motion",
         ),
         (
             "mailbox_slot_arrival_entity",
-            "mailbox_slot_door_entity",
+            CONF_MAIL_SLOT_ENTITY,
             "mailbox_slot",
         ),
     ],
 )
-async def test_mailbox_door_sensor_is_required(
-    hass, enable_custom_integrations, arrival_key, door_key, profile
+async def test_mailbox_can_be_configured_without_main_door_sensor(
+    hass, enable_custom_integrations, arrival_key, arrival_config_key, profile
 ):
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -914,19 +963,16 @@ async def test_mailbox_door_sensor_is_required(
         hass, flow_id, "Mailbox", profile
     )
 
-    with pytest.raises(InvalidData):
-        await hass.config_entries.flow.async_configure(
-            flow_id, {arrival_key: "binary_sensor.mail_arrival"}
-        )
-
     result = await hass.config_entries.flow.async_configure(
-        flow_id,
-        {
-            arrival_key: "binary_sensor.mail_arrival",
-            door_key: "binary_sensor.mailbox_door",
-        },
+        flow_id, {arrival_key: "binary_sensor.mail_arrival"}
     )
-    assert result["step_id"] == f"parameters_{profile}"
+    assert result["step_id"] == f"actions_{profile}"
+    result = await hass.config_entries.flow.async_configure(flow_id, {})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    appliance = result["data"]["appliances"][0]
+    assert appliance["data"][arrival_config_key] == "binary_sensor.mail_arrival"
+    assert CONF_DOOR_ENTITY not in appliance["data"]
 
 
 @pytest.mark.asyncio

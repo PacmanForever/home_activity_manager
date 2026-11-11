@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.65 - 2026-11-11
+
+### Changed
+
+- Make the mailbox main-door contact optional in both mailbox profiles; retain manual pending-mail clearing when it is omitted.
+- Allow an optional area to be assigned during initial device setup.
+
+### Tests
+
+- Cover mailbox setup without a main-door contact and area assignment during initial setup.
+
 ## v0.9.64 - 2026-11-11
 
 ### Changed
