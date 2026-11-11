@@ -1389,6 +1389,28 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 self.assertEqual(
                     translation["entity"][domain][key]["name"], expected_name
                 )
+        expected_power_names = (
+            ("Current Power", "Current Power (HAM Proxy)"),
+            ("Current Power", "Current Power (HAM Proxy)"),
+            ("Potencia actual", "Potencia actual (HAM Proxy)"),
+            ("Potència actual", "Potència actual (HAM Proxy)"),
+        )
+        expected_energy_names = (
+            ("Energy consumed", "Energy consumed (HAM Proxy)"),
+            ("Energy consumed", "Energy consumed (HAM Proxy)"),
+            ("Energía consumida", "Energía consumida (HAM Proxy)"),
+            ("Energia consumida", "Energia consumida (HAM Proxy)"),
+        )
+        for translation, expected_names in zip(translations, expected_power_names):
+            sensor_names = translation["entity"]["sensor"]
+            for key, expected_name in zip(("power", "proxy_power"), expected_names):
+                self.assertEqual(sensor_names[key]["name"], expected_name)
+        for translation, expected_names in zip(translations, expected_energy_names):
+            sensor_names = translation["entity"]["sensor"]
+            for key, expected_name in zip(
+                ("total_energy", "proxy_total_energy"), expected_names
+            ):
+                self.assertEqual(sensor_names[key]["name"], expected_name)
         expected_status_names = (
             ("State", "Pending to unload"),
             ("State", "Pending to unload"),
@@ -1402,10 +1424,10 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             ):
                 self.assertEqual(binary_sensor_names[key]["name"], expected_name)
         expected_button_names = (
-            ("Turn off “Pending to unload”", "Reset “Total energy”"),
-            ("Turn off “Pending to unload”", "Reset “Total energy”"),
-            ("Desactiva «Pendiente de vaciar»", "Reinicia «Energía total»"),
-            ("Desactiva “Pendent de buidar”", "Reinicia “Energia total”"),
+            ("Turn off “Pending to unload”", "Reset “Energy consumed”"),
+            ("Turn off “Pending to unload”", "Reset “Energy consumed”"),
+            ("Desactiva «Pendiente de vaciar»", "Reinicia «Energía consumida»"),
+            ("Desactiva “Pendent de buidar”", "Reinicia “Energia consumida”"),
         )
         for translation, expected_names in zip(translations, expected_button_names):
             button_names = translation["entity"]["button"]

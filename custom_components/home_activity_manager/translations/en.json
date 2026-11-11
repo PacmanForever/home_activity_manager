@@ -390,8 +390,8 @@
       "proxy_ph": {"name": "pH (HAM Proxy)"},
       "water_level": {"name": "Water level"},
       "proxy_water_level": {"name": "Water level (HAM Proxy)"},
-      "total_energy": {"name": "Total energy"},
-      "proxy_total_energy": {"name": "Total energy (HAM Proxy)"},
+      "total_energy": {"name": "Energy consumed"},
+      "proxy_total_energy": {"name": "Energy consumed (HAM Proxy)"},
       "last_cycle_duration": {"name": "Last cycle duration"},
       "last_cycle_energy": {"name": "Energy consumed in the last cycle"},
       "door_open_duration": {"name": "Duration of the last door opening"},
@@ -428,7 +428,7 @@
     },
     "button": {
       "clear_pending": {"name": "Turn off “Pending to unload”"},
-      "reset_energy": {"name": "Reset “Total energy”"}
+      "reset_energy": {"name": "Reset “Energy consumed”"}
     }
   }
 }

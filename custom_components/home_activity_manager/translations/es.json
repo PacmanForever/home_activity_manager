@@ -390,8 +390,8 @@
       "proxy_ph": {"name": "pH (HAM Proxy)"},
       "water_level": {"name": "Nivel de agua"},
       "proxy_water_level": {"name": "Nivel de agua (HAM Proxy)"},
-      "total_energy": {"name": "Energía total"},
-      "proxy_total_energy": {"name": "Energía total (HAM Proxy)"},
+      "total_energy": {"name": "Energía consumida"},
+      "proxy_total_energy": {"name": "Energía consumida (HAM Proxy)"},
       "last_cycle_duration": {"name": "Duración del último ciclo"},
       "last_cycle_energy": {"name": "Energía consumida en el último ciclo"},
       "door_open_duration": {"name": "Duración de la última apertura de la puerta"},
@@ -428,7 +428,7 @@
     },
     "button": {
       "clear_pending": {"name": "Desactiva «Pendiente de vaciar»"},
-      "reset_energy": {"name": "Reinicia «Energía total»"}
+      "reset_energy": {"name": "Reinicia «Energía consumida»"}
     }
   }
 }

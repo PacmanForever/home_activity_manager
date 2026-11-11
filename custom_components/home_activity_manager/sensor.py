@@ -83,7 +83,7 @@ class ApplianceSensor(SensorEntity):
         self._attr_translation_key = (
             f"proxy_{key}" if source_entity_id else key
         )
-        if source_entity_id:
+        if source_entity_id and key not in {"power", "total_energy"}:
             source_name = _source_entity_name(runtime.hass, source_entity_id)
             self._attr_has_entity_name = True
             if source_name is not None:

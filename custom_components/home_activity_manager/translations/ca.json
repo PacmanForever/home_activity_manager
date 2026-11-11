@@ -390,8 +390,8 @@
       "proxy_ph": {"name": "pH (HAM Proxy)"},
       "water_level": {"name": "Nivell d’aigua"},
       "proxy_water_level": {"name": "Nivell d’aigua (HAM Proxy)"},
-      "total_energy": {"name": "Energia total"},
-      "proxy_total_energy": {"name": "Energia total (HAM Proxy)"},
+      "total_energy": {"name": "Energia consumida"},
+      "proxy_total_energy": {"name": "Energia consumida (HAM Proxy)"},
       "last_cycle_duration": {"name": "Durada de l’últim cicle"},
       "last_cycle_energy": {"name": "Energia consumida en l’últim cicle"},
       "door_open_duration": {"name": "Durada de l’última obertura de la porta"},
@@ -428,7 +428,7 @@
     },
     "button": {
       "clear_pending": {"name": "Desactiva “Pendent de buidar”"},
-      "reset_energy": {"name": "Reinicia “Energia total”"}
+      "reset_energy": {"name": "Reinicia “Energia consumida”"}
     }
   }
 }

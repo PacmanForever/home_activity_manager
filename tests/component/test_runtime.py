@@ -1598,9 +1598,17 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
     }
     if with_power:
         config[CONF_POWER_ENTITY] = "sensor.ac_power"
-        hass.states.async_set(config[CONF_POWER_ENTITY], "100", {ATTR_UNIT_OF_MEASUREMENT: "W"})
+        hass.states.async_set(
+            config[CONF_POWER_ENTITY],
+            "100",
+            {ATTR_UNIT_OF_MEASUREMENT: "W", "friendly_name": "Potència"},
+        )
     hass.states.async_set(config[CONF_CLIMATE_ENTITY], "off")
-    hass.states.async_set(config[CONF_ENERGY_ENTITY], "2500", {ATTR_UNIT_OF_MEASUREMENT: "Wh"})
+    hass.states.async_set(
+        config[CONF_ENERGY_ENTITY],
+        "2500",
+        {ATTR_UNIT_OF_MEASUREMENT: "Wh", "friendly_name": "Energia"},
+    )
     hass.states.async_set(
         config[CONF_PLUG_ENTITY], "on", {"friendly_name": "Kitchen outlet"}
     )
@@ -1635,6 +1643,9 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
     plug_id = registry.async_get_entity_id("switch", DOMAIN, f"{entry.entry_id}_plug")
     assert energy_id is not None
     assert float(hass.states.get(energy_id).state) == pytest.approx(2.5)
+    energy_entry = registry.async_get(energy_id)
+    assert energy_entry is not None
+    assert energy_entry.original_name == "Energy consumed (HAM Proxy)"
     if with_collision:
         assert energy_id == "sensor.air_conditioner_total_energy"
         assert registry.async_get("sensor.air_conditioner_ac_energy_ham_proxy") == (
@@ -1649,6 +1660,9 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
     assert (power_id is not None) == with_power
     if power_id is not None:
         assert power_id == "sensor.air_conditioner_ac_power_ham_proxy"
+        power_entry = registry.async_get(power_id)
+        assert power_entry is not None
+        assert power_entry.original_name == "Current Power (HAM Proxy)"
     assert plug_id is not None
     assert plug_id == (
         "switch.air_conditioner_"
@@ -3081,7 +3095,23 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             or getattr(source, "original_name_unprefixed", None)
             or source.original_name
         )
-        if source_name is None:
+        if input_config.output_entity == "power":
+            assert wrapper_state.attributes["friendly_name"].endswith(
+                (
+                    "Current Power (HAM Proxy)",
+                    "Potencia actual (HAM Proxy)",
+                    "Potència actual (HAM Proxy)",
+                )
+            )
+        elif input_config.output_entity == "total_energy":
+            assert wrapper_state.attributes["friendly_name"].endswith(
+                (
+                    "Energy consumed (HAM Proxy)",
+                    "Energía consumida (HAM Proxy)",
+                    "Energia consumida (HAM Proxy)",
+                )
+            )
+        elif source_name is None:
             assert wrapper_state.attributes["friendly_name"].endswith(
                 "Il·luminació (HAM Proxy)"
             )

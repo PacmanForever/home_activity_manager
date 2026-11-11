@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.64 - 2026-11-11
+
+### Changed
+
+- Rename the energy total output to Energy consumed and power readings to Current Power, including their HAM Proxy labels.
+- Keep energy and power proxy names consistent across appliances instead of inheriting the source entity name.
+
+### Tests
+
+- Verify translated labels and consistent source-backed proxy names across profiles.
+
 ## v0.9.63 - 2026-11-11
 
 ### Fixed
