@@ -2,7 +2,7 @@
   "issues": {
     "input_unavailable": {
       "title": "Entrada configurada no disponible",
-      "description": "La entidad de entrada configurada {entity_id} no existe o no está disponible. Restáurala o edita este dispositivo para seleccionar otra."
+      "description": "La entidad de entrada configurada {entity_id} no existe o no está disponible. Restáurala o edita los dispositivos afectados para seleccionar otra."
     }
   },
   "config": {

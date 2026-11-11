@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.63 - 2026-11-11
+
+### Fixed
+
+- Defer unavailable-input Repairs issues until Home Assistant has completed startup, avoiding transient warnings while source integrations are loading.
+- Deduplicate Repairs issues when multiple appliances share the same unavailable input and remove legacy per-appliance issues.
+
+### Tests
+
+- Cover shared inputs, startup availability reconciliation, and issue cleanup after recovery.
+
 ## v0.9.62 - 2026-11-10
 
 ### Fixed

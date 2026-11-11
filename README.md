@@ -13,7 +13,7 @@
 
 **Turn a non-smart appliance into a Home Assistant device.** Home Activity Manager groups its existing entities, such as a smart plug's power sensor and a door contact, under one dedicated device in Home Assistant. The appliance stays physically unchanged, while its activity, controls, reminders, and alarms are managed together. No cloud service, credentials, external helpers, or automations are needed. Its extensible profiles cover climate control, large appliances (laundry and refrigeration), animal care, deliveries, electronics, openings, and sun protection.
 
-**Last updated:** 2026-11-10
+**Last updated:** 2026-11-11
 
 ## Installation
 
@@ -196,7 +196,7 @@ Windows and sliding closures use a required contact sensor, and conventional doo
 - Running state is exposed when a profile can infer activity. Opening and contact-only sun-protection profiles expose position instead; cycle-based profiles expose last-cycle duration.
 - Power and energy can be monitored independently of activity detection where supported. Energy uses a selected cumulative sensor or is calculated from power.
 - Cycle-capable devices with configured power or cumulative energy also expose **Energy consumed in the last cycle**. It is unknown until a measured cycle completes and retains that completed value while the next cycle runs. A selected cumulative sensor takes precedence and its start-to-finish difference is used; otherwise, power is integrated during confirmed activity. This result is independent of total energy and its reset button. An unavailable or reset cumulative source does not fall back to power.
-- A Repairs issue is raised when a configured input is missing or unavailable and clears when the input recovers.
+- One Repairs issue is raised per configured input entity when it is missing or unavailable, even if multiple appliances share that entity. Startup availability is checked after Home Assistant finishes starting, avoiding transient issues while source integrations are still loading. The issue clears when the input recovers.
 - Compatible profiles can configure an immediate switch-off alarm with its own repeat interval and count. It pauses while the switch state is unavailable and rearms when switched on.
 
 ### Group actions

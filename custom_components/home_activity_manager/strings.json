@@ -2,7 +2,7 @@
   "issues": {
     "input_unavailable": {
       "title": "Configured input unavailable",
-      "description": "The configured input entity {entity_id} is missing or unavailable. Restore the entity or edit this device to select a replacement."
+      "description": "The configured input entity {entity_id} is missing or unavailable. Restore it or edit the affected devices to select a replacement."
     }
   },
   "config": {

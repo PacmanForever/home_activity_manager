@@ -2,7 +2,7 @@
   "issues": {
     "input_unavailable": {
       "title": "Font configurada no disponible",
-      "description": "L’entitat d’entrada configurada {entity_id} no existeix o no està disponible. Recupera-la o edita aquest dispositiu per seleccionar-ne una altra."
+      "description": "L’entitat d’entrada configurada {entity_id} no existeix o no està disponible. Recupera-la o edita els dispositius afectats per seleccionar-ne una altra."
     }
   },
   "config": {

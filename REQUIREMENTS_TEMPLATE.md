@@ -258,7 +258,7 @@ Les accions locals són configuració de cada dispositiu i les globals són conf
 - El temps màxim configurat i l'estat d'avís ja executat del cicle actual s'han de conservar després d'un reinici, per evitar perdre el límit o repetir l'acció d'avís.
 - Modificar una opció ha d'actualitzar només el dispositiu afectat i les seves entitats.
 - La integració ha d'actualitzar-se davant de canvis de les entitats d'entrada sense fer sondeig de xarxa innecessari.
-- Si una entitat seleccionada desapareix o queda no disponible, el dispositiu ha de continuar carregat i crear un issue de Repairs per a l'entitat. En recuperar-se, l'issue s'ha d'eliminar.
+- Si una entitat seleccionada desapareix o queda no disponible, el dispositiu ha de continuar carregat i crear un issue de Repairs per a l'entitat. Si diversos dispositius comparteixen la mateixa entitat, només es crea un issue per entitat. Durant l'arrencada de Home Assistant, els estats inicials no disponibles no han de generar avisos transitoris; les fonts es reavaluen quan Home Assistant acaba d'arrencar. En recuperar-se, l'issue s'ha d'eliminar.
 
 ## 7. Seguretat i privadesa
 

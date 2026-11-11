@@ -18,6 +18,7 @@ from homeassistant.components.vacuum.const import VacuumActivity, VacuumEntityFe
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfPower
+from homeassistant.core import CoreState, EVENT_HOMEASSISTANT_STARTED
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers.issue_registry import async_get as async_get_issue_registry
 from homeassistant.util import dt as dt_util
@@ -4536,6 +4537,60 @@ async def test_climate_mode_transitions_run_start_and_finish_actions(
 
 
 @pytest.mark.asyncio
+async def test_simultaneous_group_finish_actions_run_for_each_climate_device(
+    hass, enable_custom_integrations
+):
+    configs = [
+        {
+            "id": appliance_id,
+            "data": {
+                CONF_APPLIANCE_TYPE: "thermostat_climate",
+                CONF_CLIMATE_ENTITY: f"climate.{appliance_id}",
+                "name": name,
+            },
+            "options": {},
+        }
+        for appliance_id, name in (
+            ("study_thermostat", "Study thermostat"),
+            ("living_thermostat", "Living room thermostat"),
+        )
+    ]
+    for appliance in configs:
+        hass.states.async_set(appliance["data"][CONF_CLIMATE_ENTITY], "heat")
+    messages = []
+
+    async def capture_message(call):
+        messages.append(call.data["message"])
+
+    hass.services.async_register("notify", "send_message", capture_message)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=8,
+        data={"category": "climate", "appliances": configs},
+        options={
+            CONF_GROUP_ACTIONS: {
+                CONF_FINISH_ACTIONS: [
+                    {
+                        "action": "notify.send_message",
+                        "data": {"message": "{{ ham_device_name }}"},
+                    }
+                ]
+            }
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    for appliance in configs:
+        hass.states.async_set(appliance["data"][CONF_CLIMATE_ENTITY], "off")
+    await hass.async_block_till_done()
+
+    assert sorted(messages) == ["Living room thermostat", "Study thermostat"]
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "appliance_type", ("thermostat_climate", "air_conditioner_climate")
 )
@@ -5107,12 +5162,28 @@ async def test_unavailable_input_creates_and_resolves_repair_issue(
     hass.states.async_set(config[CONF_DOOR_ENTITY], "off")
     entry = MockConfigEntry(domain=DOMAIN, data=config)
     entry.add_to_hass(hass)
-    runtime = ApplianceRuntime(hass, entry, config)
-    await runtime.async_setup()
+    first_config = {**config, "_appliance_id": "washer_one"}
+    second_config = {**config, "_appliance_id": "washer_two"}
+    first_runtime = ApplianceRuntime(hass, entry, first_config)
+    second_runtime = ApplianceRuntime(hass, entry, second_config)
+    await first_runtime.async_setup()
+    await second_runtime.async_setup()
 
     issue_registry = async_get_issue_registry(hass)
-    issue_id = f"{entry.entry_id}_{config[CONF_POWER_ENTITY]}"
+    issue_id = f"input_unavailable_{config[CONF_POWER_ENTITY]}"
     assert issue_registry.async_get_issue(DOMAIN, issue_id) is not None
+    assert (
+        issue_registry.async_get_issue(
+            DOMAIN, f"washer_one_{config[CONF_POWER_ENTITY]}"
+        )
+        is None
+    )
+    assert (
+        issue_registry.async_get_issue(
+            DOMAIN, f"washer_two_{config[CONF_POWER_ENTITY]}"
+        )
+        is None
+    )
 
     hass.states.async_set(
         config[CONF_POWER_ENTITY],
@@ -5121,6 +5192,42 @@ async def test_unavailable_input_creates_and_resolves_repair_issue(
     )
     await hass.async_block_till_done()
 
+    assert issue_registry.async_get_issue(DOMAIN, issue_id) is None
+    await first_runtime.async_unload()
+    await second_runtime.async_unload()
+
+
+@pytest.mark.asyncio
+async def test_unavailable_input_during_startup_waits_until_homeassistant_started(
+    hass, config
+):
+    hass.states.async_set(
+        config[CONF_POWER_ENTITY],
+        "unavailable",
+        {ATTR_UNIT_OF_MEASUREMENT: "W"},
+    )
+    hass.states.async_set(config[CONF_DOOR_ENTITY], "off")
+    hass.set_state(CoreState.starting)
+    entry = MockConfigEntry(domain=DOMAIN, data=config)
+    entry.add_to_hass(hass)
+    runtime = ApplianceRuntime(hass, entry, config)
+    await runtime.async_setup()
+
+    issue_registry = async_get_issue_registry(hass)
+    issue_id = f"input_unavailable_{config[CONF_POWER_ENTITY]}"
+    assert issue_registry.async_get_issue(DOMAIN, issue_id) is None
+
+    hass.set_state(CoreState.running)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
+    await hass.async_block_till_done()
+    assert issue_registry.async_get_issue(DOMAIN, issue_id) is not None
+
+    hass.states.async_set(
+        config[CONF_POWER_ENTITY],
+        "0",
+        {ATTR_UNIT_OF_MEASUREMENT: "W"},
+    )
+    await hass.async_block_till_done()
     assert issue_registry.async_get_issue(DOMAIN, issue_id) is None
     await runtime.async_unload()
 

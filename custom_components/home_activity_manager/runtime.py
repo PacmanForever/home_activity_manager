@@ -10,7 +10,13 @@ from typing import Any, Callable
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, UnitOfEnergy
-from homeassistant.core import Context, Event, HomeAssistant
+from homeassistant.core import (
+    EVENT_HOMEASSISTANT_STARTED,
+    Context,
+    CoreState,
+    Event,
+    HomeAssistant,
+)
 from homeassistant.helpers import (
     area_registry as ar,
     config_validation as cv,
@@ -277,7 +283,9 @@ class ApplianceRuntime:
         self._unsubscribe_states: Callable[[], None] | None = None
         self._unsubscribe_timer: Callable[[], None] | None = None
         self._unsubscribe_entity_registry: Callable[[], None] | None = None
+        self._unsubscribe_start: Callable[[], None] | None = None
         self._is_unloading = False
+        self._startup_complete = hass.state is CoreState.running
         self._pending_action_running = False
         self._restoring_detector_state = False
         self._power_available = False
@@ -303,6 +311,11 @@ class ApplianceRuntime:
         self._unsubscribe_states = async_track_state_change_event(
             self.hass, entity_ids, self._async_handle_state_change
         )
+        if not self._startup_complete:
+            self._unsubscribe_start = self.hass.bus.async_listen_once(
+                EVENT_HOMEASSISTANT_STARTED,
+                self._async_handle_homeassistant_started,
+            )
         for entity_id in entity_ids:
             self._update_input_availability(
                 entity_id, self.hass.states.get(entity_id)
@@ -415,6 +428,9 @@ class ApplianceRuntime:
         if self._unsubscribe_states is not None:
             self._unsubscribe_states()
             self._unsubscribe_states = None
+        if self._unsubscribe_start is not None:
+            self._unsubscribe_start()
+            self._unsubscribe_start = None
         if self._unsubscribe_timer is not None:
             self._unsubscribe_timer()
             self._unsubscribe_timer = None
@@ -622,6 +638,14 @@ class ApplianceRuntime:
             self._update_plug_off_alarm_state(new_state, now)
         self._update_input_availability(entity_id, new_state)
 
+    async def _async_handle_homeassistant_started(self, _event: Event) -> None:
+        self._startup_complete = True
+        self._unsubscribe_start = None
+        for entity_id in dict.fromkeys(self._configured_inputs.values()):
+            self._update_input_availability(
+                entity_id, self.hass.states.get(entity_id)
+            )
+
     def _update_plug_off_alarm_state(self, state: Any, now: datetime) -> None:
         if "plug_off_alarm" not in self.profile.parameter_groups:
             self._plug_is_off = None
@@ -641,14 +665,24 @@ class ApplianceRuntime:
         self._notify()
 
     def _input_issue_id(self, entity_id: str) -> str:
+        return f"input_unavailable_{entity_id}"
+
+    def _legacy_input_issue_id(self, entity_id: str) -> str:
         return f"{self.appliance_id}_{entity_id}"
 
     def _update_input_availability(self, entity_id: str, state: Any) -> None:
         if entity_id not in self._configured_inputs.values():
             return
+        async_delete_issue(
+            self.hass, DOMAIN, self._legacy_input_issue_id(entity_id)
+        )
         unavailable = state is None or state.state in ("unknown", "unavailable")
         issue_id = self._input_issue_id(entity_id)
         if unavailable:
+            if not self._startup_complete:
+                self._unavailable_inputs.discard(entity_id)
+                async_delete_issue(self.hass, DOMAIN, issue_id)
+                return
             if entity_id in self._unavailable_inputs:
                 return
             self._unavailable_inputs.add(entity_id)
