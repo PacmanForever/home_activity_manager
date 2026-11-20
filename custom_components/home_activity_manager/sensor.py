@@ -34,9 +34,6 @@ from .const import (
 from .appliance_types import SensorInput
 from .device import appliance_device_info
 from .entity_proxy import (
-    _ham_proxy_name,
-    _source_entity_name,
-    _suggested_proxy_object_id,
     use_source_entity_on_appliance,
 )
 from .runtime import ApplianceRuntime, entry_runtimes
@@ -83,11 +80,6 @@ class ApplianceSensor(SensorEntity):
         self._attr_translation_key = (
             f"proxy_{key}" if source_entity_id else key
         )
-        if source_entity_id and key not in {"power", "total_energy"}:
-            source_name = _source_entity_name(runtime.hass, source_entity_id)
-            self._attr_has_entity_name = True
-            if source_name is not None:
-                self._attr_name = _ham_proxy_name(source_name)
         appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)
         if key == "last_cycle_duration":
             self._attr_translation_key = _DURATION_TRANSLATION_KEYS.get(
@@ -119,13 +111,6 @@ class ApplianceSensor(SensorEntity):
         if self._key == "power" and not self._runtime.power_available:
             return None
         return self._value_fn()
-
-    @property
-    def suggested_object_id(self) -> str:
-        """Suggest an appliance-based ID for source-backed sensor proxies."""
-        if self._source_entity_id is None:
-            return super().suggested_object_id
-        return _suggested_proxy_object_id(self._key)
 
     @property
     def available(self) -> bool:
@@ -181,19 +166,11 @@ class ApplianceInputSensor(SensorEntity):
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = runtime.config[input_config.config_key]
-        self._proxy_key = (
-            input_config.output_entity
-            or input_config.config_key.removesuffix("_entity")
-        )
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_"
             f"{input_config.output_entity}"
         )
         self._attr_translation_key = f"proxy_{input_config.output_entity}"
-        source_name = _source_entity_name(runtime.hass, self._source_entity_id)
-        self._attr_has_entity_name = True
-        if source_name is not None:
-            self._attr_name = _ham_proxy_name(source_name)
         self._attr_icon = {
             "illuminance": "mdi:brightness-5",
             "water_temperature": "mdi:thermometer-water",
@@ -227,11 +204,6 @@ class ApplianceInputSensor(SensorEntity):
         except ValueError:
             return state.state
         return value if math.isfinite(value) else None
-
-    @property
-    def suggested_object_id(self) -> str:
-        """Suggest an appliance-based ID for the wrapped sensor."""
-        return _suggested_proxy_object_id(self._proxy_key)
 
     @property
     def available(self) -> bool:

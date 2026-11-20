@@ -7,7 +7,6 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.storage import Store
-from homeassistant.util import slugify
 
 from .appliance_types import (
 	APPLIANCE_CATEGORIES,
@@ -41,8 +40,6 @@ from .device import (
 	remove_appliance_group_devices,
 )
 from .entity_proxy import (
-	_appliance_proxy_object_id,
-	_legacy_source_proxy_object_id,
 	release_directly_attached_entities,
 )
 from .runtime import (
@@ -136,86 +133,11 @@ def _async_release_climate_entity(
 		entity_registry.async_update_entity(climate_entity_id, device_id=None)
 
 
-def _async_normalize_proxy_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+def _async_make_proxy_entities_visible(
+	hass: HomeAssistant, entry: ConfigEntry
+) -> None:
 	entity_registry = er.async_get(hass)
-	proxy_targets = {}
-	appliance_device_id = _async_appliance_device_id(hass, entry)
-	runtimes = entry_runtimes(entry) if hasattr(entry, "runtime_data") else ()
-	for runtime in runtimes:
-		appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
-		for input_config in runtime.profile.sensor_inputs:
-			if not input_config.requires_source_representation:
-				continue
-			source_entity_id = runtime.config.get(input_config.config_key)
-			if source_entity_id is None:
-				continue
-			if input_config.proxy_always:
-				is_proxy = True
-			elif source_entity_id in runtime._ham_directly_attached_entities:
-				is_proxy = False
-			elif input_config.domain in (
-				"climate", "cover", "lock", "media_player", "fan", "vacuum"
-			):
-				source_entry = entity_registry.async_get(source_entity_id)
-				is_proxy = source_entry is None or source_entry.device_id not in (
-					None,
-					appliance_device_id,
-				)
-			else:
-				is_proxy = True
-			if not is_proxy:
-				continue
-
-			appliance_name = runtime.config.get("name") or entry.title
-			if input_config.domain in (
-				"climate", "cover", "lock", "media_player", "fan", "vacuum"
-			):
-				entity_domain = input_config.domain
-				unique_id = f"{appliance_id}_{entity_domain}_proxy"
-				proxy_key = entity_domain
-			elif input_config.output_entity is None:
-				entity_domain = input_config.domain
-				input_name = input_config.config_key.removesuffix("_entity")
-				unique_id = f"{appliance_id}_input_{input_name}"
-				proxy_key = input_name
-			else:
-				entity_domain = input_config.domain
-				unique_id = f"{appliance_id}_{input_config.output_entity}"
-				proxy_key = input_config.output_entity or input_config.config_key
-			object_id = _appliance_proxy_object_id(appliance_name, proxy_key)
-			legacy_object_id = slugify(
-				_legacy_source_proxy_object_id(source_entity_id, appliance_name)
-			)
-			proxy_targets[unique_id] = (
-				f"{entity_domain}.{object_id}",
-				f"{entity_domain}.{legacy_object_id}",
-			)
-
 	for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id):
-		suggested_object_id = entity.suggested_object_id
-		proxy_target = proxy_targets.get(entity.unique_id)
-		suggested_entity_id = proxy_target[0] if proxy_target else None
-		is_proxy = suggested_entity_id is not None or entity.entity_id.endswith(
-			"_ham_proxy"
-		) or (
-			suggested_object_id is not None
-			and suggested_object_id.endswith("_ham_proxy")
-		)
-		if is_proxy:
-			legacy_entity_id = proxy_target[1] if proxy_target else None
-			if (
-				suggested_entity_id is not None
-				and (
-					entity.entity_id == legacy_entity_id
-					or not entity.entity_id.endswith("_ham_proxy")
-				)
-				and entity.entity_id != suggested_entity_id
-			):
-				if entity_registry.async_get(suggested_entity_id) is None:
-					entity = entity_registry.async_update_entity(
-						entity.entity_id,
-						new_entity_id=suggested_entity_id,
-					)
 		if (
 			entity.domain in (
 				"climate", "cover", "lock", "media_player", "fan", "vacuum"
@@ -257,7 +179,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 	entry.runtime_data = ApplianceRuntimeCollection(runtimes)
 	entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
 	await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-	_async_normalize_proxy_entities(hass, entry)
+	_async_make_proxy_entities_visible(hass, entry)
 	return True
 
 
@@ -583,7 +505,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 		else:
 			hass.config_entries.async_update_entry(entry, version=13)
 		return True
-	_async_normalize_proxy_entities(hass, entry)
+	_async_make_proxy_entities_visible(hass, entry)
 	if entry.version == 11:
 		return await _async_migrate_to_appliance_groups(hass, entry)
 	if entry.version == 10:

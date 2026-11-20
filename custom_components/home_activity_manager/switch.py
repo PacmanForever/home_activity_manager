@@ -13,9 +13,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import CONF_PLUG_ENTITY, DOMAIN
 from .device import appliance_device_info
 from .entity_proxy import (
-    _ham_proxy_name,
-    _source_entity_name,
-    _suggested_proxy_object_id,
     use_source_entity_on_appliance,
 )
 from .runtime import ApplianceRuntime, entry_runtimes
@@ -34,18 +31,10 @@ class AppliancePlugSwitch(SwitchEntity):
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_plug"
         )
-        source_name = _source_entity_name(runtime.hass, self._entity_id)
         self._attr_has_entity_name = True
-        if source_name is not None:
-            self._attr_name = _ham_proxy_name(source_name)
         self._attr_device_info = appliance_device_info(
             entry, runtime.config, getattr(runtime, "hass", None)
         )
-
-    @property
-    def suggested_object_id(self) -> str:
-        """Suggest a switch entity ID derived from the appliance."""
-        return _suggested_proxy_object_id("plug")
 
     @property
     def is_on(self) -> bool | None:

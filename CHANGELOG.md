@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.67 - 2026-11-20
+
+### Changed
+
+- Follow Home Assistant's translated entity naming for proxies instead of deriving their visible names and entity IDs from source entities or fixed English capability slugs.
+- Keep the `(HAM Proxy)` name marker and `_ham_proxy` default ID suffix while preserving existing registry IDs and user customizations.
+
+### Tests
+
+- Verify translated proxy names, default ID suffixes, source replacement stability, and preservation of existing IDs.
+
 ## v0.9.66 - 2026-11-20
 
 ### Changed
