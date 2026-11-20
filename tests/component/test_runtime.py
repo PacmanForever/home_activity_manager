@@ -1625,16 +1625,26 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
             collision_entry.domain,
             "occupied_energy_proxy_id",
             config_entry=collision_entry,
-            suggested_object_id="air_conditioner_ac_energy_ham_proxy",
+            suggested_object_id="air_conditioner_total_energy_ham_proxy",
         )
     legacy_energy_entry = er.async_get(hass).async_get_or_create(
         "sensor",
         DOMAIN,
         f"{entry.entry_id}_total_energy",
         config_entry=entry,
-        suggested_object_id="air_conditioner_total_energy",
+        suggested_object_id="air_conditioner_ac_energy_ham_proxy",
     )
-    assert legacy_energy_entry.entity_id == "sensor.air_conditioner_total_energy"
+    assert legacy_energy_entry.entity_id == "sensor.air_conditioner_ac_energy_ham_proxy"
+    legacy_power_entry = None
+    if with_power:
+        legacy_power_entry = registry.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{entry.entry_id}_power",
+            config_entry=entry,
+            suggested_object_id="air_conditioner_ac_power_ham_proxy",
+        )
+        assert legacy_power_entry.entity_id == "sensor.air_conditioner_ac_power_ham_proxy"
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
@@ -1647,27 +1657,25 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
     assert energy_entry is not None
     assert energy_entry.original_name == "Energy consumed (HAM Proxy)"
     if with_collision:
-        assert energy_id == "sensor.air_conditioner_total_energy"
-        assert registry.async_get("sensor.air_conditioner_ac_energy_ham_proxy") == (
+        assert energy_id == "sensor.air_conditioner_ac_energy_ham_proxy"
+        assert registry.async_get("sensor.air_conditioner_total_energy_ham_proxy") == (
             collision_entity
         )
     else:
-        assert energy_id == "sensor.air_conditioner_ac_energy_ham_proxy"
+        assert energy_id == "sensor.air_conditioner_total_energy_ham_proxy"
     reset_button_id = registry.async_get_entity_id(
         "button", DOMAIN, f"{entry.entry_id}_energy_reset"
     )
     assert (reset_button_id is not None) == with_power
     assert (power_id is not None) == with_power
     if power_id is not None:
-        assert power_id == "sensor.air_conditioner_ac_power_ham_proxy"
+        assert power_id == "sensor.air_conditioner_power_ham_proxy"
+        assert legacy_power_entry is not None
         power_entry = registry.async_get(power_id)
         assert power_entry is not None
         assert power_entry.original_name == "Current Power (HAM Proxy)"
     assert plug_id is not None
-    assert plug_id == (
-        "switch.air_conditioner_"
-        f"{config[CONF_PLUG_ENTITY].split('.', maxsplit=1)[1]}_ham_proxy"
-    )
+    assert plug_id == "switch.air_conditioner_plug_ham_proxy"
     assert hass.states.get(plug_id).attributes["friendly_name"] == (
         "Air conditioner Kitchen outlet (HAM Proxy)"
     )
@@ -1682,6 +1690,9 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
         name="Rentadora",
         original_name="Old outlet name",
     )
+    custom_plug_id = "switch.custom_plug_ham_proxy"
+    registry.async_update_entity(plug_id, new_entity_id=custom_plug_id)
+    plug_id = custom_plug_id
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -1710,6 +1721,71 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
         assert float(hass.states.get(energy_id).state) == pytest.approx(0.5)
         assert hass.states.get(config[CONF_ENERGY_ENTITY]).state == "3000"
         assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_power_proxy_entity_id_is_appliance_based_and_survives_source_replacement(
+    hass, enable_custom_integrations
+):
+    source_entry = MockConfigEntry(domain="power_source")
+    source_entry.add_to_hass(hass)
+    source_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=source_entry.entry_id,
+        identifiers={(source_entry.domain, "meter")},
+        name="Power meter",
+    )
+    source_registry = er.async_get(hass)
+    source_entities = []
+    for object_id in ("old_meter_power", "replacement_meter_power"):
+        source = source_registry.async_get_or_create(
+            "sensor",
+            source_entry.domain,
+            object_id,
+            config_entry=source_entry,
+            device_id=source_device.id,
+        )
+        source_entities.append(source)
+        hass.states.async_set(
+            source.entity_id, "100", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+        )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_APPLIANCE_TYPE: "dryer",
+            CONF_POWER_ENTITY: source_entities[0].entity_id,
+            "name": "Assecadora",
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    proxy_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_power"
+    )
+    assert proxy_id == "sensor.assecadora_power_ham_proxy"
+    assert hass.states.get(proxy_id).attributes["source_entity"] == (
+        source_entities[0].entity_id
+    )
+
+    appliance_record = dict(entry.data["appliances"][0])
+    appliance_data = dict(appliance_record["data"])
+    appliance_data[CONF_POWER_ENTITY] = source_entities[1].entity_id
+    appliance_record["data"] = appliance_data
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, "appliances": [appliance_record]}
+    )
+    await hass.async_block_till_done()
+
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_power"
+    ) == proxy_id
+    assert hass.states.get(proxy_id).attributes["source_entity"] == (
+        source_entities[1].entity_id
+    )
+    assert await hass.config_entries.async_unload(entry.entry_id)
 
 
 @pytest.mark.asyncio
@@ -2305,10 +2381,7 @@ async def test_sun_protection_contact_tracks_position_without_running_output(
         "binary_sensor", DOMAIN, f"{entry.entry_id}_input_running"
     )
     assert position_entity_id is not None
-    assert position_entity_id == (
-        "binary_sensor.awning_"
-        f"{config[CONF_RUNNING_ENTITY].split('.', maxsplit=1)[1]}_ham_proxy"
-    )
+    assert position_entity_id == "binary_sensor.awning_running_ham_proxy"
     assert hass.states.get(position_entity_id).state == "off"
     assert hass.states.get(position_entity_id).attributes["device_class"] == "opening"
     assert registry.async_get_entity_id(
@@ -3022,7 +3095,14 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
     for input_config, source_entity_id, original_device_id in input_entities:
         source = source_registry.async_get(source_entity_id)
         assert source is not None
-        if input_config.domain in ("climate", "cover", "lock", "media_player"):
+        if input_config.domain in (
+            "climate",
+            "cover",
+            "lock",
+            "media_player",
+            "fan",
+            "vacuum",
+        ):
             wrapper_id = integration_registry.async_get_entity_id(
                 input_config.domain,
                 DOMAIN,
@@ -3046,8 +3126,9 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             assert hass.states.get(wrapper_id).attributes["friendly_name"].endswith(
                 f"{source_name} (HAM Proxy)"
             )
-            assert wrapper_id.endswith(
-                f"{source_entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
+            assert wrapper_id == (
+                f"{input_config.domain}.test_{appliance_type}_"
+                f"{input_config.domain}_ham_proxy"
             )
             assert hass.states.get(wrapper_id).attributes["source_entity"] == source_entity_id
             continue
@@ -3085,8 +3166,12 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
         else:
             assert wrapper.entity_id != status_entity_id
         assert wrapper.device_id == device_id
-        assert wrapper.entity_id.endswith(
-            f"{source_entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
+        proxy_key = (
+            input_config.output_entity
+            or input_config.config_key.removesuffix("_entity")
+        )
+        assert wrapper.entity_id == (
+            f"{input_config.domain}.test_{appliance_type}_{proxy_key}_ham_proxy"
         )
         wrapper_state = hass.states.get(wrapper.entity_id)
         assert wrapper_state is not None
@@ -4046,10 +4131,10 @@ async def test_domain_proxies_mirror_source_features_and_forward_actions(
     media_player = ApplianceMediaPlayerProxy(media_player_runtime, media_player_entry)
     climate.hass = cover.hass = lock.hass = media_player.hass = hass
 
-    assert climate.suggested_object_id == "original_ac_ham_proxy"
-    assert cover.suggested_object_id == "original_blind_ham_proxy"
-    assert lock.suggested_object_id == "original_door_ham_proxy"
-    assert media_player.suggested_object_id == "original_tv_ham_proxy"
+    assert climate.suggested_object_id == "climate_ham_proxy"
+    assert cover.suggested_object_id == "cover_ham_proxy"
+    assert lock.suggested_object_id == "lock_ham_proxy"
+    assert media_player.suggested_object_id == "media_player_ham_proxy"
     assert climate.hvac_mode is HVACMode.COOL
     assert [mode.value for mode in climate.hvac_modes] == ["off", "cool"]
     assert climate.hvac_action.value == "cooling"
@@ -4771,9 +4856,7 @@ async def test_lock_source_with_existing_parent_uses_named_visible_proxy(
         "lock", DOMAIN, f"{entry.entry_id}_lock_proxy"
     )
     assert proxy_id is not None
-    assert proxy_id == (
-        f"lock.porta_{source_entity.entity_id.split('.', maxsplit=1)[1]}_ham_proxy"
-    )
+    assert proxy_id == "lock.porta_lock_ham_proxy"
     proxy = er.async_get(hass).async_get(proxy_id)
     assert proxy.device_id == _async_appliance_device_id(hass, entry)
     source_name = (

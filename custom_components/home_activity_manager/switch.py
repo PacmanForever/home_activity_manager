@@ -44,8 +44,8 @@ class AppliancePlugSwitch(SwitchEntity):
 
     @property
     def suggested_object_id(self) -> str:
-        """Suggest a switch entity ID derived from the wrapped plug."""
-        return _suggested_proxy_object_id(self._entity_id)
+        """Suggest a switch entity ID derived from the appliance."""
+        return _suggested_proxy_object_id("plug")
 
     @property
     def is_on(self) -> bool | None:

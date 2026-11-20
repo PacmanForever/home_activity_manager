@@ -127,10 +127,10 @@ class ApplianceBinarySensor(BinarySensorEntity):
 
     @property
     def suggested_object_id(self) -> str:
-        """Suggest a source-derived ID for source-backed binary proxies."""
+        """Suggest an appliance-based ID for source-backed binary proxies."""
         if self._source_entity_id is None:
             return super().suggested_object_id
-        return _suggested_proxy_object_id(self._source_entity_id)
+        return _suggested_proxy_object_id(self._key)
 
     @property
     def available(self) -> bool:
@@ -287,8 +287,8 @@ class ApplianceInputBinarySensor(BinarySensorEntity):
 
     @property
     def suggested_object_id(self) -> str:
-        """Suggest a binary sensor ID derived from the wrapped input."""
-        return _suggested_proxy_object_id(self._source_entity_id)
+        """Suggest an appliance-based ID for the wrapped input."""
+        return _suggested_proxy_object_id(self._input_name)
 
     @property
     def is_on(self) -> bool | None:

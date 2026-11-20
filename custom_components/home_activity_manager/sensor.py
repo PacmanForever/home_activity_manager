@@ -122,10 +122,10 @@ class ApplianceSensor(SensorEntity):
 
     @property
     def suggested_object_id(self) -> str:
-        """Suggest a source-derived ID for source-backed sensor proxies."""
+        """Suggest an appliance-based ID for source-backed sensor proxies."""
         if self._source_entity_id is None:
             return super().suggested_object_id
-        return _suggested_proxy_object_id(self._source_entity_id)
+        return _suggested_proxy_object_id(self._key)
 
     @property
     def available(self) -> bool:
@@ -181,6 +181,10 @@ class ApplianceInputSensor(SensorEntity):
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = runtime.config[input_config.config_key]
+        self._proxy_key = (
+            input_config.output_entity
+            or input_config.config_key.removesuffix("_entity")
+        )
         self._attr_unique_id = (
             f"{getattr(runtime, 'appliance_id', entry.entry_id)}_"
             f"{input_config.output_entity}"
@@ -226,8 +230,8 @@ class ApplianceInputSensor(SensorEntity):
 
     @property
     def suggested_object_id(self) -> str:
-        """Suggest a source-derived ID for the wrapped sensor."""
-        return _suggested_proxy_object_id(self._source_entity_id)
+        """Suggest an appliance-based ID for the wrapped sensor."""
+        return _suggested_proxy_object_id(self._proxy_key)
 
     @property
     def available(self) -> bool:

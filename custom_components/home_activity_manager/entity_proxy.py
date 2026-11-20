@@ -7,16 +7,32 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.util import slugify
 
 from .const import DOMAIN
 from .device import appliance_device_info
 from .runtime import ApplianceRuntime
 
 
-def _suggested_proxy_object_id(
+def _suggested_proxy_object_id(proxy_key: str) -> str:
+    """Return the Home Assistant entity-name portion for a proxy."""
+    proxy_slug = slugify(proxy_key)
+    return f"{proxy_slug}_ham_proxy"
+
+
+def _appliance_proxy_object_id(appliance_name: str | None, proxy_key: str) -> str:
+    """Return the full object ID for a proxy attached to an appliance."""
+    appliance_slug = slugify(appliance_name or "")
+    suggested_object_id = _suggested_proxy_object_id(proxy_key)
+    if appliance_slug:
+        return f"{appliance_slug}_{suggested_object_id}"
+    return suggested_object_id
+
+
+def _legacy_source_proxy_object_id(
     source_entity_id: str, appliance_name: str | None = None
 ) -> str:
-    """Return an object ID that identifies this source-backed proxy."""
+    """Return the former source-based object ID for registry migration."""
     _, separator, object_id = source_entity_id.partition(".")
     if not separator:
         object_id = source_entity_id
@@ -104,8 +120,8 @@ class EntityProxyMixin:
 
     @property
     def suggested_object_id(self) -> str:
-        """Suggest an entity ID derived from the source entity."""
-        return _suggested_proxy_object_id(self._source_entity_id)
+        """Suggest an entity ID derived from the appliance and proxy type."""
+        return _suggested_proxy_object_id(self._proxy_key)
 
     def _init_proxy(
         self,
@@ -114,9 +130,11 @@ class EntityProxyMixin:
         source_entity_id: str,
         domain: str,
         translation_key: str,
+        proxy_key: str | None = None,
     ) -> None:
         self._runtime = runtime
         self._source_entity_id = source_entity_id
+        self._proxy_key = proxy_key or domain
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
         self._attr_unique_id = f"{appliance_id}_{domain}_proxy"
         source_name = _source_entity_name(runtime.hass, source_entity_id)

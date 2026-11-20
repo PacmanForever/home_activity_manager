@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.66 - 2026-11-20
+
+### Changed
+
+- Base visible HAM proxy entity IDs on the appliance and represented capability instead of the replaceable source entity.
+- Migrate legacy source-based proxy IDs to the stable appliance-based IDs while preserving user-customized entity IDs.
+
+### Tests
+
+- Cover proxy entity IDs across all profiles and verify that replacing a power source preserves the proxy entity ID.
+
 ## v0.9.65 - 2026-11-11
 
 ### Changed
