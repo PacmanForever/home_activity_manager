@@ -1,6 +1,7 @@
 {
   "domain": "home_activity_manager",
   "name": "Home Activity Manager",
+  "categories": ["appliances_cleaning", "climate", "media_entertainment"],
   "codeowners": ["@PacmanForever"],
   "config_flow": true,
   "documentation": "https://github.com/PacmanForever/home_activity_manager",

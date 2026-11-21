@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Add Marketplace categories for appliances and cleaning, climate, and media and entertainment.
+- Document Home Assistant's global entity ID format, its defaults, and how to change or recreate IDs.
+
 ## v0.9.67 - 2026-11-20
 
 ### Changed
