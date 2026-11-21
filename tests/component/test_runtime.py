@@ -74,7 +74,6 @@ from custom_components.home_activity_manager.const import (
 )
 from custom_components.home_activity_manager import (
     _async_appliance_device_id,
-    _async_localize_category_defaults,
     _async_reload_entry,
     async_remove_entry,
     async_unload_entry,
@@ -1290,97 +1289,6 @@ async def test_config_entry_loads_power_only_entities_and_unloads(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("language", "localized_group_name", "localized_class_name"),
-    (
-        ("ca", "Grans electrodomèstics", "Washer"),
-        ("es", "Grandes electrodomésticos", "Washer"),
-        ("en", "Large appliances", "Washer"),
-    ),
-)
-async def test_setup_localizes_legacy_category_defaults_without_changing_custom_names(
-    hass, enable_custom_integrations, language, localized_group_name, localized_class_name
-):
-    hass.config.language = language
-    for appliance_id in ("washer_default", "washer_custom"):
-        hass.states.async_set(
-            f"sensor.{appliance_id}_power",
-            "0",
-            {ATTR_UNIT_OF_MEASUREMENT: "W"},
-        )
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title="Washer",
-        data={
-            "category": "washer",
-            "appliances": [
-                {
-                    "id": "washer_default",
-                    "data": {
-                        "name": "Washer",
-                        CONF_APPLIANCE_TYPE: "washer",
-                        CONF_POWER_ENTITY: "sensor.washer_default_power",
-                    },
-                    "options": {},
-                },
-                {
-                    "id": "washer_custom",
-                    "data": {
-                        "name": "Laundry room",
-                        CONF_APPLIANCE_TYPE: "washer",
-                        CONF_POWER_ENTITY: "sensor.washer_custom_power",
-                    },
-                    "options": {},
-                },
-            ],
-        },
-    )
-    entry.add_to_hass(hass)
-
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert entry.title == localized_group_name
-    assert entry.data["appliances"][0]["data"]["name"] == localized_class_name
-    assert entry.data["appliances"][1]["data"]["name"] == "Laundry room"
-    registry = dr.async_get(hass)
-    default_device = _find_device(
-        registry,
-        identifiers={(DOMAIN, "washer_default")}
-    )
-    custom_device = _find_device(
-        registry,
-        identifiers={(DOMAIN, "washer_custom")}
-    )
-    assert default_device is not None
-    assert custom_device is not None
-    assert default_device.name == localized_class_name
-    assert custom_device.name == "Laundry room"
-
-
-def test_localize_legacy_category_defaults_preserves_custom_appliance_names(hass):
-    hass.config.language = "ca"
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title="Washer",
-        data={
-            "category": "washer",
-            "appliances": [
-                {"id": "washer_default", "data": {"name": "Washer"}},
-                {"id": "washer_custom", "data": {"name": "Laundry room"}},
-            ],
-        },
-    )
-    entry.add_to_hass(hass)
-
-    _async_localize_category_defaults(hass, entry)
-
-    assert entry.title == "Rentadora"
-    assert entry.data["appliances"][0]["data"]["name"] == "Rentadora"
-    assert entry.data["appliances"][1]["data"]["name"] == "Laundry room"
-
-
-@pytest.mark.asyncio
 async def test_category_entry_groups_appliances_without_parent_device(
     hass, enable_custom_integrations
 ):
@@ -1550,8 +1458,8 @@ async def test_thermostat_profiles_are_standalone_devices(
         )
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="Thermostat",
-        data={"category": "thermostat", "appliances": appliance_records},
+        title="Climate control",
+        data={"category": "climate", "appliances": appliance_records},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -1750,10 +1658,21 @@ async def test_power_proxy_entity_id_is_appliance_based_and_survives_source_repl
 
     entry = MockConfigEntry(
         domain=DOMAIN,
+        title="Large appliances",
         data={
-            CONF_APPLIANCE_TYPE: "dryer",
-            CONF_POWER_ENTITY: source_entities[0].entity_id,
-            "name": "Assecadora",
+            "category": "large_appliances",
+            "appliances": [
+                {
+                    "id": "dryer",
+                    "data": {
+                        CONF_APPLIANCE_TYPE: "dryer",
+                        CONF_APPLIANCE_CLASS: "dryer",
+                        CONF_POWER_ENTITY: source_entities[0].entity_id,
+                        "name": "Assecadora",
+                    },
+                    "options": {},
+                }
+            ],
         },
     )
     entry.add_to_hass(hass)
@@ -1762,7 +1681,7 @@ async def test_power_proxy_entity_id_is_appliance_based_and_survives_source_repl
 
     registry = er.async_get(hass)
     proxy_id = registry.async_get_entity_id(
-        "sensor", DOMAIN, f"{entry.entry_id}_power"
+        "sensor", DOMAIN, "dryer_power"
     )
     assert proxy_id is not None
     assert proxy_id.endswith("_ham_proxy")
@@ -1781,7 +1700,7 @@ async def test_power_proxy_entity_id_is_appliance_based_and_survives_source_repl
     await hass.async_block_till_done()
 
     assert registry.async_get_entity_id(
-        "sensor", DOMAIN, f"{entry.entry_id}_power"
+        "sensor", DOMAIN, "dryer_power"
     ) == proxy_id
     assert hass.states.get(proxy_id).attributes["source_entity"] == (
         source_entities[1].entity_id
@@ -3893,23 +3812,41 @@ async def test_unassigned_climate_source_is_attached_and_tracked(
     )
     entry = MockConfigEntry(
         domain=DOMAIN,
+        title="Climate control",
         data={
-            CONF_APPLIANCE_TYPE: appliance_type,
-            CONF_CLIMATE_ENTITY: climate_entity.entity_id,
-            "name": "Air conditioner",
+            "category": "climate",
+            "appliances": [
+                {
+                    "id": appliance_type,
+                    "data": {
+                        CONF_APPLIANCE_TYPE: appliance_type,
+                        CONF_APPLIANCE_CLASS: (
+                            "thermostat"
+                            if appliance_type == "thermostat_climate"
+                            else "air_conditioner"
+                        ),
+                        CONF_CLIMATE_ENTITY: climate_entity.entity_id,
+                        "name": "Air conditioner",
+                    },
+                    "options": {},
+                }
+            ],
         },
     )
     entry.add_to_hass(hass)
 
     assert await hass.config_entries.async_setup(entry.entry_id)
-    device_id = _async_appliance_device_id(hass, entry)
+    appliance_device = _find_device(
+        dr.async_get(hass), identifiers={(DOMAIN, appliance_type)}
+    )
+    device_id = appliance_device.id if appliance_device is not None else None
     assert device_id is not None
     registered_climate = er.async_get(hass).async_get(climate_entity.entity_id)
     assert registered_climate is not None
     assert registered_climate.config_entry_id == climate_entry.entry_id
     assert registered_climate.device_id == device_id
     proxy_entity_id = er.async_get(hass).async_get_entity_id(
-        "climate", DOMAIN, f"{entry.entry_id}_climate_proxy"
+        "climate", DOMAIN, f"{appliance_type}_climate_proxy"
     )
     assert proxy_entity_id is None
     assert entry.runtime_data.detector.is_running
@@ -3949,7 +3886,7 @@ async def test_unassigned_climate_source_is_attached_and_tracked(
     assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id == device_id
     assert (
         er.async_get(hass).async_get_entity_id(
-            "climate", DOMAIN, f"{entry.entry_id}_climate_proxy"
+            "climate", DOMAIN, f"{appliance_type}_climate_proxy"
         )
         is None
     )
@@ -3963,12 +3900,12 @@ async def test_unassigned_climate_source_is_attached_and_tracked(
         data={**entry.data, "appliances": [appliance_record]},
     )
     await hass.async_block_till_done()
-    assert CONF_CLIMATE_ENTITY not in entry.runtime_data[entry.entry_id].config
+    assert CONF_CLIMATE_ENTITY not in entry.runtime_data[appliance_type].config
     assert er.async_get(hass).async_get(replacement_climate.entity_id).device_id is None
     assert er.async_get(hass).async_get(climate_entity.entity_id).device_id is None
     assert (
         er.async_get(hass).async_get_entity_id(
-            "climate", DOMAIN, f"{entry.entry_id}_climate_proxy"
+            "climate", DOMAIN, f"{appliance_type}_climate_proxy"
         )
         is None
     )
@@ -4562,7 +4499,6 @@ async def test_climate_mode_transitions_run_start_and_finish_actions(
     }
     entry = MockConfigEntry(
         domain=DOMAIN,
-        version=8,
         data={
             "category": "climate",
             "appliances": [
@@ -4644,7 +4580,6 @@ async def test_simultaneous_group_finish_actions_run_for_each_climate_device(
     hass.services.async_register("notify", "send_message", capture_message)
     entry = MockConfigEntry(
         domain=DOMAIN,
-        version=8,
         data={"category": "climate", "appliances": configs},
         options={
             CONF_GROUP_ACTIONS: {

@@ -2,10 +2,17 @@
 
 ## Unreleased
 
+## v0.9.68 - 2026-11-21
+
 ### Changed
 
 - Add Marketplace categories for appliances and cleaning, climate, and media and entertainment.
 - Document Home Assistant's global entity ID format, its defaults, and how to change or recreate IDs.
+- Remove historical config-entry migration steps because no previous integration format needs to be supported yet; retain the migration hook for future format changes.
+
+### Tests
+
+- Verify that unsupported config-entry versions are rejected without modifying saved data.
 
 ## v0.9.67 - 2026-11-20
 

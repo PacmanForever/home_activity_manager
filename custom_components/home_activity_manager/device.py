@@ -53,25 +53,6 @@ def _get_device_by_identifier(
     )
 
 
-def move_device_to_config_entry(
-    registry: Any, device_id: str, source_entry_id: str, target_entry_id: str
-) -> None:
-    """Move a device using the registry API supported by this HA version."""
-    update_parameters = inspect.signature(
-        type(registry).async_update_device
-    ).parameters
-    if "new_config_entry_id" in update_parameters:
-        registry.async_update_device(
-            device_id, new_config_entry_id=target_entry_id
-        )
-    else:
-        registry.async_update_device(
-            device_id,
-            add_config_entry_id=target_entry_id,
-            remove_config_entry_id=source_entry_id,
-        )
-
-
 def remove_appliance_group_devices(hass: HomeAssistant) -> None:
     """Remove empty category/profile parents and detach their appliance devices."""
     registry = dr.async_get(hass)

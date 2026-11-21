@@ -13,7 +13,7 @@
 
 **Turn a non-smart appliance into a Home Assistant device.** Home Activity Manager groups its existing entities, such as a smart plug's power sensor and a door contact, under one dedicated device in Home Assistant. The appliance stays physically unchanged, while its activity, controls, reminders, and alarms are managed together. No cloud service, credentials, external helpers, or automations are needed. Its extensible profiles cover climate control, large appliances (laundry and refrigeration), animal care, deliveries, electronics, openings, and sun protection.
 
-**Last updated:** 2026-11-20
+**Last updated:** 2026-11-21
 
 ## Installation
 
@@ -229,7 +229,7 @@ For example, add a notification action to the shared activity-start hook. Replac
 
 To include the source entity in a message, use `{{ ham_source_entity_id | default('timer', true) }}` so timer-triggered actions have a fallback value. The previous names `ham_appliance_name` and `ham_area_name` remain available as aliases for existing templates.
 
-Each group has one config entry. Initial setup asks for the device name, group, and an optional area. From a group's options, choose **Add a device** to add an appliance directly to that group; this form also offers an optional area selector and shows the group as a read-only value. The selected area is applied only to the new appliance; leaving it blank creates the device without an area and does not change existing devices. Unnamed existing devices use their translated appliance class as a fallback name. Management actions are listed alphabetically in the active language, and device removal requires confirmation. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Existing per-appliance entries are consolidated automatically during migration. Legacy laundry and refrigeration entries become one Large appliances group; their shared action lists are combined, duplicate actions are removed, and appliance IDs, entity IDs, registry customizations, local options, and runtime state are preserved. Setup asks for:
+Each group has one config entry. Initial setup asks for the device name, group, and an optional area. From a group's options, choose **Add a device** to add an appliance directly to that group; this form also offers an optional area selector and shows the group as a read-only value. The selected area is applied only to the new appliance; leaving it blank creates the device without an area and does not change existing devices. Unnamed existing devices use their translated appliance class as a fallback name. Management actions are listed alphabetically in the active language, and device removal requires confirmation. The appliance class is stored separately from its functional profile and drives class-specific device metadata; the displayed name remains editable. Setup asks for:
 
 Each group entry groups its appliances on the integration page. Only configured appliances are registered as devices; the group itself is not added as an empty device.
 

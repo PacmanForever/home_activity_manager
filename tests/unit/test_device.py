@@ -56,38 +56,6 @@ def test_get_device_by_identifier_uses_legacy_registry_view():
     )
 
 
-def test_move_device_to_config_entry_uses_new_api_when_available():
-    calls = []
-
-    class ModernRegistry:
-        def async_update_device(self, device_id, *, new_config_entry_id):
-            calls.append((device_id, new_config_entry_id))
-
-    device_module.move_device_to_config_entry(
-        ModernRegistry(), "device", "old-entry", "new-entry"
-    )
-
-    assert calls == [("device", "new-entry")]
-
-
-def test_move_device_to_config_entry_falls_back_to_legacy_api():
-    calls = []
-
-    class LegacyRegistry:
-        def async_update_device(
-            self, device_id, *, add_config_entry_id, remove_config_entry_id
-        ):
-            calls.append(
-                (device_id, add_config_entry_id, remove_config_entry_id)
-            )
-
-    device_module.move_device_to_config_entry(
-        LegacyRegistry(), "device", "old-entry", "new-entry"
-    )
-
-    assert calls == [("device", "new-entry", "old-entry")]
-
-
 def test_remove_appliance_group_devices_uses_public_device_collection(
     monkeypatch, hass
 ):
