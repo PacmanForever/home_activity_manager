@@ -1130,7 +1130,7 @@ async def test_options_flow_shows_immutable_category_and_mode(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("version", (2, 13))
+@pytest.mark.parametrize("version", (2, 15))
 async def test_config_entry_without_migration_is_rejected(hass, version):
     entry = MockConfigEntry(domain=DOMAIN, version=version, data={"kept": True})
     entry.add_to_hass(hass)
@@ -1138,6 +1138,24 @@ async def test_config_entry_without_migration_is_rejected(hass, version):
     assert not await async_migrate_entry(hass, entry)
     assert entry.version == version
     assert entry.data == {"kept": True}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("version", (1, 13))
+async def test_migrate_current_format_entry_without_changing_saved_data(
+    hass, version
+):
+    data = {"category": "electronics", "appliances": [{"id": "tv"}]}
+    options = {CONF_GROUP_ACTIONS: {"activity_start": [{"action": "test.run"}]}}
+    entry = MockConfigEntry(
+        domain=DOMAIN, version=version, data=data, options=options
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry)
+    assert entry.version == 14
+    assert entry.data == data
+    assert entry.options == options
 
 
 @pytest.mark.parametrize(

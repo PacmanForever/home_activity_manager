@@ -163,7 +163,10 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_migrate_entry(
-	_hass: HomeAssistant, _entry: ConfigEntry
+	hass: HomeAssistant, entry: ConfigEntry
 ) -> bool:
 	"""Provide Home Assistant's migration hook for future format changes."""
+	if entry.version in (1, 13):
+		hass.config_entries.async_update_entry(entry, version=14)
+		return True
 	return False

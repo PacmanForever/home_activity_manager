@@ -943,7 +943,7 @@ def _entry_options(values: dict[str, Any]) -> dict[str, Any]:
 class ApplianceCycleMonitorConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle initial setup of an appliance category."""
 
-    VERSION = 1
+    VERSION = 14
 
     def __init__(self) -> None:
         self._draft: dict[str, Any] = {}

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v0.9.69 - 2026-11-21
+
+### Fixed
+
+- Migrate current-format version 1 and 13 config entries to version 14 without changing saved data or options, preventing Home Assistant from rejecting existing entries as newer than the integration.
+
+### Tests
+
+- Verify current-format version 1 and 13 config entries migrate successfully with data and options preserved.
+
 ## v0.9.68 - 2026-11-21
 
 ### Changed
