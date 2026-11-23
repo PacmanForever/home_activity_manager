@@ -774,7 +774,7 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                     },
                 )
                 for input_config in profile.sensor_inputs:
-                    if input_config.proxy_always:
+                    if input_config.always_wrap_source:
                         self.assertEqual(input_config.config_key, CONF_ENERGY_ENTITY)
                         self.assertEqual(input_config.output_entity, "total_energy")
                 self.assertEqual(
@@ -1396,21 +1396,19 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             ("Potència actual", "Potència actual (HAM Proxy)"),
         )
         expected_energy_names = (
-            ("Energy consumed", "Energy consumed (HAM Proxy)"),
-            ("Energy consumed", "Energy consumed (HAM Proxy)"),
-            ("Energía consumida", "Energía consumida (HAM Proxy)"),
-            ("Energia consumida", "Energia consumida (HAM Proxy)"),
+            "Energy consumed",
+            "Energy consumed",
+            "Energía consumida",
+            "Energia consumida",
         )
         for translation, expected_names in zip(translations, expected_power_names):
             sensor_names = translation["entity"]["sensor"]
             for key, expected_name in zip(("power", "proxy_power"), expected_names):
                 self.assertEqual(sensor_names[key]["name"], expected_name)
-        for translation, expected_names in zip(translations, expected_energy_names):
+        for translation, expected_name in zip(translations, expected_energy_names):
             sensor_names = translation["entity"]["sensor"]
-            for key, expected_name in zip(
-                ("total_energy", "proxy_total_energy"), expected_names
-            ):
-                self.assertEqual(sensor_names[key]["name"], expected_name)
+            self.assertEqual(sensor_names["total_energy"]["name"], expected_name)
+            self.assertNotIn("proxy_total_energy", sensor_names)
         expected_status_names = (
             ("State", "Pending to unload"),
             ("State", "Pending to unload"),
@@ -1734,6 +1732,25 @@ class ConfigFlowSchemaTests(unittest.TestCase):
                 translation["options"]["abort"]["last_appliance_removed"].strip()
             )
             self.assertNotIn("last_appliance_removed", translation["config"]["abort"])
+
+    def test_remove_confirmation_uses_action_label(self) -> None:
+        root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
+        expected_labels = ("Remove", "Remove", "Eliminar", "Elimina")
+        paths = (
+            root / "strings.json",
+            root / "translations" / "en.json",
+            root / "translations" / "es.json",
+            root / "translations" / "ca.json",
+        )
+        for path, expected_label in zip(paths, expected_labels):
+            translation = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                translation["options"]["step"]["confirm_remove"]["menu_options"][
+                    "confirm_remove_appliance"
+                ],
+                expected_label,
+                path,
+            )
 
 
 @pytest.mark.asyncio

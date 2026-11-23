@@ -78,7 +78,9 @@ class ApplianceSensor(SensorEntity):
         self._source_entity_id = source_entity_id
         self._attr_unique_id = f"{getattr(runtime, 'appliance_id', entry.entry_id)}_{key}"
         self._attr_translation_key = (
-            f"proxy_{key}" if source_entity_id else key
+            f"proxy_{key}"
+            if source_entity_id and key != "total_energy"
+            else key
         )
         appliance_class = runtime.config.get(CONF_APPLIANCE_CLASS)
         if key == "last_cycle_duration":
@@ -232,7 +234,7 @@ async def async_setup_entry(
     registry = er.async_get(hass)
     for runtime in entry_runtimes(entry):
         appliance_id = getattr(runtime, "appliance_id", entry.entry_id)
-        proxy_sources: dict[str, str] = {}
+        source_backed_outputs: dict[str, str] = {}
         directly_attached_outputs: set[str] = set()
         for input_config in runtime.profile.sensor_inputs:
             if input_config.domain != "sensor" or input_config.output_entity is None:
@@ -240,14 +242,14 @@ async def async_setup_entry(
             source_entity_id = runtime.config.get(input_config.config_key)
             if source_entity_id is None:
                 continue
-            if input_config.proxy_always:
-                proxy_sources[input_config.output_entity] = source_entity_id
+            if input_config.always_wrap_source:
+                source_backed_outputs[input_config.output_entity] = source_entity_id
             elif use_source_entity_on_appliance(
                 hass, entry, runtime, source_entity_id
             ):
                 directly_attached_outputs.add(input_config.output_entity)
             else:
-                proxy_sources[input_config.output_entity] = source_entity_id
+                source_backed_outputs[input_config.output_entity] = source_entity_id
         sensors = {
             "power": ApplianceSensor(
                 runtime,
@@ -257,7 +259,7 @@ async def async_setup_entry(
                 UnitOfPower.WATT,
                 SensorDeviceClass.POWER,
                 SensorStateClass.MEASUREMENT,
-                proxy_sources.get("power"),
+                source_backed_outputs.get("power"),
             ),
             "total_energy": ApplianceSensor(
                 runtime,
@@ -267,7 +269,7 @@ async def async_setup_entry(
                 UnitOfEnergy.KILO_WATT_HOUR,
                 SensorDeviceClass.ENERGY,
                 SensorStateClass.TOTAL_INCREASING,
-                proxy_sources.get("total_energy"),
+                source_backed_outputs.get("total_energy"),
             ),
             "last_cycle_energy": ApplianceSensor(
                 runtime,
@@ -334,7 +336,7 @@ async def async_setup_entry(
                 and key is not None
                 and key not in sensors
                 and runtime.config.get(input_config.config_key)
-                and key in proxy_sources
+                and key in source_backed_outputs
             ):
                 sensors[key] = ApplianceInputSensor(runtime, entry, input_config)
         input_outputs = {

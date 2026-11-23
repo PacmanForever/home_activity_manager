@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## v0.9.70 - 2026-11-23
+
+### Changed
+
+- Reserve the `(HAM Proxy)` marker for entities duplicated to preserve an existing Home Assistant device association; name external-energy wrappers **Energy consumed** and preserve existing entity IDs.
+- Use an explicit **Remove** action label in the localized appliance-removal confirmation.
+
+### Tests
+
+- Verify external-energy wrapper naming and preservation of existing entity IDs.
+- Verify localized appliance-removal confirmation labels.
+
 ## v0.9.69 - 2026-11-21
 
 ### Fixed

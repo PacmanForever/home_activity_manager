@@ -1564,7 +1564,7 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
     assert float(hass.states.get(energy_id).state) == pytest.approx(2.5)
     energy_entry = registry.async_get(energy_id)
     assert energy_entry is not None
-    assert energy_entry.original_name == "Energy consumed (HAM Proxy)"
+    assert energy_entry.original_name == "Energy consumed"
     if with_collision:
         assert registry.async_get("sensor.air_conditioner_total_energy_ham_proxy") == (
             collision_entity
@@ -2952,7 +2952,7 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             device_id=(
                 source_device.id
                 if input_config.domain != "climate"
-                and not input_config.proxy_always
+                and not input_config.always_wrap_source
                 and index % 2 == 1
                 else None
             ),
@@ -3057,8 +3057,8 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             if input_config in profile.inputs_requiring_wrapper
             else f"{entry.entry_id}_{input_config.output_entity}"
         )
-        always_proxy = input_config.proxy_always
-        if original_device_id is None and not always_proxy:
+        always_wrap = input_config.always_wrap_source
+        if original_device_id is None and not always_wrap:
             assert source.device_id == device_id
             assert integration_registry.async_get_entity_id(
                 input_config.domain, DOMAIN, unique_id
@@ -3081,12 +3081,17 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
         else:
             assert wrapper.entity_id != status_entity_id
         assert wrapper.device_id == device_id
-        assert wrapper.entity_id.endswith("_ham_proxy")
         wrapper_state = hass.states.get(wrapper.entity_id)
         assert wrapper_state is not None
-        assert wrapper_state.attributes["friendly_name"].endswith("(HAM Proxy)")
         assert wrapper.original_name is not None
-        assert wrapper.original_name.endswith("(HAM Proxy)")
+        if input_config.output_entity == "total_energy":
+            assert not wrapper.entity_id.endswith("_ham_proxy")
+            assert "(HAM Proxy)" not in wrapper_state.attributes["friendly_name"]
+            assert "(HAM Proxy)" not in wrapper.original_name
+        else:
+            assert wrapper.entity_id.endswith("_ham_proxy")
+            assert wrapper_state.attributes["friendly_name"].endswith("(HAM Proxy)")
+            assert wrapper.original_name.endswith("(HAM Proxy)")
         assert wrapper_state.attributes["source_entity"] == source_entity_id
         if input_config in profile.inputs_requiring_wrapper:
             assert wrapper_state.attributes["device_class"] == "opening"

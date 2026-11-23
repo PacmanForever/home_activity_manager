@@ -163,7 +163,7 @@
       },
       "add_appliance": {"title": "Add a device", "data": {"name": "Name shown for this device", "area_id": "Area (optional)", "appliance_group": "Device group"}},
       "select_appliance": {"title": "Select device", "data": {"appliance_id": "Device"}},
-      "confirm_remove": {"title": "Confirm device removal", "description": "Are you sure you want to remove {name}?", "menu_options": {"confirm_remove_appliance": "Confirm", "cancel_remove_appliance": "Cancel"}},
+      "confirm_remove": {"title": "Confirm device removal", "description": "Are you sure you want to remove {name}?", "menu_options": {"confirm_remove_appliance": "Remove", "cancel_remove_appliance": "Cancel"}},
       "group_actions": {
         "title": "Group actions",
         "description": "Shared actions run separately for each device, before its local actions. See the README for group-action setup and examples.",
@@ -392,7 +392,6 @@
       "water_level": {"name": "Water level"},
       "proxy_water_level": {"name": "Water level (HAM Proxy)"},
       "total_energy": {"name": "Energy consumed"},
-      "proxy_total_energy": {"name": "Energy consumed (HAM Proxy)"},
       "last_cycle_duration": {"name": "Last cycle duration"},
       "last_cycle_energy": {"name": "Energy consumed in the last cycle"},
       "door_open_duration": {"name": "Duration of the last door opening"},
