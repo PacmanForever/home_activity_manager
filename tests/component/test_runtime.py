@@ -1580,7 +1580,7 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
         assert power_id.endswith("_ham_proxy")
         power_entry = registry.async_get(power_id)
         assert power_entry is not None
-        assert power_entry.original_name == "Current Power (HAM Proxy)"
+        assert power_entry.original_name == "Current Power"
     assert plug_id is not None
     assert plug_id.endswith("_ham_proxy")
     plug_entry = registry.async_get(plug_id)
@@ -1631,7 +1631,7 @@ async def test_climate_appliance_exposes_optional_electrical_entities(
 
 
 @pytest.mark.asyncio
-async def test_power_proxy_entity_id_is_appliance_based_and_survives_source_replacement(
+async def test_power_entity_id_is_appliance_based_and_survives_source_replacement(
     hass, enable_custom_integrations
 ):
     source_entry = MockConfigEntry(domain="power_source")
@@ -1680,13 +1680,13 @@ async def test_power_proxy_entity_id_is_appliance_based_and_survives_source_repl
     await hass.async_block_till_done()
 
     registry = er.async_get(hass)
-    proxy_id = registry.async_get_entity_id(
+    power_entity_id = registry.async_get_entity_id(
         "sensor", DOMAIN, "dryer_power"
     )
-    assert proxy_id is not None
-    assert proxy_id.endswith("_ham_proxy")
-    assert registry.async_get(proxy_id).original_name == "Current Power (HAM Proxy)"
-    assert hass.states.get(proxy_id).attributes["source_entity"] == (
+    assert power_entity_id is not None
+    assert not power_entity_id.endswith("_ham_proxy")
+    assert registry.async_get(power_entity_id).original_name == "Current Power"
+    assert hass.states.get(power_entity_id).attributes["source_entity"] == (
         source_entities[0].entity_id
     )
 
@@ -1701,8 +1701,8 @@ async def test_power_proxy_entity_id_is_appliance_based_and_survives_source_repl
 
     assert registry.async_get_entity_id(
         "sensor", DOMAIN, "dryer_power"
-    ) == proxy_id
-    assert hass.states.get(proxy_id).attributes["source_entity"] == (
+    ) == power_entity_id
+    assert hass.states.get(power_entity_id).attributes["source_entity"] == (
         source_entities[1].entity_id
     )
     assert await hass.config_entries.async_unload(entry.entry_id)
@@ -3088,10 +3088,7 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
         wrapper_state = hass.states.get(wrapper.entity_id)
         assert wrapper_state is not None
         assert wrapper.original_name is not None
-        if input_config.output_entity == "total_energy" or (
-            input_config.output_entity == "power"
-            and original_device_id is None
-        ):
+        if input_config.output_entity in {"power", "total_energy"}:
             assert not wrapper.entity_id.endswith("_ham_proxy")
             assert "(HAM Proxy)" not in wrapper_state.attributes["friendly_name"]
             assert "(HAM Proxy)" not in wrapper.original_name
@@ -3538,7 +3535,7 @@ async def test_unassigned_appliance_plug_is_attached_without_duplicate(
 
 
 @pytest.mark.asyncio
-async def test_unregistered_power_source_uses_proxy_without_modifying_source(
+async def test_unregistered_power_source_uses_wrapper_without_modifying_source(
     hass, enable_custom_integrations
 ):
     source_entry = MockConfigEntry(domain="screen_source")
@@ -3586,16 +3583,15 @@ async def test_unregistered_power_source_uses_proxy_without_modifying_source(
     assert appliance_device_id is not None
     assert registry.async_get(unregistered_power_id) is None
     assert hass.states.get(unregistered_power_id).state == "42"
-    power_proxy_id = registry.async_get_entity_id(
+    power_entity_id = registry.async_get_entity_id(
         "sensor", DOMAIN, f"{entry.entry_id}_power"
     )
-    assert power_proxy_id is not None
-    power_proxy = registry.async_get(power_proxy_id)
-    assert power_proxy is not None
-    assert power_proxy.device_id == appliance_device_id
-    assert power_proxy.original_name is not None
-    assert power_proxy.original_name.endswith("(HAM Proxy)")
-    assert hass.states.get(power_proxy_id).attributes["source_entity"] == (
+    assert power_entity_id is not None
+    power_output = registry.async_get(power_entity_id)
+    assert power_output is not None
+    assert power_output.device_id == appliance_device_id
+    assert power_output.original_name == "Current Power"
+    assert hass.states.get(power_entity_id).attributes["source_entity"] == (
         unregistered_power_id
     )
 
@@ -3717,8 +3713,7 @@ async def test_power_and_energy_sources_follow_association_state_on_setup_and_re
     power_output = registry.async_get(power_entity_id)
     assert power_output is not None
     assert power_output.device_id == _async_appliance_device_id(hass, entry)
-    assert power_output.original_name is not None
-    assert power_output.original_name.endswith("(HAM Proxy)")
+    assert power_output.original_name == "Current Power"
     assert hass.states.get(power_entity_id).attributes["source_entity"] == power.entity_id
     energy_wrapper = registry.async_get(energy_entity_id)
     assert energy_wrapper is not None

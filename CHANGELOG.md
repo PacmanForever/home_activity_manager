@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v0.9.72 - 2026-11-23
+
+### Changed
+
+- Always name the HAM power wrapper **Current Power** and never mark it as a `(HAM Proxy)`, regardless of the source's registry or device association.
+
+### Tests
+
+- Verify consistent power naming and preservation of sources with no parent, another parent, or no registry entry.
+
 ## v0.9.71 - 2026-11-23
 
 ### Changed

@@ -383,7 +383,6 @@
     "vacuum": {"vacuum_proxy": {"name": "Aspirador (HAM Proxy)"}},
     "sensor": {
       "power": {"name": "Potència actual"},
-      "proxy_power": {"name": "Potència actual (HAM Proxy)"},
       "illuminance": {"name": "Lluminositat"},
       "proxy_illuminance": {"name": "Il·luminació (HAM Proxy)"},
       "water_temperature": {"name": "Temperatura de l’aigua"},
