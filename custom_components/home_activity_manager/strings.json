@@ -163,7 +163,7 @@
       },
       "add_appliance": {"title": "Add a device", "data": {"name": "Name shown for this device", "area_id": "Area (optional)", "appliance_group": "Device group"}},
       "select_appliance": {"title": "Select device", "data": {"appliance_id": "Device"}},
-      "confirm_remove": {"title": "Confirm device removal", "description": "Are you sure you want to remove {name}?", "menu_options": {"confirm_remove_appliance": "Remove", "cancel_remove_appliance": "Cancel"}},
+      "confirm_remove": {"title": "Confirm device removal", "description": "Are you sure you want to remove {name}?", "data": {"confirm_remove_appliance": "I confirm that I want to remove this device"}},
       "group_actions": {
         "title": "Group actions",
         "description": "Shared actions run separately for each device, before its local actions. See the README for group-action setup and examples.",
@@ -294,7 +294,8 @@
       "media_player_entity_requires_no_device": "Select an existing media player, or the media player already assigned to this device.",
       "fan_entity_requires_fan": "Select an existing fan entity.",
       "vacuum_entity_requires_vacuum": "Select an existing vacuum entity.",
-      "climate_entity_requires_no_device": "Select an existing climate entity, or the climate entity already assigned to this device."
+      "climate_entity_requires_no_device": "Select an existing climate entity, or the climate entity already assigned to this device.",
+      "confirm_remove_required": "Check the box to confirm device removal."
     }
   },
   "selector": {

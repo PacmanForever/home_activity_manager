@@ -1565,29 +1565,22 @@ async def test_options_flow_removes_one_appliance_and_preserves_group_members(
     result = await hass.config_entries.options.async_configure(
         flow_id, {"appliance_id": removed_id}
     )
-    assert result["type"] is FlowResultType.MENU
+    assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "confirm_remove"
     assert result["description_placeholders"] == {"name": "Washer to remove"}
     assert len(entry.data["appliances"]) == 2
     assert entity_registry.async_get(removed_entity.entity_id) is not None
 
     result = await hass.config_entries.options.async_configure(
-        flow_id, {"next_step_id": "cancel_remove_appliance"}
+        flow_id, {"confirm_remove_appliance": False}
     )
     assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "confirm_remove_required"}
     assert entity_registry.async_get(removed_entity.entity_id) is not None
     assert await store.async_load() == {"last_cycle_duration_seconds": 60}
 
     result = await hass.config_entries.options.async_configure(
-        flow_id, {"appliance_action": "remove"}
-    )
-    assert result["step_id"] == "select_appliance"
-    result = await hass.config_entries.options.async_configure(
-        flow_id, {"appliance_id": removed_id}
-    )
-    assert result["step_id"] == "confirm_remove"
-    result = await hass.config_entries.options.async_configure(
-        flow_id, {"next_step_id": "confirm_remove_appliance"}
+        flow_id, {"confirm_remove_appliance": True}
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -1599,6 +1592,98 @@ async def test_options_flow_removes_one_appliance_and_preserves_group_members(
     ) is None
     assert device_registry.async_get(retained_device.id) is not None
     assert await Store(hass, 1, f"{DOMAIN}_{removed_id}").async_load() is None
+
+
+@pytest.mark.asyncio
+async def test_removing_appliance_cleans_proxy_for_unregistered_power_source(
+    hass, enable_custom_integrations
+):
+    source_entry = MockConfigEntry(domain="screen_source")
+    source_entry.add_to_hass(hass)
+    source_registry = er.async_get(hass)
+    media_players = {}
+    records = []
+    for appliance_id in ("screen_to_remove", "screen_to_keep"):
+        media_player = source_registry.async_get_or_create(
+            "media_player",
+            source_entry.domain,
+            appliance_id,
+            config_entry=source_entry,
+            original_name=appliance_id,
+        )
+        media_players[appliance_id] = media_player
+        hass.states.async_set(media_player.entity_id, "playing")
+        records.append(
+            {
+                "id": appliance_id,
+                "data": {
+                    "name": appliance_id,
+                    CONF_APPLIANCE_TYPE: "screen_media_player",
+                    CONF_APPLIANCE_CLASS: "screen",
+                    CONF_MEDIA_PLAYER_ENTITY: media_player.entity_id,
+                    CONF_POWER_ENTITY: "sensor.screen_power_without_unique_id",
+                },
+                "options": {},
+            }
+        )
+
+    unregistered_power_id = "sensor.screen_power_without_unique_id"
+    hass.states.async_set(
+        unregistered_power_id, "42", {"unit_of_measurement": "W"}
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Electronics",
+        data={"category": "electronics", "appliances": records},
+    )
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+
+    assert registry.async_get(unregistered_power_id) is None
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    removed_proxy_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, "screen_to_remove_power"
+    )
+    retained_proxy_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, "screen_to_keep_power"
+    )
+    assert removed_proxy_id is not None
+    assert retained_proxy_id is not None
+    assert hass.states.get(removed_proxy_id) is not None
+    assert hass.states.get(retained_proxy_id) is not None
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    flow_id = result["flow_id"]
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_action": "remove"}
+    )
+    assert result["step_id"] == "select_appliance"
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"appliance_id": "screen_to_remove"}
+    )
+    assert result["step_id"] == "confirm_remove"
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"confirm_remove_appliance": True}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+
+    assert registry.async_get(unregistered_power_id) is None
+    assert hass.states.get(unregistered_power_id).state == "42"
+    assert source_registry.async_get(
+        media_players["screen_to_remove"].entity_id
+    ).device_id is None
+    assert registry.async_get(removed_proxy_id) is None
+    assert hass.states.get(removed_proxy_id) is None
+    assert registry.async_get(retained_proxy_id) is not None
+    assert hass.states.get(retained_proxy_id) is not None
+    retained_device = device_module._get_device_by_identifier(
+        dr.async_get(hass), (DOMAIN, "screen_to_keep"), entry.entry_id
+    )
+    assert retained_device is not None
+    assert source_registry.async_get(
+        media_players["screen_to_keep"].entity_id
+    ).device_id == retained_device.id
 
 
 @pytest.mark.asyncio
@@ -1634,12 +1719,20 @@ async def test_removing_last_appliance_requires_confirmation(
         flow_id, {"appliance_id": "only-window"}
     )
 
-    assert result["type"] is FlowResultType.MENU
+    assert result["type"] is FlowResultType.FORM
     assert entry in hass.config_entries.async_entries(DOMAIN)
     assert len(entry.data["appliances"]) == 1
 
     result = await hass.config_entries.options.async_configure(
-        flow_id, {"next_step_id": "confirm_remove_appliance"}
+        flow_id, {"confirm_remove_appliance": False}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "confirm_remove_required"}
+    assert entry in hass.config_entries.async_entries(DOMAIN)
+    assert len(entry.data["appliances"]) == 1
+
+    result = await hass.config_entries.options.async_configure(
+        flow_id, {"confirm_remove_appliance": True}
     )
 
     assert result["type"] is FlowResultType.ABORT

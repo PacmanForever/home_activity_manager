@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## v0.9.71 - 2026-11-23
+
+### Changed
+
+- Require checking a confirmation box before removing an appliance.
+- Always expose selected power readings through a named HAM entity; leave external source associations untouched, release legacy direct HAM associations, and use the `(HAM Proxy)` label only when the source requires a proxy.
+
+### Tests
+
+- Verify unchecked removal confirmation leaves the appliance unchanged and checked confirmation removes it.
+- Verify power naming, source preservation, proxy labeling, and cleanup of legacy direct associations.
+
 ## v0.9.70 - 2026-11-23
 
 ### Changed

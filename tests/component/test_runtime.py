@@ -1384,7 +1384,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     )
     assert result["step_id"] == "confirm_remove"
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"next_step_id": "confirm_remove_appliance"}
+        result["flow_id"], {"confirm_remove_appliance": True}
     )
     assert result["type"] == "create_entry"
     await hass.async_block_till_done()
@@ -1413,7 +1413,7 @@ async def test_category_entry_groups_appliances_without_parent_device(
     )
     assert result["step_id"] == "confirm_remove"
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"next_step_id": "confirm_remove_appliance"}
+        result["flow_id"], {"confirm_remove_appliance": True}
     )
     assert result["type"] == "abort"
     assert result["reason"] == "last_appliance_removed"
@@ -3058,7 +3058,11 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             else f"{entry.entry_id}_{input_config.output_entity}"
         )
         always_wrap = input_config.always_wrap_source
-        if original_device_id is None and not always_wrap:
+        if (
+            original_device_id is None
+            and not always_wrap
+            and input_config.output_entity != "power"
+        ):
             assert source.device_id == device_id
             assert integration_registry.async_get_entity_id(
                 input_config.domain, DOMAIN, unique_id
@@ -3084,7 +3088,10 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
         wrapper_state = hass.states.get(wrapper.entity_id)
         assert wrapper_state is not None
         assert wrapper.original_name is not None
-        if input_config.output_entity == "total_energy":
+        if input_config.output_entity == "total_energy" or (
+            input_config.output_entity == "power"
+            and original_device_id is None
+        ):
             assert not wrapper.entity_id.endswith("_ham_proxy")
             assert "(HAM Proxy)" not in wrapper_state.attributes["friendly_name"]
             assert "(HAM Proxy)" not in wrapper.original_name
@@ -3137,6 +3144,10 @@ async def test_all_profile_inputs_are_represented_without_reassigning_sources(
             assert hass.states.get(wrapper.entity_id).state == expected
 
     assert await hass.config_entries.async_unload(entry.entry_id)
+    for input_config, source_entity_id, original_device_id in input_entities:
+        source = source_registry.async_get(source_entity_id)
+        assert source is not None
+        assert source.device_id == original_device_id
 
 
 @pytest.mark.asyncio
@@ -3524,6 +3535,372 @@ async def test_unassigned_appliance_plug_is_attached_without_duplicate(
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert er.async_get(hass).async_get(source_entity.entity_id).device_id is None
+
+
+@pytest.mark.asyncio
+async def test_unregistered_power_source_uses_proxy_without_modifying_source(
+    hass, enable_custom_integrations
+):
+    source_entry = MockConfigEntry(domain="screen_source")
+    source_entry.add_to_hass(hass)
+    source_registry = er.async_get(hass)
+    media_player = source_registry.async_get_or_create(
+        "media_player",
+        source_entry.domain,
+        "screen",
+        config_entry=source_entry,
+        original_name="Screen",
+    )
+    energy = source_registry.async_get_or_create(
+        "sensor",
+        source_entry.domain,
+        "screen_energy",
+        config_entry=source_entry,
+        original_name="Screen energy",
+    )
+    unregistered_power_id = "sensor.screen_power_without_unique_id"
+    hass.states.async_set(media_player.entity_id, "playing")
+    hass.states.async_set(
+        unregistered_power_id, "42", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+    )
+    hass.states.async_set(
+        energy.entity_id, "12", {ATTR_UNIT_OF_MEASUREMENT: "kWh"}
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_APPLIANCE_TYPE: "screen_media_player",
+            CONF_MEDIA_PLAYER_ENTITY: media_player.entity_id,
+            CONF_POWER_ENTITY: unregistered_power_id,
+            CONF_ENERGY_ENTITY: energy.entity_id,
+            "name": "Screen",
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert er.async_get(hass).async_get(unregistered_power_id) is None
+    assert await hass.config_entries.async_setup(entry.entry_id)
+
+    registry = er.async_get(hass)
+    appliance_device_id = _async_appliance_device_id(hass, entry)
+    assert appliance_device_id is not None
+    assert registry.async_get(unregistered_power_id) is None
+    assert hass.states.get(unregistered_power_id).state == "42"
+    power_proxy_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_power"
+    )
+    assert power_proxy_id is not None
+    power_proxy = registry.async_get(power_proxy_id)
+    assert power_proxy is not None
+    assert power_proxy.device_id == appliance_device_id
+    assert power_proxy.original_name is not None
+    assert power_proxy.original_name.endswith("(HAM Proxy)")
+    assert hass.states.get(power_proxy_id).attributes["source_entity"] == (
+        unregistered_power_id
+    )
+
+    energy_entity_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_total_energy"
+    )
+    assert energy_entity_id is not None
+    energy_wrapper = registry.async_get(energy_entity_id)
+    assert energy_wrapper is not None
+    assert energy_wrapper.original_name is not None
+    assert "(HAM Proxy)" not in energy_wrapper.original_name
+    assert registry.async_get(energy.entity_id).device_id is None
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert registry.async_get(unregistered_power_id) is None
+    assert hass.states.get(unregistered_power_id).state == "42"
+
+
+@pytest.mark.asyncio
+async def test_power_and_energy_sources_follow_association_state_on_setup_and_reload(
+    hass, enable_custom_integrations
+):
+    source_entry = MockConfigEntry(domain="screen_source")
+    source_entry.add_to_hass(hass)
+    source_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=source_entry.entry_id,
+        identifiers={(source_entry.domain, "screen")},
+        name="Source screen",
+    )
+    source_registry = er.async_get(hass)
+    media_player = source_registry.async_get_or_create(
+        "media_player",
+        source_entry.domain,
+        "screen",
+        config_entry=source_entry,
+        original_name="Screen",
+    )
+    power = source_registry.async_get_or_create(
+        "sensor",
+        source_entry.domain,
+        "screen_power",
+        config_entry=source_entry,
+        original_name="Screen power",
+    )
+    energy = source_registry.async_get_or_create(
+        "sensor",
+        source_entry.domain,
+        "screen_energy",
+        config_entry=source_entry,
+        original_name="Screen energy",
+    )
+    hass.states.async_set(media_player.entity_id, "playing")
+    hass.states.async_set(
+        power.entity_id, "42", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+    )
+    hass.states.async_set(
+        energy.entity_id, "12", {ATTR_UNIT_OF_MEASUREMENT: "kWh"}
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_APPLIANCE_TYPE: "screen_media_player",
+            CONF_MEDIA_PLAYER_ENTITY: media_player.entity_id,
+            CONF_POWER_ENTITY: power.entity_id,
+            CONF_ENERGY_ENTITY: energy.entity_id,
+            "name": "Screen",
+        },
+    )
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    appliance_device_id = _async_appliance_device_id(hass, entry)
+    assert appliance_device_id is not None
+    assert registry.async_get(power.entity_id).device_id is None
+    assert registry.async_get(media_player.entity_id).device_id == appliance_device_id
+    assert registry.async_get(energy.entity_id).device_id is None
+    power_entity_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_power"
+    )
+    assert power_entity_id is not None
+    power_output = registry.async_get(power_entity_id)
+    assert power_output is not None
+    assert power_output.device_id == appliance_device_id
+    assert power_output.original_name == "Current Power"
+
+    energy_entity_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_total_energy"
+    )
+    assert energy_entity_id is not None
+    energy_wrapper = registry.async_get(energy_entity_id)
+    assert energy_wrapper is not None
+    assert energy_wrapper.device_id == appliance_device_id
+    assert energy_wrapper.original_name is not None
+    assert "(HAM Proxy)" not in energy_wrapper.original_name
+    assert "(HAM Proxy)" not in hass.states.get(
+        energy_entity_id
+    ).attributes["friendly_name"]
+
+    registry.async_update_entity(power.entity_id, device_id=appliance_device_id)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    assert registry.async_get(power.entity_id).device_id is None
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_power"
+    ) == power_entity_id
+    power_output = registry.async_get(power_entity_id)
+    assert power_output is not None
+    assert power_output.original_name == "Current Power"
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert registry.async_get(power.entity_id).device_id is None
+    registry.async_update_entity(power.entity_id, device_id=source_device.id)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    assert registry.async_get(power.entity_id).device_id == source_device.id
+    power_entity_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_power"
+    )
+    assert power_entity_id is not None
+    power_output = registry.async_get(power_entity_id)
+    assert power_output is not None
+    assert power_output.device_id == _async_appliance_device_id(hass, entry)
+    assert power_output.original_name is not None
+    assert power_output.original_name.endswith("(HAM Proxy)")
+    assert hass.states.get(power_entity_id).attributes["source_entity"] == power.entity_id
+    energy_wrapper = registry.async_get(energy_entity_id)
+    assert energy_wrapper is not None
+    assert energy_wrapper.original_name is not None
+    assert "(HAM Proxy)" not in energy_wrapper.original_name
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    assert registry.async_get(power.entity_id).device_id == source_device.id
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_power"
+    ) == power_entity_id
+    energy_wrapper = registry.async_get(energy_entity_id)
+    assert energy_wrapper is not None
+    assert energy_wrapper.original_name is not None
+    assert "(HAM Proxy)" not in energy_wrapper.original_name
+
+    registry.async_update_entity(power.entity_id, device_id=None)
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_power"
+    ) == power_entity_id
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    appliance_device_id = _async_appliance_device_id(hass, entry)
+    assert appliance_device_id is not None
+    assert registry.async_get(power.entity_id).device_id is None
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_power"
+    ) == power_entity_id
+    power_output = registry.async_get(power_entity_id)
+    assert power_output is not None
+    assert power_output.device_id == appliance_device_id
+    assert power_output.original_name == "Current Power"
+    assert registry.async_get(energy.entity_id).device_id is None
+    assert registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_total_energy"
+    ) == energy_entity_id
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert registry.async_get(power.entity_id).device_id is None
+
+
+@pytest.mark.asyncio
+async def test_repeated_grouped_tvs_share_unassigned_power_without_losing_ownership(
+    hass, enable_custom_integrations
+):
+    source_entry = MockConfigEntry(domain="shared_screen_source")
+    source_entry.add_to_hass(hass)
+    source_registry = er.async_get(hass)
+    media_players = [
+        source_registry.async_get_or_create(
+            "media_player",
+            source_entry.domain,
+            f"screen_{index}",
+            config_entry=source_entry,
+            original_name=f"Screen {index}",
+        )
+        for index in range(1, 4)
+    ]
+    power = source_registry.async_get_or_create(
+        "sensor",
+        source_entry.domain,
+        "shared_screen_power",
+        config_entry=source_entry,
+        original_name="Shared screen power",
+    )
+    energy = source_registry.async_get_or_create(
+        "sensor",
+        source_entry.domain,
+        "shared_screen_energy",
+        config_entry=source_entry,
+        original_name="Shared screen energy",
+    )
+    for media_player in media_players:
+        hass.states.async_set(media_player.entity_id, "playing")
+    hass.states.async_set(
+        power.entity_id, "42", {ATTR_UNIT_OF_MEASUREMENT: "W"}
+    )
+    hass.states.async_set(
+        energy.entity_id, "12", {ATTR_UNIT_OF_MEASUREMENT: "kWh"}
+    )
+
+    def appliance_record(index: int) -> dict[str, object]:
+        return {
+            "id": f"screen_{index}",
+            "data": {
+                CONF_APPLIANCE_TYPE: "screen_media_player",
+                CONF_APPLIANCE_CLASS: "screen",
+                CONF_MEDIA_PLAYER_ENTITY: media_players[index - 1].entity_id,
+                CONF_POWER_ENTITY: power.entity_id,
+                CONF_ENERGY_ENTITY: energy.entity_id,
+                "name": f"Screen {index}",
+            },
+            "options": {},
+        }
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Electronics",
+        data={
+            "category": "electronics",
+            "appliances": [appliance_record(1)],
+        },
+    )
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    first_device = _find_device(
+        dr.async_get(hass), identifiers={(DOMAIN, "screen_1")}
+    )
+    assert first_device is not None
+    assert registry.async_get(power.entity_id).device_id is None
+    first_power_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, "screen_1_power"
+    )
+    assert first_power_id is not None
+    first_power = registry.async_get(first_power_id)
+    assert first_power is not None
+    assert first_power.device_id == first_device.id
+    assert first_power.original_name is not None
+    assert "(HAM Proxy)" not in first_power.original_name
+
+    for appliance_count in (2, 3):
+        hass.config_entries.async_update_entry(
+            entry,
+            data={
+                **entry.data,
+                "appliances": [
+                    *(appliance_record(index) for index in range(1, appliance_count)),
+                    appliance_record(appliance_count),
+                ],
+            },
+        )
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        assert registry.async_get(power.entity_id).device_id is None
+        for index in range(1, appliance_count + 1):
+            power_proxy_id = registry.async_get_entity_id(
+                "sensor", DOMAIN, f"screen_{index}_power"
+            )
+            assert power_proxy_id is not None
+            power_proxy = registry.async_get(power_proxy_id)
+            assert power_proxy is not None
+            assert power_proxy.original_name == "Current Power"
+
+    device_registry = dr.async_get(hass)
+    assert registry.async_get(power.entity_id).device_id is None
+    assert registry.async_get(energy.entity_id).device_id is None
+
+    for index in range(1, 4):
+        power_entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"screen_{index}_power"
+        )
+        assert power_entity_id is not None
+        power_output = registry.async_get(power_entity_id)
+        assert power_output is not None
+        assert power_output.original_name == "Current Power"
+        device = _find_device(
+            device_registry, identifiers={(DOMAIN, f"screen_{index}")}
+        )
+        assert device is not None
+        assert power_output.device_id == device.id
+        assert hass.states.get(power_entity_id).attributes["source_entity"] == (
+            power.entity_id
+        )
+
+        energy_entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"screen_{index}_total_energy"
+        )
+        assert energy_entity_id is not None
+        energy_wrapper = registry.async_get(energy_entity_id)
+        assert energy_wrapper is not None
+        assert energy_wrapper.original_name is not None
+        assert "(HAM Proxy)" not in energy_wrapper.original_name
+        device = _find_device(
+            device_registry, identifiers={(DOMAIN, f"screen_{index}")}
+        )
+        assert device is not None
+        assert energy_wrapper.device_id == device.id
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert registry.async_get(power.entity_id).device_id is None
+    assert registry.async_get(energy.entity_id).device_id is None
 
 
 @pytest.mark.asyncio

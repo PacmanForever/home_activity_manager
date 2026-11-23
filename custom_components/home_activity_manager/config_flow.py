@@ -1575,17 +1575,26 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             if record.get("id") == self._appliance_id
         )
         language = self.hass.config.language if self.hass is not None else "en"
-        return self.async_show_menu(
+        if user_input is not None and user_input.get("confirm_remove_appliance"):
+            return await self._async_remove_appliance()
+        return self.async_show_form(
             step_id="confirm_remove",
-            menu_options=("confirm_remove_appliance", "cancel_remove_appliance"),
+            data_schema=vol.Schema(
+                {
+                    vol.Required("confirm_remove_appliance", default=False): bool,
+                }
+            ),
+            errors=(
+                {"base": "confirm_remove_required"}
+                if user_input is not None
+                else None
+            ),
             description_placeholders={
                 "name": self._category_appliance_name(record, language)
             },
         )
 
-    async def async_step_confirm_remove_appliance(
-        self, user_input: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    async def _async_remove_appliance(self) -> dict[str, Any]:
         records = self.config_entry.data["appliances"]
         appliance_id = self._appliance_id
         if appliance_id is None or not any(
@@ -1624,13 +1633,6 @@ class ApplianceCycleMonitorOptionsFlow(OptionsFlow):
             },
         )
         return self.async_create_entry(title="", data=self.config_entry.options)
-
-    async def async_step_cancel_remove_appliance(
-        self, user_input: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
-        self._appliance_id = None
-        self._appliance_action = None
-        return await self.async_step_init()
 
     async def async_step_activity_mode(
         self, user_input: dict[str, Any] | None = None

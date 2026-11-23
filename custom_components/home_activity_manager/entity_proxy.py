@@ -39,6 +39,28 @@ def use_source_entity_on_appliance(
     return True
 
 
+def power_source_requires_proxy(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    runtime: ApplianceRuntime,
+    source_entity_id: str,
+) -> bool:
+    """Return whether the named HAM power output must be marked as a proxy."""
+    entity_registry = er.async_get(hass)
+    source_entry = entity_registry.async_get(source_entity_id)
+    if source_entry is None:
+        return True
+
+    appliance_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        **appliance_device_info(entry, runtime.config, hass),
+    )
+    if source_entry.device_id == appliance_device.id:
+        entity_registry.async_update_entity(source_entity_id, device_id=None)
+        return False
+    return source_entry.device_id is not None
+
+
 def release_directly_attached_entities(
     hass: HomeAssistant, runtime: ApplianceRuntime
 ) -> None:

@@ -1733,22 +1733,32 @@ class ConfigFlowSchemaTests(unittest.TestCase):
             )
             self.assertNotIn("last_appliance_removed", translation["config"]["abort"])
 
-    def test_remove_confirmation_uses_action_label(self) -> None:
+    def test_remove_confirmation_checkbox_is_translated(self) -> None:
         root = Path(__file__).parents[2] / "custom_components" / "home_activity_manager"
-        expected_labels = ("Remove", "Remove", "Eliminar", "Elimina")
+        expected = (
+            ("I confirm that I want to remove this device", "Check the box to confirm device removal."),
+            ("I confirm that I want to remove this device", "Check the box to confirm device removal."),
+            ("Confirmo que quiero eliminar este dispositivo", "Marca la casilla para confirmar la eliminación del dispositivo."),
+            ("Confirmo que vull eliminar aquest aparell", "Marca la casella per confirmar l’eliminació del dispositiu."),
+        )
         paths = (
             root / "strings.json",
             root / "translations" / "en.json",
             root / "translations" / "es.json",
             root / "translations" / "ca.json",
         )
-        for path, expected_label in zip(paths, expected_labels):
+        for path, (expected_label, expected_error) in zip(paths, expected):
             translation = json.loads(path.read_text(encoding="utf-8"))
+            step = translation["options"]["step"]["confirm_remove"]
             self.assertEqual(
-                translation["options"]["step"]["confirm_remove"]["menu_options"][
-                    "confirm_remove_appliance"
-                ],
+                step["data"]["confirm_remove_appliance"],
                 expected_label,
+                path,
+            )
+            self.assertNotIn("menu_options", step)
+            self.assertEqual(
+                translation["options"]["error"]["confirm_remove_required"],
+                expected_error,
                 path,
             )
 

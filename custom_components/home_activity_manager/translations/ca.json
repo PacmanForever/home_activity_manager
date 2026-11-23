@@ -163,7 +163,7 @@
       },
       "add_appliance": {"title": "Afegeix un dispositiu", "data": {"name": "Nom que es mostrarà per a aquest dispositiu", "area_id": "Àrea (opcional)", "appliance_group": "Agrupació de dispositius"}},
       "select_appliance": {"title": "Selecciona el dispositiu", "data": {"appliance_id": "Dispositiu"}},
-      "confirm_remove": {"title": "Confirma l’eliminació", "description": "Vols eliminar {name}?", "menu_options": {"confirm_remove_appliance": "Elimina", "cancel_remove_appliance": "Cancel·la"}},
+      "confirm_remove": {"title": "Confirma l’eliminació", "description": "Vols eliminar {name}?", "data": {"confirm_remove_appliance": "Confirmo que vull eliminar aquest aparell"}},
       "group_actions": {
         "title": "Accions de l’agrupació",
         "description": "Les accions compartides s’executen per separat per a cada dispositiu, abans que les accions locals. Consulta el README per veure com configurar-les i exemples.",
@@ -294,7 +294,8 @@
       "climate_entity_requires_no_device": "Tria una entitat climate existent o la que ja estigui assignada a aquest dispositiu.",
       "media_player_entity_requires_no_device": "Tria una entitat media player existent o la que ja estigui assignada a aquest dispositiu.",
       "fan_entity_requires_fan": "Tria una entitat fan existent.",
-      "vacuum_entity_requires_vacuum": "Tria una entitat vacuum existent."
+      "vacuum_entity_requires_vacuum": "Tria una entitat vacuum existent.",
+      "confirm_remove_required": "Marca la casella per confirmar l’eliminació del dispositiu."
     }
   },
   "selector": {
